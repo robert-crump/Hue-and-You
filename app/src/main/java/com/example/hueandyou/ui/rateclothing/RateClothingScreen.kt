@@ -1,6 +1,8 @@
 package com.example.hueandyou.ui.rateclothing
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -51,12 +53,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.ExtractedColor
 import com.example.hueandyou.colorspace.WhiteBalanceFailureReason
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.colorspace.formatHexColor
+import java.io.File
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,6 +75,13 @@ fun RateClothingScreen(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) viewModel.onPhotoPicked(context.contentResolver, uri)
+    }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    val takePhotoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uri = pendingCameraUri
+        if (success && uri != null) viewModel.onPhotoPicked(context.contentResolver, uri)
     }
 
     Scaffold(
@@ -95,6 +106,11 @@ fun RateClothingScreen(
         ) {
             when (val state = uiState) {
                 is RateClothingUiState.PickingPhoto -> PickPhotoStep(
+                    onTakePhoto = {
+                        val uri = createCameraPhotoUri(context)
+                        pendingCameraUri = uri
+                        takePhotoLauncher.launch(uri)
+                    },
                     onPickPhoto = {
                         pickPhotoLauncher.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
@@ -120,7 +136,7 @@ fun RateClothingScreen(
 }
 
 @Composable
-private fun PickPhotoStep(onPickPhoto: () -> Unit) {
+private fun PickPhotoStep(onTakePhoto: () -> Unit, onPickPhoto: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -132,10 +148,19 @@ private fun PickPhotoStep(onPickPhoto: () -> Unit) {
             text = stringResource(R.string.rate_clothing_white_sheet_reminder),
             style = MaterialTheme.typography.bodyLarge
         )
-        Button(onClick = onPickPhoto, modifier = Modifier.padding(top = 24.dp)) {
+        Button(onClick = onTakePhoto, modifier = Modifier.padding(top = 24.dp)) {
+            Text(stringResource(R.string.rate_clothing_take_photo))
+        }
+        Button(onClick = onPickPhoto, modifier = Modifier.padding(top = 8.dp)) {
             Text(stringResource(R.string.rate_clothing_pick_photo))
         }
     }
+}
+
+private fun createCameraPhotoUri(context: Context): Uri {
+    val capturesDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
+    val photoFile = File.createTempFile("capture_", ".jpg", capturesDir)
+    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
 }
 
 @Composable

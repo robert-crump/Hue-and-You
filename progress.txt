@@ -1,5 +1,48 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #7: Camera capture as photo source
+
+Added "Take photo" alongside the existing gallery picker on `PickPhotoStep` (`:app`,
+`ui/rateclothing/RateClothingScreen.kt`) - no custom in-app camera, per the issue, just the
+system camera app via the standard `ActivityResultContracts.TakePicture()` contract, which
+(unlike `TakePicturePreview()`) writes the full-resolution photo to a URI instead of handing
+back a small thumbnail `Bitmap` - full resolution matters here since the same photo is later
+sampled pixel-by-pixel for white-balance calibration and dominant-color extraction.
+
+`TakePicture()` needs a destination `content://` URI up front, which needs a `FileProvider`:
+added `androidx.core.content.FileProvider` to `AndroidManifest.xml` (authority
+`${applicationId}.fileprovider`, `exported="false"`, `grantUriPermissions="true"`) plus
+`res/xml/file_paths.xml` declaring one `cache-path` (`camera_captures/`). No new runtime
+permission needed - launching the system camera via an implicit `TakePicture` intent doesn't
+require `android.permission.CAMERA` (that's only for apps driving the camera hardware
+directly via camera2/CameraX), confirmed by diffing the merged manifest before/after: the
+only addition is the `<provider>` entry itself.
+
+`createCameraPhotoUri()` (in `RateClothingScreen.kt`, next to `PickPhotoStep` since it needs
+a live `Context`) creates a fresh temp file under `cacheDir/camera_captures/` per capture
+attempt and wraps it via `FileProvider.getUriForFile`. The screen holds the pending URI in
+`remember { mutableStateOf<Uri?>(null) }` since the `TakePicture()` callback only receives a
+`Boolean` success flag, not the URI itself - on `success == true` it's handed to the existing
+`viewModel.onPhotoPicked(contentResolver, uri)`, the same entry point the gallery picker
+already uses, so the ViewModel needed zero changes (it already treats "photo" as "some URI I
+can open via `ContentResolver`", regardless of source). On cancel (`success == false`) the
+pending URI is just dropped and the screen stays on `PickingPhoto` - satisfies "cancelling
+the camera returns to the photo step without error" for free, no new state needed.
+
+`PickPhotoStep` now takes both `onTakePhoto` and `onPickPhoto` and shows both buttons
+unconditionally, so `RateClothingViewModel.chooseNewPhoto()` (the "choose a different photo"
+recovery path added in issue #6) automatically offers the camera too, since it just resets
+back to the same `PickingPhoto` state - no separate wiring needed for that acceptance
+criterion either. Renamed the existing gallery-pick string (`rate_clothing_pick_photo`,
+"Choose photo" -> "Pick from gallery") and added `rate_clothing_take_photo` ("Take photo") to
+match the issue's own button wording.
+
+`./gradlew assembleDebug test` passes (no new unit tests - this is compose UI wiring over
+Android framework classes, `ContentResolver`/camera intents/`FileProvider`, same
+Robolectric/JDK-26 limitation noted in the #3 entry, and still no emulator/device available
+in this environment to exercise it end to end). Verified via merged-manifest diff that the
+only new manifest content is the `FileProvider` `<provider>` entry - no new permissions.
+
 ## 2026-09-23 - Issue #6: Calibration failures - clipped, too dark, not white
 
 Added real failure *detection* to `WhiteBalanceCalibrator.calibrate` in `:colorspace` (issue #5
@@ -205,35 +248,3 @@ retry of Robolectric once it/the JDK situation here changes.
 
 `./gradlew assembleDebug test` passes (7 new tests: 5 repository, 2 ViewModel hex/delete
 logic). Verified no new permissions in the merged manifest.
-
-## 2026-09-23 - Issue #2: ColorSpace module (conversions, CIEDE2000, hex parsing)
-
-Added a new `:colorspace` Gradle module: pure-Kotlin JVM (org.jetbrains.kotlin.jvm plugin,
-no AGP, no Android dependency), so this module is a plain JAR consumable outside the app
-too. Public API lives in package com.example.hueandyou.colorspace:
-- LinearRgb / Lab / Hct: immutable data classes (Lab and linear RGB on the CIE 0-100 scale,
-  not 0-1, so they line up with Y = relative luminance and with the white point).
-- argbToLinearRgb/linearRgbToArgb, linearRgbToLab/labToLinearRgb, argbToLab/labToArgb,
-  argbToHct/hctToArgb: sRGB math (companding, D65 sRGB<->XYZ matrices, CIE 1976 Lab
-  piecewise f/f-inverse) is implemented directly in this module; HCT is NOT reimplemented -
-  it delegates to Material Color Utilities' Hct.fromInt/Hct.from/toInt (moved the
-  `material-color-utilities` dependency from :app to :colorspace, :app now depends on
-  :colorspace via `implementation(project(":colorspace"))` and no longer touches MCU
-  directly).
-- ciede2000(Lab, Lab): Double - full Sharma/Wu/Dalal (2005) ΔE00 formula.
-- parseHexColor(String): Int? / formatHexColor(Int): String - `#RRGGBB`/`RRGGBB`,
-  case-insensitive in, `#RRGGBB` uppercase out; alpha is ignored on format and forced to
-  0xFF on parse.
-
-Verified CIEDE2000 against the actual published 34-pair Sharma/Wu/Dalal reference table
-(fetched from the paper author's site, not reconstructed from memory) - all 34 pairs match
-to the table's own 4-decimal precision. Round-trip tests (srgb->linear->srgb,
-srgb->lab->srgb, srgb->hct->srgb) run over a fixed set of primaries/secondaries/grays/
-arbitrary colors rather than randomized input, to keep the suite deterministic.
-
-Added the `kotlin-jvm` plugin alias to libs.versions.toml/root build.gradle.kts (`apply
-false` at root, applied for real in colorspace/build.gradle.kts) - this is unrelated to
-and not blocked by the AGP-built-in-Kotlin gotcha below, since that gotcha only affects
-Android (AGP) modules; a non-Android module still needs the ordinary Kotlin JVM plugin.
-
-`./gradlew assembleDebug test` (root) and `./gradlew :colorspace:test` both pass.

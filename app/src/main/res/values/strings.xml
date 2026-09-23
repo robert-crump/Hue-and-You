@@ -46,7 +46,8 @@
 
     <string name="rate_clothing_title">Rate clothing</string>
     <string name="rate_clothing_white_sheet_reminder">Choose a photo that includes a plain white sheet of paper — it\'s used to calibrate colors.</string>
-    <string name="rate_clothing_pick_photo">Choose photo</string>
+    <string name="rate_clothing_take_photo">Take photo</string>
+    <string name="rate_clothing_pick_photo">Pick from gallery</string>
     <string name="rate_clothing_tap_white_sheet">Tap the white sheet of paper in the photo</string>
     <string name="rate_clothing_photo_content_description">Selected photo</string>
     <string name="rate_clothing_calibration_failed">Couldn\'t sample that spot — try tapping again</string>
