@@ -48,8 +48,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
+import com.example.hueandyou.colorspace.ColorMatchBand
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.ui.common.HarmonyOptionsControls
+import com.example.hueandyou.ui.common.colorMatchBandLabel
 import com.example.hueandyou.ui.profiles.ProfilesViewModel
 import kotlinx.coroutines.launch
 
@@ -194,6 +196,16 @@ fun SettingsScreen(
                     }
                 }
             }
+            item(key = "about_header") {
+                Text(
+                    text = stringResource(R.string.settings_about_section_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            item(key = "about_body") {
+                AboutSection()
+            }
         }
     }
 
@@ -291,6 +303,47 @@ private fun ProfileCard(profile: Profile, onClick: () -> Unit, onShare: () -> Un
         }
     }
 }
+
+@Composable
+private fun AboutSection() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(stringResource(R.string.settings_about_how_it_works), style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.settings_about_best_guess), style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.settings_about_calibration), style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.settings_about_delta_e), style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.settings_about_bands_intro), style = MaterialTheme.typography.bodyMedium)
+        listOf(
+            ColorMatchBand.MATCH to ColorMatchBand.MATCH_MAX_DELTA_E,
+            ColorMatchBand.CLOSE to ColorMatchBand.CLOSE_MAX_DELTA_E,
+            ColorMatchBand.RELATED to ColorMatchBand.RELATED_MAX_DELTA_E,
+        ).forEach { (band, maxDeltaE) ->
+            Text(
+                text = stringResource(
+                    R.string.settings_about_band_row_upper,
+                    stringResource(colorMatchBandLabel(band)),
+                    formatDeltaE(maxDeltaE)
+                ),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+        Text(
+            text = stringResource(
+                R.string.settings_about_band_row_over,
+                stringResource(colorMatchBandLabel(ColorMatchBand.FAR)),
+                formatDeltaE(ColorMatchBand.RELATED_MAX_DELTA_E)
+            ),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+private fun formatDeltaE(value: Double): String =
+    if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
 
 @Composable
 private fun SharePreviewDialog(uri: Uri, onDismiss: () -> Unit, onShare: () -> Unit) {

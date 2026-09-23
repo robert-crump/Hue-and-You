@@ -1,5 +1,29 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #17: Settings - About section with disclaimers and closeness bands
+
+Added an "About these results" section to the bottom of `SettingsScreen` (`AboutSection`
+composable, after the Backup section) - static explanatory text plus a dynamically-built list of
+the four closeness bands. All disclaimer/explanation copy (how measurement works, the "best guess"
+caveat, seasonal color analysis having little scientific backing, and the white-sheet calibration's
+optical-brightener/lighting limits) lives in `strings.xml` as plain `settings_about_*` strings -
+nothing there needed to be dynamic.
+
+The band list is the one part the issue required to "never drift": each row is built from
+`ColorMatchBand.MATCH_MAX_DELTA_E`/`CLOSE_MAX_DELTA_E`/`RELATED_MAX_DELTA_E` (the same constants
+`PaletteScorer`/`ColorMatchBand.forDeltaE` already score against) rather than restating 3/8/15 as
+literals in `strings.xml`, so a future change to those thresholds automatically updates this text.
+Band labels reuse the existing `colorMatchBandLabel()` (from `PaletteResultView.kt`, already
+`internal` and thus visible across `ui.*` packages in the app module) instead of adding parallel
+`settings_about_band_*_label` strings - same label the Rate Clothing result screen already shows
+for Match/Close/Related/Far. A small `formatDeltaE` helper trims the trailing `.0` off these
+currently-whole-number `Double` constants (`3.0` -> "3") without hardcoding the assumption that
+they'll always be whole numbers into the string resources themselves.
+
+No new tests: this is static UI copy plus a read of existing, already-tested constants - no new
+logic to unit-test, and this app has no Compose UI test harness (same Robolectric/JDK-26 gap noted
+since #3). `./gradlew assembleDebug test` passes with no new failures.
+
 ## 2026-09-23 - Issue #16: JSON backup - export and import all data
 
 New `data/backup/` package. `BackupSerializer` (`JsonBackupSerializer`) is a pure function
