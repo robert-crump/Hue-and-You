@@ -14,6 +14,8 @@ import com.example.hueandyou.data.profile.ProfileRepository
 import com.example.hueandyou.data.profile.RoomProfileRepository
 import com.example.hueandyou.data.settings.DataStoreSettingsRepository
 import com.example.hueandyou.data.settings.SettingsRepository
+import com.example.hueandyou.data.share.FileShareCardRenderer
+import com.example.hueandyou.data.share.ShareCardRenderer
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "hue_and_you_settings"
@@ -29,6 +31,7 @@ interface AppContainer {
     val historyRepository: HistoryRepository
     val thumbnailStore: ThumbnailStore
     val settingsRepository: SettingsRepository
+    val shareCardRenderer: ShareCardRenderer
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -54,5 +57,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val settingsRepository: SettingsRepository by lazy {
         DataStoreSettingsRepository(settingsDataStore)
+    }
+
+    override val shareCardRenderer: ShareCardRenderer by lazy {
+        FileShareCardRenderer(context)
     }
 }

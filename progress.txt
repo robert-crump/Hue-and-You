@@ -1,5 +1,51 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #15: Share card - PNG palette card via share sheet
+
+New `data/share/ShareCardRenderer.kt`: `ShareCardRenderer` interface plus `FileShareCardRenderer`,
+following the same shape as `ThumbnailStore`/`FileThumbnailStore` - a `Context`-holding class with
+one suspend entry point (`render(profile): Uri`) that does its work on `Dispatchers.IO`. Drawing is
+plain `android.graphics.Canvas`/`Paint` (not Compose - there's no Compose-to-Bitmap rasterizer in
+this codebase, and the issue's output is a raster PNG anyway), sized in two passes: paints are built
+first (title/section/hex/empty, all independent of any `Canvas`), their `fontMetrics` measure the
+exact height each block needs, *then* the bitmap is allocated at that computed height - so
+`drawSection`'s own layout math (`sectionContentHeight`, shared between the pre-measure sum and the
+actual per-swatch draw loop) is the single source of truth for vertical space, rather than two
+formulas that could drift apart. Empty Best/Avoid lists (the "any profile" AC) render the section
+header plus the existing `profile_editor_no_colors` string instead of a swatch grid - reusing that
+string (and `profile_editor_best_colors_title`/`_avoid_colors_title`) rather than adding parallel
+`share_card_*` copies, since the card's sections are meant to read identically to the editor's.
+Hex labels under each swatch reuse `colorspace`'s `formatHexColor` (already used by
+`ProfileEditorScreen`), not a new formatter. The PNG goes to a new `cache/share_cards/` dir (new
+`file_paths.xml` `cache-path` entry alongside the existing `camera_captures` one) and out through the
+same `androidx.core.content.FileProvider` authority `RateClothingScreen`'s camera-capture flow
+already registers in the manifest - no new provider needed, since a `FileProvider` authority isn't
+tied to one specific source directory.
+
+`AppContainer` gained `shareCardRenderer: ShareCardRenderer` (same `by lazy { ... }` pattern as
+`thumbnailStore`). `ProfilesViewModel` gained the `ShareCardRenderer` dependency and a
+`shareCard(profile, onRendered)` that launches the render in `viewModelScope` and hands the
+resulting `Uri` back via callback - `SettingsScreen` already held the only `ProfilesViewModel`
+instance backing the profile cards, so this was the natural place rather than a new ViewModel just
+for sharing.
+
+UI: `SettingsScreen`'s `ProfileCard` gained a `Share` `IconButton` next to the profile name (title
+`Row` now `weight(1f)` + icon, matching `ColorSection`'s title-row-with-trailing-action shape from
+`ProfileEditorScreen`). Tapping it calls `shareCard`, storing the returned `Uri` in screen-level
+state; a non-null `Uri` shows a new `SharePreviewDialog` (plain `AlertDialog`, decoding the PNG via
+`BitmapFactory.decodeStream` off the content `Uri` + `asImageBitmap()`, same decode-and-display shape
+`HistoryScreen` already uses for thumbnails) with a Share button that fires
+`Intent.createChooser(ACTION_SEND, "image/png")` carrying the same `Uri` with
+`FLAG_GRANT_READ_URI_PERMISSION` - no separate "confirm" step beyond the preview itself, since the
+preview *is* what the issue calls the required preview step.
+
+No unit test for the renderer per the issue's own spec ("Checked manually on device (no unit tests
+for the renderer in v1)") - `./gradlew assembleDebug test` passes with no new failures. Verified by
+reading through the two-pass measure/draw logic for both a populated and an empty-list profile
+shape, and by the fact `SharePreviewDialog`'s decode path mirrors `HistoryScreen`'s already-working
+`BitmapFactory.decodeFile`/`asImageBitmap` pattern (same Robolectric/JDK-26 gap noted since #3 for
+anything requiring an actual Compose render pass).
+
 ## 2026-09-23 - Issue #14: Palette import from an image (screenshot)
 
 New `ui/paletteimport/` flow, started from a "Import palette from photo" `TextButton` added to
@@ -184,50 +230,3 @@ to a valid in-gamut ARGB int. `DefaultHistoryRepositoryTest` gained two `saveObj
 multi-select checkboxes (same Robolectric/JDK-26 limitation noted since the #3 entry, still no
 emulator/device in this environment) - verified by reading through the state machine and Compose
 tree instead, mirroring Rate Clothing's own photo-flow screens which have the same gap.
-
-## 2026-09-23 - Issue #10: History - rename and delete with undo
-
-Rename (AC "user can rename an entry from the History list") was already fully implemented as
-part of #9 - `HistoryDetailScreen` (reached by tapping a row in the list) has a name text field
-wired to `HistoryRepository.renameEntry`, and it persists. This issue's real remaining scope was
-delete-with-undo, so that's all that's new here.
-
-Delete uses the "hide immediately, delete for real once the undo window elapses" pattern rather
-than an `AlertDialog` confirmation (unlike `ProfileEditorScreen`'s profile delete) - the issue's
-ACs ask for confirmation *or* undo, and a Snackbar-with-Undo covers "guarded against accidents"
-without an extra modal tap, while giving a real, literal undo (as opposed to a dialog, which can
-only prevent the delete, not reverse one already committed). `HistoryViewModel` gained a
-`pendingDeletions: MutableStateFlow<Map<Long, HistoryEntry>>` (id -> the full entry, so the
-Snackbar can show its name) plus a `pendingDeletionJobs` map of the scheduled finalization
-coroutines. `uiState` is now `combine(repository.observeEntries(), pendingDeletions)`, filtering
-pending ids out of the visible list - so the entry disappears from the list the instant delete is
-tapped, before any real deletion happens. `deleteEntry(entry)` marks it pending and schedules a
-`viewModelScope.launch { delay(UNDO_WINDOW_MILLIS); repository.deleteEntry(...) }`; `undoDelete(id)`
-just cancels that job and unmarks the id - since nothing was actually touched in the repository
-yet, undo is trivially "full" restoration (thumbnail included) with no snapshot/restore logic
-needed. The known tradeoff (noted rather than solved, since nothing else in this app persists
-transient ViewModel state across process death either - see the #7 entry's `currentBitmap`): if
-the process dies during the ~4s undo window, the pending delete is silently abandoned and the
-entry survives - never silently lost data, just a surprising "it came back" if it happens.
-
-`HistoryRepository` gained `deleteEntry(entryId)`, implemented in `DefaultHistoryRepository` by
-reading the entity first (for its `thumbnailPath`), deleting the Room row, then deleting the
-thumbnail file via a new `ThumbnailStore.delete(path)` - satisfies "thumbnail file is removed once
-deletion is final" by construction, since this function *is* what "final" means (nothing else
-calls it during the undo window). `HistoryDao` gained a one-shot `getEntry` (suspend, not `Flow`)
-alongside the existing `observeEntry`, plus a plain `DELETE ... WHERE id = :entryId` query.
-
-UI: `HistoryScreen`'s row gained a trailing delete `IconButton`; the screen now wraps its content
-in a local `Scaffold` (nested under the nav host's own bottom-bar `Scaffold`, same as any
-per-screen `Scaffold` needing its own `SnackbarHost` in a bottom-nav app) with a `SnackbarHost`,
-and a `LaunchedEffect` keyed on the pending entry's id shows the "Deleted "<name>"" / Undo
-snackbar and calls `viewModel.undoDelete` on `SnackbarResult.ActionPerformed`.
-
-`./gradlew assembleDebug test` passes, including a new `HistoryViewModelTest` (`StandardTestDispatcher`
-+ manual `advanceUntilIdle`/`runCurrent`, since the delete/undo logic is defined by *when* things
-happen relative to the undo window, which `UnconfinedTestDispatcher`'s eager execution would paper
-over) covering: hide-on-delete without touching the repository, undo before the window elapses
-never calls the repository, and after the window elapses the repository's `deleteEntry` fires.
-`DefaultHistoryRepositoryTest` gained a `FakeThumbnailStore` and two tests for the delete path.
-No UI/instrumented test for the Snackbar itself (same Robolectric/JDK-26 limitation noted since the
-#3 entry) - verified by reading through the composable instead.

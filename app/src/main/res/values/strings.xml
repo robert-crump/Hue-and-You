@@ -25,6 +25,10 @@
     <string name="profile_default_name">New profile</string>
     <string name="profiles_empty_state">No profiles yet. Tap + to add one.</string>
     <string name="profile_no_best_colors">No best colors yet</string>
+    <string name="profile_share_content_description">Share profile</string>
+    <string name="share_preview_title">Share card</string>
+    <string name="share_preview_image_content_description">Palette card preview</string>
+    <string name="share_preview_action">Share</string>
 
     <string name="profile_editor_title">Edit profile</string>
     <string name="profile_editor_name_label">Name</string>
