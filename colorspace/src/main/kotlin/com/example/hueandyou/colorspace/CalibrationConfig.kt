@@ -34,4 +34,17 @@ object CalibrationConfig {
 
     /** ...and needs to lead the runner-up color by at least this multiple. */
     const val DOMINANT_MIN_RATIO_TO_RUNNER_UP = 3.0
+
+    /**
+     * Number of clusters requested when extracting a palette-import region (a grid of small,
+     * uniformly colored swatches, e.g. a screenshot), high enough that each swatch quantizes to
+     * its own color instead of being merged with its neighbors.
+     */
+    const val PALETTE_IMPORT_QUANTIZER_CLUSTER_COUNT = 24
+
+    /** Candidate swatch colors below this share of the marked region are dropped. */
+    const val PALETTE_IMPORT_MIN_COLOR_SHARE = 0.01
+
+    /** Maximum number of swatch colors returned from a marked region. */
+    const val PALETTE_IMPORT_MAX_COLORS = 24
 }

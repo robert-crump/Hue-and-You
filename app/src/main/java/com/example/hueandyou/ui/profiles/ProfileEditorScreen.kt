@@ -58,6 +58,7 @@ import com.example.hueandyou.data.profile.PaletteColor
 fun ProfileEditorScreen(
     profileId: Long,
     onNavigateBack: () -> Unit,
+    onNavigateToImportPalette: () -> Unit,
     viewModel: ProfileEditorViewModel = viewModel(
         factory = ProfileEditorViewModel.factory(LocalContext.current, profileId)
     )
@@ -122,6 +123,13 @@ fun ProfileEditorScreen(
                 onRemoveColor = { viewModel.removeColor(it) },
                 onMoveColor = { colorId, direction -> viewModel.moveColor(colorId, direction) }
             )
+
+            TextButton(
+                onClick = onNavigateToImportPalette,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            ) {
+                Text(stringResource(R.string.profile_editor_import_palette))
+            }
         }
     }
 

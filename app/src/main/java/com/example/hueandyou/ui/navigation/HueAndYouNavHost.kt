@@ -31,6 +31,7 @@ import com.example.hueandyou.R
 import com.example.hueandyou.ui.history.HistoryDetailScreen
 import com.example.hueandyou.ui.history.HistoryScreen
 import com.example.hueandyou.ui.matchcolors.MatchObjectScreen
+import com.example.hueandyou.ui.paletteimport.PaletteImportScreen
 import com.example.hueandyou.ui.profiles.ProfileEditorScreen
 import com.example.hueandyou.ui.rateclothing.RateClothingScreen
 import com.example.hueandyou.ui.settings.SettingsScreen
@@ -155,6 +156,21 @@ fun HueAndYouNavHost() {
             ) { backStackEntry ->
                 val profileId = backStackEntry.arguments?.getLong(Destination.ProfileEditor.ARG_PROFILE_ID) ?: 0L
                 ProfileEditorScreen(
+                    profileId = profileId,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToImportPalette = {
+                        navController.navigate(Destination.PaletteImport.route(profileId))
+                    }
+                )
+            }
+            composable(
+                Destination.PaletteImport.route,
+                arguments = listOf(
+                    navArgument(Destination.PaletteImport.ARG_PROFILE_ID) { type = NavType.LongType }
+                )
+            ) { backStackEntry ->
+                val profileId = backStackEntry.arguments?.getLong(Destination.PaletteImport.ARG_PROFILE_ID) ?: 0L
+                PaletteImportScreen(
                     profileId = profileId,
                     onNavigateBack = { navController.popBackStack() }
                 )

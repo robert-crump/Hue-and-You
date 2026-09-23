@@ -20,6 +20,10 @@ sealed class Destination(val route: String) {
         const val ARG_PROFILE_ID = "profileId"
         fun route(profileId: Long) = "profile_editor/$profileId"
     }
+    data object PaletteImport : Destination("palette_import/{profileId}") {
+        const val ARG_PROFILE_ID = "profileId"
+        fun route(profileId: Long) = "palette_import/$profileId"
+    }
     data object RateClothing : Destination("rate_clothing")
     data object MatchObject : Destination("match_object")
 }

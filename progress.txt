@@ -1,5 +1,49 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #14: Palette import from an image (screenshot)
+
+New `ui/paletteimport/` flow, started from a "Import palette from photo" `TextButton` added to
+`ProfileEditorScreen` (below the two `ColorSection`s) via a new `Destination.PaletteImport`
+route carrying the `profileId`. Same photo -> region -> extract shape as Rate Clothing/Match
+Object, but region marking is a *drag* (`detectDragGestures`, not `detectTapGestures`) producing a
+`RectRegion` in bitmap-pixel space, run twice in sequence (Best area, then Avoid area, each
+skippable via a dedicated Skip button that just advances with an empty swatch list) rather than the
+single white-sheet tap those flows use. `ColorExtractor.extract()` already took `correction` as
+nullable and `region`/`clusterCount`/`minShare`/`maxColors` as parameters (issue #5's shape), so no
+signature change was needed - `PaletteImportViewModel` just calls it with `correction = null` (no
+white-balance for a screenshot) and three new `CalibrationConfig` constants
+(`PALETTE_IMPORT_QUANTIZER_CLUSTER_COUNT = 24`, `PALETTE_IMPORT_MIN_COLOR_SHARE = 0.01`,
+`PALETTE_IMPORT_MAX_COLORS = 24`) sized for "many small swatches in one region" rather than the
+existing clothing/object constants sized for "one dominant garment color".
+
+Review screen (`PaletteImportUiState.Reviewing`) holds two independent `List<ImportSwatch>` (Best/
+Avoid), each item carrying a locally-unique `id` (a ViewModel-held counter, not a DB id - nothing's
+persisted until Confirm) so extracted swatches, manually hex-added swatches, and removals can all
+be addressed uniformly. Deselecting a swatch (`Checkbox`, same pattern as `MatchObjectScreen`'s
+multi-select) keeps it in the list but excludes it from import, distinct from removing it outright;
+"Add to profile" (`confirmImport`) calls the existing `ProfileRepository.addColor` once per
+*selected* swatch in each list - no new repository method needed, since `addColor` already appends
+at the next position, which is exactly "confirmed colors are appended to the profile's existing
+lists" by construction, including across multiple import runs.
+
+`ColorExtractorTest` gained `syntheticSwatchGridReturnsOneColorPerSwatch`, the issue's required
+unit test - but getting a *reliable* synthetic grid took a few tries: the underlying Celebi
+quantizer (Wu boxes + k-means refinement) doesn't cleanly separate every set of "obviously distinct"
+solid colors regardless of `clusterCount` requested. Six pure RGB-cube-corner colors (adding
+magenta and either black or white to the four already-separable red/green/blue/yellow) reliably
+collapsed two pairs into blended averages, independent of `clusterCount` in {6, 8, 12, 16, 24, 32} -
+looks like an early-termination quirk in `QuantizerWu.createBoxes`'s variance-based cut loop rather
+than anything share/threshold related. Swapping the sixth swatch from magenta to white produces six
+boxes that all separate cleanly at every tested `clusterCount`, so the test's swatch grid is red/
+green/blue/yellow/cyan/white (3x2), matching this codebase's actual `PALETTE_IMPORT_*` constants
+rather than a round `clusterCount`.
+
+`./gradlew assembleDebug test` passes (1 new `ColorExtractorTest` case). No UI test for the new
+drag-to-mark-rectangle interaction or the review screen (same Robolectric/JDK-26 gap noted since
+#3) - verified by reading through the state machine and by `MatchObjectScreen`'s existing
+`Checkbox`-multi-select and `CalibratingStep`'s tap-to-region conversion math already having passing
+render paths to model this screen's `ReviewingStep`/`MarkingAreaStep` on.
+
 ## 2026-09-23 - Issue #13: Settings - default color wheel and balance mode
 
 New `data/settings/SettingsRepository` (`DataStoreSettingsRepository`), a thin wrapper over the
@@ -187,75 +231,3 @@ never calls the repository, and after the window elapses the repository's `delet
 `DefaultHistoryRepositoryTest` gained a `FakeThumbnailStore` and two tests for the delete path.
 No UI/instrumented test for the Snackbar itself (same Robolectric/JDK-26 limitation noted since the
 #3 entry) - verified by reading through the composable instead.
-
-## 2026-09-23 - Issue #9: History - auto-save clothing results, list and reopen
-
-New `data/history` package (`:app`): `HistoryEntryEntity` (Room, table `history_entries`, no FK to
-`profiles` - deliberately, since AC requires a profile's History entries to stay readable after
-that profile is deleted) stores the snapshot as plain columns rather than reusing `:colorspace`'s
-`PaletteScore`/`ColorMatch` domain types directly, matching the existing "primitives at the module
-boundary" pattern (`nearestBestArgb`/`nearestBestDeltaE`/etc, nullable in pairs; `ColorMatchBand` is
-recomputed from `deltaE` via `ColorMatchBand.forDeltaE` on read rather than stored, since it's a
-pure function of the ΔE already saved - one less thing to keep in sync). `bestColorsArgb`/
-`avoidColorsArgb` (the profile's Best/Avoid lists *at save time*) round-trip through a new
-`HistoryConverters` as a comma-joined string - plain values, no JSON library needed since these are
-just `List<Int>`. `HistoryEntry` (domain) holds a real `score: PaletteScore`, reconstructed by
-`HistoryEntryEntity.toDomain()`; `:app` can freely reference `:colorspace` types (only the reverse
-direction is restricted), so this doesn't fight the module boundary the way storing them by-value
-does above.
-
-`HistoryRepository.saveClothingResult(thumbnailPath: String, calibratedArgb, profile: Profile?,
-score: PaletteScore)` takes an already-saved thumbnail *path*, not a `Bitmap` - keeps
-`DefaultHistoryRepository` fully unit-testable with `FakeHistoryDao` (same in-memory-map-plus-
-`MutableStateFlow` shape as `FakeProfileDao`) with zero Android framework dependency, since this
-repo's app-module unit tests can't touch `android.graphics.*` (Robolectric/JDK-26 limitation, noted
-since the #3 entry). The actual Bitmap -> downscaled-JPEG-in-`filesDir` work lives in a separate
-`ThumbnailStore`/`FileThumbnailStore` (512px long edge, `context.filesDir/history_thumbnails/`,
-`Dispatchers.IO`) that `RateClothingViewModel` calls directly before handing the resulting path to
-the repository - not verified by a JVM unit test for the same Bitmap-can't-be-constructed reason as
-`ThumbnailStore`'s Android-framework siblings elsewhere in the app, verified by reading through it
-instead. Default name is "type + date/time" (`defaultHistoryEntryName`, e.g. "Clothing Sep 23, 2026
-3:45 PM") via `java.time` (`minSdk 37`, no desugaring needed).
-
-`HueAndYouDatabase` bumped to version 2 (new `HistoryEntryEntity` + `historyDao()`); `AppContainer`'s
-`Room.databaseBuilder` now calls `.fallbackToDestructiveMigration(dropAllTables = true)` since there's
-no shipped install base yet to write a real migration for.
-
-`:app` wiring: `RateClothingViewModel` gained `historyRepository`/`thumbnailStore` (both from
-`AppContainer`, same factory pattern as `profileRepository`) and a `currentBitmap` field (set in
-`onPhotoPicked`, independent of the UI state machine) since the color-selection step
-(`SelectingColor`) doesn't itself carry the original bitmap. `confirmCalibration()`'s
-clearly-dominant path and `selectColor()` now funnel through `showResult(argb)`, which computes the
-`PaletteScore` synchronously (unchanged logic, renamed from the old `resultFor` to `scoreFor`) but
-saves to History inside a `viewModelScope.launch` (thumbnail encode + Room insert are real I/O) -
-`ShowingResult` only appears once the entry is saved and has its id/name, so by the time a result is
-on screen it's already persisted; `RateClothingUiState.ShowingResult` gained `historyEntryId`/
-`historyEntryName` fields for this. `renameResult(name)` on the ViewModel persists a rename via
-`historyRepository.renameEntry`.
-
-UI: extracted the swatch/hex/closer-to-avoid-warning/ΔE-rows/disclaimer block out of
-`RateClothingScreen.kt`'s old private `ResultStep` into a new `ui/common/PaletteResultView.kt`
-(`internal` visibility - shared module-wide, not truly public) as `PaletteResultBody`, since both
-the live Rate Clothing result step and the new History detail screen need to render the exact same
-content from a `PaletteScore` snapshot. `ResultStep` now also has an `OutlinedTextField` for the
-name (`rememberSaveable` keyed on `entryId`, same "local state + call the ViewModel on each edit"
-pattern `ProfileEditorScreen`'s name field already uses, to avoid Flow round-trip cursor jumps).
-
-New `ui/history/`: `HistoryViewModel` now exposes real `observeEntries()` data instead of a stub;
-`HistoryScreen` renders a `LazyColumn` of rows (thumbnail decoded off the main thread via
-`produceState` + `BitmapFactory.decodeFile`, name, "type · profile name" subtitle, formatted date),
-tappable into a new `Destination.HistoryDetail` route / `HistoryDetailScreen` +
-`HistoryDetailViewModel`, which observes one entry by id and reuses `PaletteResultBody` plus the
-same editable-name field - "reopening" is just rendering the saved snapshot's `calibratedArgb`/
-`score`, so it's naturally unaffected by later profile edits or deletion (nothing re-reads
-`ProfileRepository`).
-
-New tests: `FakeHistoryDao` + `DefaultHistoryRepositoryTest` (default name format, profile/score
-snapshot fields with and without a profile, newest-first ordering, rename persists, and an explicit
-test that mutating a `Profile` object after saving doesn't touch the already-stored snapshot).
-
-`./gradlew assembleDebug test` passes (6 new `DefaultHistoryRepositoryTest` cases). No UI/
-instrumented test for the History list/detail screens or thumbnail file I/O (same Robolectric/
-JDK-26 limitation noted since the #3 entry) - verified by reading through the Compose tree and
-repository wiring instead. Verified no new manifest permissions were introduced (no manifest
-changes in this issue).

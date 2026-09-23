@@ -36,6 +36,22 @@
     <string name="profile_editor_delete_content_description">Delete profile</string>
     <string name="profile_editor_move_up_content_description">Move up</string>
     <string name="profile_editor_move_down_content_description">Move down</string>
+    <string name="profile_editor_import_palette">Import palette from photo</string>
+
+    <string name="palette_import_title">Import palette from photo</string>
+    <string name="palette_import_pick_photo_reminder">Choose a photo of a palette, e.g. a screenshot with Best Colors and Colors to Avoid sections.</string>
+    <string name="palette_import_pick_photo">Pick photo</string>
+    <string name="palette_import_photo_content_description">Selected photo</string>
+    <string name="palette_import_mark_best_instruction">Drag a rectangle over the Best Colors area, or skip if this photo doesn\'t have one</string>
+    <string name="palette_import_mark_avoid_instruction">Drag a rectangle over the Colors to Avoid area, or skip if this photo doesn\'t have one</string>
+    <string name="palette_import_confirm_area">Continue</string>
+    <string name="palette_import_skip_area">Skip</string>
+    <string name="palette_import_reviewing_best_title">Best Colors</string>
+    <string name="palette_import_reviewing_avoid_title">Colors to Avoid</string>
+    <string name="palette_import_no_swatches">No colors extracted</string>
+    <string name="palette_import_add_color_content_description">Add color</string>
+    <string name="palette_import_remove_color_content_description">Remove color</string>
+    <string name="palette_import_confirm_import">Add to profile</string>
 
     <string name="add_color_dialog_title_best">Add a Best Color</string>
     <string name="add_color_dialog_title_avoid">Add a Color to Avoid</string>
