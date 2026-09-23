@@ -18,10 +18,14 @@ interface HistoryRepository {
     ): HistoryEntry
 
     suspend fun renameEntry(entryId: Long, name: String)
+
+    /** Deletes an entry and its thumbnail file. */
+    suspend fun deleteEntry(entryId: Long)
 }
 
 class DefaultHistoryRepository(
     private val dao: HistoryDao,
+    private val thumbnailStore: ThumbnailStore,
     private val currentTimeMillis: () -> Long = System::currentTimeMillis
 ) : HistoryRepository {
 
@@ -57,5 +61,11 @@ class DefaultHistoryRepository(
 
     override suspend fun renameEntry(entryId: Long, name: String) {
         dao.updateName(entryId, name)
+    }
+
+    override suspend fun deleteEntry(entryId: Long) {
+        val entity = dao.getEntry(entryId) ?: return
+        dao.delete(entryId)
+        thumbnailStore.delete(entity.thumbnailPath)
     }
 }

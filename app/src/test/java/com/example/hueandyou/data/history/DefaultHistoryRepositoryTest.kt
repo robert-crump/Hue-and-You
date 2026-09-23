@@ -16,13 +16,15 @@ import org.junit.Test
 class DefaultHistoryRepositoryTest {
 
     private lateinit var dao: FakeHistoryDao
+    private lateinit var thumbnailStore: FakeThumbnailStore
     private lateinit var repository: HistoryRepository
     private var clock = 1_000L
 
     @Before
     fun setUp() {
         dao = FakeHistoryDao()
-        repository = DefaultHistoryRepository(dao) { clock }
+        thumbnailStore = FakeThumbnailStore()
+        repository = DefaultHistoryRepository(dao, thumbnailStore) { clock }
     }
 
     private fun autumnProfile() = Profile(
@@ -130,5 +132,35 @@ class DefaultHistoryRepositoryTest {
         assertEquals(listOf(0xFF112233.toInt()), stored.bestColorsArgb)
         // The renamed profile is a distinct object; the stored snapshot never reads from it.
         assertEquals("Deep Autumn", renamedProfile.name)
+    }
+
+    @Test
+    fun deleteEntry_removesRowAndThumbnailFile() = runBlocking {
+        val entry = repository.saveClothingResult(
+            "a.jpg", 0xFF111111.toInt(), null, PaletteScore(null, null, false)
+        )
+
+        repository.deleteEntry(entry.id)
+
+        assertNull(repository.observeEntry(entry.id).first())
+        assertEquals(listOf("a.jpg"), thumbnailStore.deletedPaths)
+    }
+
+    @Test
+    fun deleteEntry_withUnknownId_doesNothing() = runBlocking {
+        repository.deleteEntry(999L)
+
+        assertTrue(thumbnailStore.deletedPaths.isEmpty())
+    }
+}
+
+private class FakeThumbnailStore : com.example.hueandyou.data.history.ThumbnailStore {
+    val deletedPaths = mutableListOf<String>()
+
+    override suspend fun save(bitmap: android.graphics.Bitmap): String =
+        throw UnsupportedOperationException("not used by this test")
+
+    override suspend fun delete(path: String) {
+        deletedPaths += path
     }
 }

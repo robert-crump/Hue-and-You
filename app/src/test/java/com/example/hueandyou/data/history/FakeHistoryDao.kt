@@ -19,6 +19,8 @@ class FakeHistoryDao : HistoryDao {
     override fun observeEntry(entryId: Long): Flow<HistoryEntryEntity?> =
         entriesFlow.map { list -> list.find { it.id == entryId } }
 
+    override suspend fun getEntry(entryId: Long): HistoryEntryEntity? = entries[entryId]
+
     override suspend fun insert(entry: HistoryEntryEntity): Long {
         val id = nextId++
         entries[id] = entry.copy(id = id)
@@ -28,6 +30,11 @@ class FakeHistoryDao : HistoryDao {
 
     override suspend fun updateName(entryId: Long, name: String) {
         entries[entryId]?.let { entries[entryId] = it.copy(name = name) }
+        emit()
+    }
+
+    override suspend fun delete(entryId: Long) {
+        entries.remove(entryId)
         emit()
     }
 }

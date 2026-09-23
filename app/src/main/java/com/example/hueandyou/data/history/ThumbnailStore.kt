@@ -13,6 +13,9 @@ private const val THUMBNAIL_MAX_DIMENSION_PX = 512
 /** Saves a downscaled JPEG copy of a photo to app-private storage, for History thumbnails. */
 interface ThumbnailStore {
     suspend fun save(bitmap: Bitmap): String
+
+    /** Deletes the thumbnail file at [path], if it still exists. */
+    suspend fun delete(path: String)
 }
 
 class FileThumbnailStore(private val context: Context) : ThumbnailStore {
@@ -23,6 +26,11 @@ class FileThumbnailStore(private val context: Context) : ThumbnailStore {
         file.outputStream().use { out -> scaled.compress(Bitmap.CompressFormat.JPEG, 90, out) }
         if (scaled !== bitmap) scaled.recycle()
         file.absolutePath
+    }
+
+    override suspend fun delete(path: String) = withContext(Dispatchers.IO) {
+        File(path).delete()
+        Unit
     }
 }
 

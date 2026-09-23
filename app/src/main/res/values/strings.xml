@@ -14,6 +14,9 @@
     <string name="history_entry_type_object">Object</string>
     <string name="history_entry_name_label">Name</string>
     <string name="history_detail_title">Result</string>
+    <string name="history_entry_delete_content_description">Delete entry</string>
+    <string name="history_entry_deleted_message">Deleted \"%1$s\"</string>
+    <string name="history_entry_deleted_undo_action">Undo</string>
 
     <string name="profiles_section_title">Profiles</string>
     <string name="profile_add_content_description">Add profile</string>

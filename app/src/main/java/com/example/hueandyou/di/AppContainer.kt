@@ -41,11 +41,11 @@ class DefaultAppContainer(context: Context) : AppContainer {
         RoomProfileRepository(database.profileDao())
     }
 
-    override val historyRepository: HistoryRepository by lazy {
-        DefaultHistoryRepository(database.historyDao())
-    }
-
     override val thumbnailStore: ThumbnailStore by lazy {
         FileThumbnailStore(context)
+    }
+
+    override val historyRepository: HistoryRepository by lazy {
+        DefaultHistoryRepository(database.historyDao(), thumbnailStore)
     }
 }
