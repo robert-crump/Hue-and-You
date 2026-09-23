@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Hue and You"
 include(":app")
+include(":colorspace")
