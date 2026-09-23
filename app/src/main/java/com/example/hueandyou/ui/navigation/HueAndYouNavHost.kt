@@ -21,13 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.hueandyou.R
 import com.example.hueandyou.ui.history.HistoryScreen
 import com.example.hueandyou.ui.matchcolors.MatchColorsPlaceholderScreen
+import com.example.hueandyou.ui.profiles.ProfileEditorScreen
 import com.example.hueandyou.ui.rateclothing.RateClothingPlaceholderScreen
 import com.example.hueandyou.ui.settings.SettingsScreen
 
@@ -50,7 +53,7 @@ fun HueAndYouNavHost() {
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
-                            navController.navigate(topLevel.destination.route) {
+                            navController.navigate(topLevel.navRoute) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
                                 }
@@ -109,8 +112,35 @@ fun HueAndYouNavHost() {
             composable(Destination.History.route) {
                 HistoryScreen()
             }
-            composable(Destination.Settings.route) {
-                SettingsScreen()
+            composable(
+                Destination.Settings.route,
+                arguments = listOf(
+                    navArgument(Destination.Settings.ARG_SCROLL_TO_PROFILES) {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    }
+                )
+            ) { backStackEntry ->
+                val scrollToProfiles = backStackEntry.arguments
+                    ?.getBoolean(Destination.Settings.ARG_SCROLL_TO_PROFILES) == true
+                SettingsScreen(
+                    scrollToProfiles = scrollToProfiles,
+                    onOpenProfile = { profileId ->
+                        navController.navigate(Destination.ProfileEditor.route(profileId))
+                    }
+                )
+            }
+            composable(
+                Destination.ProfileEditor.route,
+                arguments = listOf(
+                    navArgument(Destination.ProfileEditor.ARG_PROFILE_ID) { type = NavType.LongType }
+                )
+            ) { backStackEntry ->
+                val profileId = backStackEntry.arguments?.getLong(Destination.ProfileEditor.ARG_PROFILE_ID) ?: 0L
+                ProfileEditorScreen(
+                    profileId = profileId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             composable(Destination.RateClothingPlaceholder.route) {
                 RateClothingPlaceholderScreen(onNavigateBack = { navController.popBackStack() })

@@ -11,7 +11,31 @@
     <string name="history_fab_action_rate_clothing">Rate clothing</string>
     <string name="history_fab_action_match_colors">Match colors for an object</string>
 
-    <string name="settings_placeholder_body">Settings will appear here in a future update.</string>
+    <string name="profiles_section_title">Profiles</string>
+    <string name="profile_add_content_description">Add profile</string>
+    <string name="profile_default_name">New profile</string>
+    <string name="profiles_empty_state">No profiles yet. Tap + to add one.</string>
+    <string name="profile_no_best_colors">No best colors yet</string>
+
+    <string name="profile_editor_title">Edit profile</string>
+    <string name="profile_editor_name_label">Name</string>
+    <string name="profile_editor_best_colors_title">Best Colors</string>
+    <string name="profile_editor_avoid_colors_title">Colors to Avoid</string>
+    <string name="profile_editor_no_colors">No colors yet</string>
+    <string name="profile_editor_add_color_content_description">Add color</string>
+    <string name="profile_editor_remove_color_content_description">Remove color</string>
+    <string name="profile_editor_delete_content_description">Delete profile</string>
+
+    <string name="add_color_dialog_title_best">Add a Best Color</string>
+    <string name="add_color_dialog_title_avoid">Add a Color to Avoid</string>
+    <string name="add_color_dialog_hex_label">Hex code</string>
+    <string name="add_color_dialog_invalid_hex">Enter a valid hex code, like #3A7DFF</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_add">Add</string>
+
+    <string name="delete_profile_dialog_title">Delete profile?</string>
+    <string name="delete_profile_dialog_body">This removes \"%1$s\" and its colors. This can\'t be undone.</string>
+    <string name="delete_profile_dialog_confirm">Delete</string>
 
     <string name="rate_clothing_placeholder_title">Rate clothing</string>
     <string name="rate_clothing_placeholder_body">This screen is coming soon.</string>
