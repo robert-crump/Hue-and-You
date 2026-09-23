@@ -21,5 +21,10 @@ sealed interface RateClothingUiState {
 
     data class SelectingColor(val colors: List<ExtractedColor>) : RateClothingUiState
 
-    data class ShowingResult(val argb: Int, val score: PaletteScore) : RateClothingUiState
+    data class ShowingResult(
+        val argb: Int,
+        val score: PaletteScore,
+        val historyEntryId: Long,
+        val historyEntryName: String,
+    ) : RateClothingUiState
 }

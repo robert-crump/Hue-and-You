@@ -16,6 +16,8 @@ import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.PaletteScorer
 import com.example.hueandyou.colorspace.WhiteBalanceCalibrator
 import com.example.hueandyou.colorspace.WhiteBalanceResult
+import com.example.hueandyou.data.history.HistoryRepository
+import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
 import kotlinx.coroutines.Dispatchers
@@ -28,11 +30,16 @@ import kotlinx.coroutines.withContext
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
 
-class RateClothingViewModel(private val profileRepository: ProfileRepository) : ViewModel() {
+class RateClothingViewModel(
+    private val profileRepository: ProfileRepository,
+    private val historyRepository: HistoryRepository,
+    private val thumbnailStore: ThumbnailStore,
+) : ViewModel() {
     private val _uiState = MutableStateFlow<RateClothingUiState>(RateClothingUiState.LoadingProfiles)
     val uiState: StateFlow<RateClothingUiState> = _uiState.asStateFlow()
 
     private var selectedProfile: Profile? = null
+    private var currentBitmap: Bitmap? = null
 
     init {
         viewModelScope.launch {
@@ -57,6 +64,7 @@ class RateClothingViewModel(private val profileRepository: ProfileRepository) : 
         _uiState.value = RateClothingUiState.LoadingPhoto
         viewModelScope.launch {
             val bitmap = withContext(Dispatchers.Default) { decodeBitmap(contentResolver, uri) }
+            currentBitmap = bitmap
             _uiState.value = RateClothingUiState.Calibrating(bitmap)
         }
     }
@@ -79,29 +87,51 @@ class RateClothingViewModel(private val profileRepository: ProfileRepository) : 
             correction = success.correction,
             exclusion = success.sampledRegion,
         )
-        _uiState.value = if (extraction.isClearlyDominant && extraction.colors.isNotEmpty()) {
-            resultFor(extraction.colors.first().argb)
+        if (extraction.isClearlyDominant && extraction.colors.isNotEmpty()) {
+            showResult(extraction.colors.first().argb)
         } else {
-            RateClothingUiState.SelectingColor(extraction.colors)
+            _uiState.value = RateClothingUiState.SelectingColor(extraction.colors)
         }
     }
 
     fun selectColor(argb: Int) {
-        _uiState.value = resultFor(argb)
+        showResult(argb)
     }
 
-    private fun resultFor(argb: Int): RateClothingUiState.ShowingResult {
+    fun renameResult(name: String) {
+        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
+        viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
+    }
+
+    private fun showResult(argb: Int) {
         val profile = selectedProfile
-        val score = if (profile != null) {
-            PaletteScorer.score(
-                measuredArgb = argb,
-                bestColors = profile.bestColors.map { it.argb },
-                avoidColors = profile.avoidColors.map { it.argb },
+        val score = scoreFor(argb, profile)
+        val bitmap = requireNotNull(currentBitmap)
+        viewModelScope.launch {
+            val thumbnailPath = thumbnailStore.save(bitmap)
+            val entry = historyRepository.saveClothingResult(
+                thumbnailPath = thumbnailPath,
+                calibratedArgb = argb,
+                profile = profile,
+                score = score,
             )
-        } else {
-            PaletteScore(nearestBest = null, nearestAvoid = null, closerToAvoid = false)
+            _uiState.value = RateClothingUiState.ShowingResult(
+                argb = argb,
+                score = score,
+                historyEntryId = entry.id,
+                historyEntryName = entry.name,
+            )
         }
-        return RateClothingUiState.ShowingResult(argb, score)
+    }
+
+    private fun scoreFor(argb: Int, profile: Profile?): PaletteScore = if (profile != null) {
+        PaletteScorer.score(
+            measuredArgb = argb,
+            bestColors = profile.bestColors.map { it.argb },
+            avoidColors = profile.avoidColors.map { it.argb },
+        )
+    } else {
+        PaletteScore(nearestBest = null, nearestAvoid = null, closerToAvoid = false)
     }
 
     private fun decodeBitmap(contentResolver: ContentResolver, uri: Uri): Bitmap {
@@ -122,9 +152,12 @@ class RateClothingViewModel(private val profileRepository: ProfileRepository) : 
     companion object {
         fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val repository = (context.applicationContext as HueAndYouApplication)
-                    .container.profileRepository
-                RateClothingViewModel(repository)
+                val container = (context.applicationContext as HueAndYouApplication).container
+                RateClothingViewModel(
+                    profileRepository = container.profileRepository,
+                    historyRepository = container.historyRepository,
+                    thumbnailStore = container.thumbnailStore,
+                )
             }
         }
     }

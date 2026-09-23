@@ -1,0 +1,61 @@
+package com.example.hueandyou.data.history
+
+import com.example.hueandyou.colorspace.PaletteScore
+import com.example.hueandyou.data.profile.Profile
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+
+interface HistoryRepository {
+    fun observeEntries(): Flow<List<HistoryEntry>>
+    fun observeEntry(entryId: Long): Flow<HistoryEntry?>
+
+    /** Saves a Rate Clothing result as a new history entry and returns it (with its assigned id). */
+    suspend fun saveClothingResult(
+        thumbnailPath: String,
+        calibratedArgb: Int,
+        profile: Profile?,
+        score: PaletteScore
+    ): HistoryEntry
+
+    suspend fun renameEntry(entryId: Long, name: String)
+}
+
+class DefaultHistoryRepository(
+    private val dao: HistoryDao,
+    private val currentTimeMillis: () -> Long = System::currentTimeMillis
+) : HistoryRepository {
+
+    override fun observeEntries(): Flow<List<HistoryEntry>> =
+        dao.observeEntries().map { list -> list.map { it.toDomain() } }
+
+    override fun observeEntry(entryId: Long): Flow<HistoryEntry?> =
+        dao.observeEntry(entryId).map { it?.toDomain() }
+
+    override suspend fun saveClothingResult(
+        thumbnailPath: String,
+        calibratedArgb: Int,
+        profile: Profile?,
+        score: PaletteScore
+    ): HistoryEntry {
+        val now = currentTimeMillis()
+        val entry = HistoryEntry(
+            id = 0,
+            type = HistoryEntryType.CLOTHING,
+            name = defaultHistoryEntryName(HistoryEntryType.CLOTHING, now),
+            createdAt = now,
+            thumbnailPath = thumbnailPath,
+            calibratedArgb = calibratedArgb,
+            profileId = profile?.id,
+            profileName = profile?.name,
+            bestColorsArgb = profile?.bestColors.orEmpty().map { it.argb },
+            avoidColorsArgb = profile?.avoidColors.orEmpty().map { it.argb },
+            score = score
+        )
+        val id = dao.insert(entry.toEntity())
+        return entry.copy(id = id)
+    }
+
+    override suspend fun renameEntry(entryId: Long, name: String) {
+        dao.updateName(entryId, name)
+    }
+}

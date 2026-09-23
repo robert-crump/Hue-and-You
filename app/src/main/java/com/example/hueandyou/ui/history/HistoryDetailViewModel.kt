@@ -11,24 +11,27 @@ import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-data class HistoryUiState(val entries: List<HistoryEntry> = emptyList()) {
-    val isEmpty: Boolean get() = entries.isEmpty()
-}
+class HistoryDetailViewModel(
+    private val repository: HistoryRepository,
+    private val entryId: Long,
+) : ViewModel() {
 
-class HistoryViewModel(repository: HistoryRepository) : ViewModel() {
-    val uiState: StateFlow<HistoryUiState> = repository.observeEntries()
-        .map { HistoryUiState(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
+    val entry: StateFlow<HistoryEntry?> = repository.observeEntry(entryId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    fun rename(name: String) {
+        viewModelScope.launch { repository.renameEntry(entryId, name) }
+    }
 
     companion object {
-        fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
+        fun factory(context: Context, entryId: Long): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val repository = (context.applicationContext as HueAndYouApplication)
                     .container.historyRepository
-                HistoryViewModel(repository)
+                HistoryDetailViewModel(repository, entryId)
             }
         }
     }

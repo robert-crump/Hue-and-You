@@ -28,6 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.hueandyou.R
+import com.example.hueandyou.ui.history.HistoryDetailScreen
 import com.example.hueandyou.ui.history.HistoryScreen
 import com.example.hueandyou.ui.matchcolors.MatchColorsPlaceholderScreen
 import com.example.hueandyou.ui.profiles.ProfileEditorScreen
@@ -110,7 +111,23 @@ fun HueAndYouNavHost() {
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Destination.History.route) {
-                HistoryScreen()
+                HistoryScreen(
+                    onOpenEntry = { entryId ->
+                        navController.navigate(Destination.HistoryDetail.route(entryId))
+                    }
+                )
+            }
+            composable(
+                Destination.HistoryDetail.route,
+                arguments = listOf(
+                    navArgument(Destination.HistoryDetail.ARG_ENTRY_ID) { type = NavType.LongType }
+                )
+            ) { backStackEntry ->
+                val entryId = backStackEntry.arguments?.getLong(Destination.HistoryDetail.ARG_ENTRY_ID) ?: 0L
+                HistoryDetailScreen(
+                    entryId = entryId,
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             composable(
                 Destination.Settings.route,

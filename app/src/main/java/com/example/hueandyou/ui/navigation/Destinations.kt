@@ -8,6 +8,10 @@ import com.example.hueandyou.R
 
 sealed class Destination(val route: String) {
     data object History : Destination("history")
+    data object HistoryDetail : Destination("history_detail/{entryId}") {
+        const val ARG_ENTRY_ID = "entryId"
+        fun route(entryId: Long) = "history_detail/$entryId"
+    }
     data object Settings : Destination("settings?scrollToProfiles={scrollToProfiles}") {
         const val ARG_SCROLL_TO_PROFILES = "scrollToProfiles"
         fun route(scrollToProfiles: Boolean = false) = "settings?scrollToProfiles=$scrollToProfiles"

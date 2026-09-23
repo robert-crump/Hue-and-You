@@ -10,6 +10,10 @@
     <string name="history_fab_content_description">Start a new analysis</string>
     <string name="history_fab_action_rate_clothing">Rate clothing</string>
     <string name="history_fab_action_match_colors">Match colors for an object</string>
+    <string name="history_entry_type_clothing">Clothing</string>
+    <string name="history_entry_type_object">Object</string>
+    <string name="history_entry_name_label">Name</string>
+    <string name="history_detail_title">Result</string>
 
     <string name="profiles_section_title">Profiles</string>
     <string name="profile_add_content_description">Add profile</string>

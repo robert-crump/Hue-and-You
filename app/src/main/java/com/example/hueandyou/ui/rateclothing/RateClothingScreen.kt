@@ -34,6 +34,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +44,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,14 +62,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
-import com.example.hueandyou.colorspace.ColorMatch
-import com.example.hueandyou.colorspace.ColorMatchBand
 import com.example.hueandyou.colorspace.ExtractedColor
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.WhiteBalanceFailureReason
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.colorspace.formatHexColor
 import com.example.hueandyou.data.profile.Profile
+import com.example.hueandyou.ui.common.PaletteResultBody
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -147,7 +148,13 @@ fun RateClothingScreen(
                     colors = state.colors,
                     onSelect = viewModel::selectColor,
                 )
-                is RateClothingUiState.ShowingResult -> ResultStep(argb = state.argb, score = state.score)
+                is RateClothingUiState.ShowingResult -> ResultStep(
+                    argb = state.argb,
+                    score = state.score,
+                    entryId = state.historyEntryId,
+                    name = state.historyEntryName,
+                    onRenameChange = viewModel::renameResult,
+                )
             }
         }
     }
@@ -364,7 +371,15 @@ private fun SelectingColorStep(
 }
 
 @Composable
-private fun ResultStep(argb: Int, score: PaletteScore) {
+private fun ResultStep(
+    argb: Int,
+    score: PaletteScore,
+    entryId: Long,
+    name: String,
+    onRenameChange: (String) -> Unit,
+) {
+    var currentName by rememberSaveable(entryId) { mutableStateOf(name) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -372,82 +387,15 @@ private fun ResultStep(argb: Int, score: PaletteScore) {
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
-            text = stringResource(R.string.rate_clothing_measured_color_label),
-            style = MaterialTheme.typography.titleMedium
+        OutlinedTextField(
+            value = currentName,
+            onValueChange = {
+                currentName = it
+                onRenameChange(it)
+            },
+            label = { Text(stringResource(R.string.history_entry_name_label)) },
+            modifier = Modifier.fillMaxWidth()
         )
-        Box(
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(Color(argb))
-        )
-        Text(
-            text = formatHexColor(argb),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-
-        if (score.closerToAvoid) {
-            Text(
-                text = stringResource(R.string.rate_clothing_closer_to_avoid_warning),
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 24.dp)
-            )
-        }
-
-        score.nearestBest?.let { match ->
-            ColorMatchRow(labelRes = R.string.rate_clothing_nearest_best_label, match = match)
-        }
-        score.nearestAvoid?.let { match ->
-            ColorMatchRow(labelRes = R.string.rate_clothing_nearest_avoid_label, match = match)
-        }
-
-        Text(
-            text = stringResource(R.string.rate_clothing_best_guess_disclaimer),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 24.dp)
-        )
+        PaletteResultBody(argb = argb, score = score)
     }
-}
-
-@Composable
-private fun ColorMatchRow(labelRes: Int, match: ColorMatch) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 24.dp)
-    ) {
-        Text(text = stringResource(labelRes), style = MaterialTheme.typography.titleSmall)
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Color(match.argb))
-            )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(text = formatHexColor(match.argb))
-                Text(
-                    text = "ΔE %.1f — %s".format(
-                        match.deltaE,
-                        stringResource(colorMatchBandLabel(match.band))
-                    ),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-        }
-    }
-}
-
-private fun colorMatchBandLabel(band: ColorMatchBand): Int = when (band) {
-    ColorMatchBand.MATCH -> R.string.color_match_band_match
-    ColorMatchBand.CLOSE -> R.string.color_match_band_close
-    ColorMatchBand.RELATED -> R.string.color_match_band_related
-    ColorMatchBand.FAR -> R.string.color_match_band_far
 }
