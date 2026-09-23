@@ -12,6 +12,8 @@ import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.profile.HueAndYouDatabase
 import com.example.hueandyou.data.profile.ProfileRepository
 import com.example.hueandyou.data.profile.RoomProfileRepository
+import com.example.hueandyou.data.settings.DataStoreSettingsRepository
+import com.example.hueandyou.data.settings.SettingsRepository
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
     name = "hue_and_you_settings"
@@ -26,6 +28,7 @@ interface AppContainer {
     val profileRepository: ProfileRepository
     val historyRepository: HistoryRepository
     val thumbnailStore: ThumbnailStore
+    val settingsRepository: SettingsRepository
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -47,5 +50,9 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val historyRepository: HistoryRepository by lazy {
         DefaultHistoryRepository(database.historyDao(), thumbnailStore)
+    }
+
+    override val settingsRepository: SettingsRepository by lazy {
+        DataStoreSettingsRepository(settingsDataStore)
     }
 }

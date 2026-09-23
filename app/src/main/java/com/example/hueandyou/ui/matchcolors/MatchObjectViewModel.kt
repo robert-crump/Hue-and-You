@@ -18,21 +18,22 @@ import com.example.hueandyou.colorspace.WhiteBalanceCalibrator
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
+import com.example.hueandyou.data.settings.SettingsRepository
 import com.example.hueandyou.ui.common.toPixelSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
-private val DEFAULT_WHEEL = HarmonyWheel.PERCEPTUAL
-private val DEFAULT_BALANCE = HarmonyBalance.FAITHFUL
 
 class MatchObjectViewModel(
     private val historyRepository: HistoryRepository,
     private val thumbnailStore: ThumbnailStore,
+    private val settingsRepository: SettingsRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MatchObjectUiState>(MatchObjectUiState.PickingPhoto)
     val uiState: StateFlow<MatchObjectUiState> = _uiState.asStateFlow()
@@ -85,17 +86,18 @@ class MatchObjectViewModel(
         val bitmap = requireNotNull(currentBitmap)
         val inputColors = state.selectedArgb.toList()
         viewModelScope.launch {
+            val defaults = settingsRepository.observeDefaults().first()
             val thumbnailPath = thumbnailStore.save(bitmap)
             val entry = historyRepository.saveObjectResult(
                 thumbnailPath = thumbnailPath,
                 inputColorsArgb = inputColors,
-                wheel = DEFAULT_WHEEL,
-                balance = DEFAULT_BALANCE,
+                wheel = defaults.wheel,
+                balance = defaults.balance,
             )
             _uiState.value = MatchObjectUiState.ShowingResult(
                 inputColorsArgb = entry.inputColorsArgb,
-                wheel = DEFAULT_WHEEL,
-                balance = DEFAULT_BALANCE,
+                wheel = entry.wheel ?: defaults.wheel,
+                balance = entry.balance ?: defaults.balance,
                 historyEntryId = entry.id,
                 historyEntryName = entry.name,
             )
@@ -141,6 +143,7 @@ class MatchObjectViewModel(
                 MatchObjectViewModel(
                     historyRepository = container.historyRepository,
                     thumbnailStore = container.thumbnailStore,
+                    settingsRepository = container.settingsRepository,
                 )
             }
         }

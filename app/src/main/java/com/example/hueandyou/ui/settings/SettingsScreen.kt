@@ -32,15 +32,18 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.data.profile.Profile
+import com.example.hueandyou.ui.common.HarmonyOptionsControls
 import com.example.hueandyou.ui.profiles.ProfilesViewModel
 
 @Composable
 fun SettingsScreen(
     scrollToProfiles: Boolean = false,
     onOpenProfile: (Long) -> Unit,
-    viewModel: ProfilesViewModel = viewModel(factory = ProfilesViewModel.factory(LocalContext.current))
+    profilesViewModel: ProfilesViewModel = viewModel(factory = ProfilesViewModel.factory(LocalContext.current)),
+    settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(LocalContext.current)),
 ) {
-    val profiles by viewModel.profiles.collectAsState()
+    val profiles by profilesViewModel.profiles.collectAsState()
+    val defaults by settingsViewModel.defaults.collectAsState()
     val listState = rememberLazyListState()
     val defaultProfileName = stringResource(R.string.profile_default_name)
 
@@ -51,6 +54,22 @@ fun SettingsScreen(
     }
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
+        item(key = "defaults_header") {
+            Text(
+                text = stringResource(R.string.settings_defaults_section_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+        }
+        item(key = "defaults_controls") {
+            HarmonyOptionsControls(
+                wheel = defaults.wheel,
+                balance = defaults.balance,
+                onWheelChange = settingsViewModel::setDefaultWheel,
+                onBalanceChange = settingsViewModel::setDefaultBalance,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         item(key = "profiles_header") {
             Row(
                 modifier = Modifier
@@ -64,7 +83,7 @@ fun SettingsScreen(
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = {
-                    viewModel.createProfile(defaultProfileName) { id -> onOpenProfile(id) }
+                    profilesViewModel.createProfile(defaultProfileName) { id -> onOpenProfile(id) }
                 }) {
                     Icon(
                         Icons.Filled.Add,

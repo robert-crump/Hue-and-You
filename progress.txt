@@ -1,5 +1,44 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #13: Settings - default color wheel and balance mode
+
+New `data/settings/SettingsRepository` (`DataStoreSettingsRepository`), a thin wrapper over the
+`AppContainer.settingsDataStore` that #9 already created but never used - `observeDefaults(): Flow
+<HarmonyDefaults>` plus `setDefaultWheel`/`setDefaultBalance`, storing each enum by its `.name` as
+a `stringPreferencesKey` (same "store enums as strings, parse defensively" spirit as `HistoryConverters`,
+except here a missing/unrecognized value falls back to `PERCEPTUAL`/`FAITHFUL` rather than failing,
+since unlike Room there's no migration path for a stale DataStore key). `AppContainer` gained
+`settingsRepository`, built from the existing `settingsDataStore` property.
+
+`ui/settings/`: new `SettingsViewModel` (same `StateFlow` + `viewModelScope.launch` factory pattern
+as `ProfilesViewModel`/`HistoryDetailViewModel`) exposing `defaults` and the two setters.
+`SettingsScreen` gained a "Defaults for new object results" section above Profiles, reusing #12's
+`HarmonyOptionsControls` composable directly (it was already `internal`, so no visibility change
+needed) - same dropdown/segmented-row UI as the live result screen and History detail, just wired
+to the stored default instead of one entry's last-used value. `SettingsScreen`'s single `viewModel`
+parameter split into `profilesViewModel`/`settingsViewModel` to host both.
+
+`MatchObjectViewModel.confirmColorSelection()` now reads `settingsRepository.observeDefaults().first()`
+right before saving, instead of the hardcoded `PERCEPTUAL`/`FAITHFUL` constants #11/#12 left as a
+placeholder for this issue - satisfies "new object results use the defaults" by construction, since
+that's the only place a wheel/balance gets chosen for a brand-new entry. Reopened entries are
+unaffected: `HistoryDetailViewModel`/`HistoryDetailScreen` already read `entry.wheel`/`entry.balance`
+straight off the stored row (#12), never touching Settings.
+
+New `DataStoreSettingsRepositoryTest`: builds a real `PreferenceDataStoreFactory` over a temp file
+(pure JVM, no Robolectric needed - `datastore-preferences` doesn't touch `android.*`) - empty-store
+fallback, each setter persists without disturbing the other, and both together round-trip through
+the same repository instance. (A cross-instance "close and reopen" case was tried and dropped:
+DataStore refuses a second concurrent instance over the same file path even after the first's last
+write completes, so that shape isn't testable without an explicit close API this artifact doesn't
+expose - the same-instance round-trip already covers the encode/decode logic.)
+
+`./gradlew assembleDebug test` passes (4 new `DataStoreSettingsRepositoryTest` cases). No UI test
+for the new Settings controls or for `MatchObjectViewModel`'s default read (same Robolectric/JDK-26
+gap noted since #3; `MatchObjectViewModel` still has no dedicated test file, same as before this
+issue) - verified by reading through the wiring and by `HarmonyOptionsControls` already having a
+passing render path from #12.
+
 ## 2026-09-23 - Issue #12: Color wheels (Traditional, Screen) and Faithful/Softened toggle
 
 `Harmony.kt` (`:colorspace`) gained the two remaining `ColorWheelStrategy` implementations and the
@@ -220,64 +259,3 @@ instrumented test for the History list/detail screens or thumbnail file I/O (sam
 JDK-26 limitation noted since the #3 entry) - verified by reading through the Compose tree and
 repository wiring instead. Verified no new manifest permissions were introduced (no manifest
 changes in this issue).
-
-## 2026-09-23 - Issue #8: Rate clothing - profile selection, PaletteScorer and result screen
-
-Closed the loop on the Rate Clothing flow: profile choice at the start, scoring the measured
-color against that profile, and a real result screen (replacing the old "swatch + hex" stub
-from issue #5).
-
-`PaletteScorer` (new, `:colorspace`, pure Kotlin): `PaletteScorer.score(measuredArgb,
-bestColors, avoidColors)` takes plain `List<Int>` ARGB lists rather than the app module's
-`Profile`/`PaletteColor` domain types - `:colorspace` is a pure-JVM module and can't depend on
-`:app`, matching the existing `ColorExtractor`/`WhiteBalanceCalibrator` pattern of talking in
-primitives at the module boundary. Converts the measured color to Lab once and finds each
-side's nearest match by ΔE00 (`ciede2000`, from issue #2); either side is `null` when its list
-is empty, and `closerToAvoid` is only ever true when *both* sides have a match and Avoid's ΔE
-is strictly smaller - an empty Best list can't make "closer to Avoid" true by default, since
-there's nothing to be closer *than*. Bands live in a new `ColorMatchBand` enum with the
-boundary constants and the classifying function on its companion, in the same file as
-`PaletteScorer` - "one place" per the issue, and colocated rather than folded into
-`CalibrationConfig` since these thresholds are about matching against a profile, not about
-calibration/extraction. Boundaries per the issue's own numbers: ΔE ≤ 3 match, ≤ 8 close, ≤ 15
-related, > 15 far (all inclusive at the upper edge, tested directly at each boundary value).
-
-`:app` wiring: `RateClothingViewModel` now takes a `ProfileRepository` (via the same
-`companion object factory(context)` + `viewModelFactory { initializer { ... } }` pattern
-`ProfilesViewModel`/`ProfileEditorViewModel` already use) and starts in a new
-`LoadingProfiles` state. `init` reads `observeProfiles().first()` once (a snapshot for this
-rating session, not a live subscription - the profile list isn't expected to change mid-flow)
-and branches to `NoProfile`, or straight past selection into `PickingPhoto` with
-`selectedProfile` set when there's exactly one profile, or `SelectingProfile(profiles)` when
-there are several; `selectProfile(profile)` (called on user tap) does the same
-"stash-then-advance-to-PickingPhoto" transition. Both `confirmCalibration()`'s
-clearly-dominant path and `selectColor()` now funnel through a shared `resultFor(argb)` that
-runs `PaletteScorer.score` against the stashed `selectedProfile` (or an all-null/false
-`PaletteScore` if somehow still unset) and produces `ShowingResult(argb, score)` -
-`RateClothingUiState.ShowingResult` gained that `score: PaletteScore` field.
-
-UI (`ui/rateclothing/RateClothingScreen.kt`): `NoProfile` renders an `AlertDialog` (title +
-body + "Cancel"/"Go to Settings" buttons, both dismissing) rather than a full screen, since the
-issue frames it as a dialog, not a step; "Cancel" reuses the screen's existing
-`onNavigateBack`, and the new `onNavigateToProfileSettings` callback (screen gained this
-parameter) is wired in `HueAndYouNavHost` to `Destination.Settings.route(scrollToProfiles =
-true)` - the deep-link route issue #3 built for exactly this. `SelectingProfile` is a plain
-tappable name list, matching the existing `SelectingColorStep` list pattern. `ResultStep` now
-shows the measured swatch+hex (unchanged from before, just relabeled), then an error-colored
-"closer to Avoid" warning when `score.closerToAvoid`, then a `ColorMatchRow` (swatch + hex + "ΔE
-x.x — <band>") for each of `nearestBest`/`nearestAvoid` that isn't null, then the "best guess"
-disclaimer at the bottom - the whole column is now `verticalScroll`-wrapped since this can run
-longer than one screen on small devices. Band labels are their own four string resources
-(`color_match_band_*`) via a small `colorMatchBandLabel` mapping function, same shape as the
-existing `calibrationFailureMessage` mapping for `WhiteBalanceFailureReason`.
-
-New tests: `PaletteScorerTest` (`:colorspace`) - band boundaries at each threshold edge,
-nearest-color selection among several candidates, `closerToAvoid` true/false in both
-directions, and all three empty-list combinations (empty Best, empty Avoid, both empty).
-
-`./gradlew assembleDebug test` passes (7 new `PaletteScorerTest` cases). No UI/instrumented
-test for the profile dialog/list taps or the result screen layout itself (same
-Robolectric/JDK-26 limitation noted in the #3 entry, and still no emulator/device available in
-this environment) - verified by reading through the state machine and Compose tree instead.
-Verified no new manifest permissions were introduced (no manifest-affecting changes in this
-issue).

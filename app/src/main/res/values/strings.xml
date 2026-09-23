@@ -18,6 +18,8 @@
     <string name="history_entry_deleted_message">Deleted \"%1$s\"</string>
     <string name="history_entry_deleted_undo_action">Undo</string>
 
+    <string name="settings_defaults_section_title">Defaults for new object results</string>
+
     <string name="profiles_section_title">Profiles</string>
     <string name="profile_add_content_description">Add profile</string>
     <string name="profile_default_name">New profile</string>
