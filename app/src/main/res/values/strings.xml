@@ -1,3 +1,23 @@
 <resources>
     <string name="app_name">Hue and You</string>
+
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="history_empty_state_title">No analyses yet</string>
+    <string name="history_empty_state_body">Tap the + button to rate a piece of clothing or match colors for an object. Your results will show up here.</string>
+
+    <string name="history_fab_content_description">Start a new analysis</string>
+    <string name="history_fab_action_rate_clothing">Rate clothing</string>
+    <string name="history_fab_action_match_colors">Match colors for an object</string>
+
+    <string name="settings_placeholder_body">Settings will appear here in a future update.</string>
+
+    <string name="rate_clothing_placeholder_title">Rate clothing</string>
+    <string name="rate_clothing_placeholder_body">This screen is coming soon.</string>
+
+    <string name="match_colors_placeholder_title">Match colors for an object</string>
+    <string name="match_colors_placeholder_body">This screen is coming soon.</string>
+
+    <string name="navigate_back">Back</string>
 </resources>

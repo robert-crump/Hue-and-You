@@ -1,0 +1,31 @@
+Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
+
+## 2026-09-23 - Issue #1: App shell (navigation, dynamic color, History empty state, FAB)
+
+Implemented the runnable app shell:
+- Wired the agreed stack: Compose + Material3, Navigation Compose, Room (runtime/ktx only,
+  no KSP/compiler yet - no entities exist), kotlinx.serialization, DataStore (preferences),
+  and Material Color Utilities (me.tatarka.google.material:material-color-utilities, the
+  only real Maven Central artifact for the Java port of Google's library).
+- Added HueAndYouApplication + a manual DI AppContainer (holds a DataStore<Preferences>).
+- MainActivity hosts a NavHost with History and Settings bottom-nav destinations, plus two
+  placeholder destinations ("Rate clothing", "Match colors for an object") reached from a
+  FAB dropdown menu on the History tab.
+- Theme.kt uses dynamicLightColorScheme/dynamicDarkColorScheme (device is always API 31+,
+  so dynamic color is unconditionally available) with a static fallback.
+- History screen shows an empty state (icon + title + explanatory body text).
+- Removed the legacy View-based Material Components theme/colors.xml since the app is
+  Compose-only now.
+
+Key gotcha for future issues: this repo's AGP (9.2.1) has *built-in* Kotlin support - do
+NOT apply the `org.jetbrains.kotlin.android` plugin, it now fails the build outright
+("no longer required for Kotlin support since AGP 9.0"). Only apply
+`org.jetbrains.kotlin.plugin.compose` / `.plugin.serialization` when needed, version-pinned
+via libs.versions.toml (kotlin = "2.4.20"). Also: androidx.compose.material3.TopAppBar is
+still `@ExperimentalMaterial3Api` on the compose-bom version in use (2026.09.00) - needs
+`@OptIn(ExperimentalMaterial3Api::class)`.
+
+`./gradlew assembleDebug test` passes. Verified no INTERNET permission in the merged
+manifest. Room's compiler/KSP setup is deliberately deferred to whichever issue first adds
+a real @Entity/@Dao (likely issue #9, History auto-save) - wiring KSP now without any
+annotated classes to process would add unverified version-matching risk for no benefit.
