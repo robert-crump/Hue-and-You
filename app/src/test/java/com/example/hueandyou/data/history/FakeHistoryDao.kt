@@ -1,5 +1,7 @@
 package com.example.hueandyou.data.history
 
+import com.example.hueandyou.colorspace.HarmonyBalance
+import com.example.hueandyou.colorspace.HarmonyWheel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -30,6 +32,11 @@ class FakeHistoryDao : HistoryDao {
 
     override suspend fun updateName(entryId: Long, name: String) {
         entries[entryId]?.let { entries[entryId] = it.copy(name = name) }
+        emit()
+    }
+
+    override suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance) {
+        entries[entryId]?.let { entries[entryId] = it.copy(wheel = wheel, balance = balance) }
         emit()
     }
 

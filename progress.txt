@@ -1,5 +1,49 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #12: Color wheels (Traditional, Screen) and Faithful/Softened toggle
+
+`Harmony.kt` (`:colorspace`) gained the two remaining `ColorWheelStrategy` implementations and the
+second `BalanceMode`, without touching `HarmonyEngine` itself (exactly the seam #11 set up).
+`TraditionalWheel` (Goethe/Itten RYB) and `ScreenWheel` (RGB/HSV) both go through a new private
+`PiecewiseHueMap`: HCT hue -> the other wheel's hue via linear interpolation between six anchor
+points (red/orange/yellow/green/blue/violet for RYB, red/yellow/green/cyan/blue/magenta for HSV),
+rotate by the offset there, then map back. The anchor hues aren't round numbers - they're each
+primary/secondary's *actual* HCT hue (e.g. pure yellow #FFFF00 is HCT hue ~111, not 60), computed
+once via a throwaway test-and-print and hardcoded as starting guesses, same spirit as
+`CalibrationConfig`. This makes "yellow's complement is violet" (Traditional) and "yellow's
+complement is blue" (Screen) fall out of the anchor table rather than needing special-casing.
+`SoftenedBalance` multiplies chroma by `HarmonyConfig.SOFTENED_CHROMA_FACTOR` (0.7) and pulls tone
+30% of the way toward `SOFTENED_TONE_TARGET` (65) - both starting guesses in the new `HarmonyConfig`
+object. `HarmonyWheel`/`HarmonyBalance` gained `TRADITIONAL`/`SCREEN` and `SOFTENED` entries; Room's
+`HistoryConverters` serializes by enum name, so no migration was needed for the wider domain.
+
+`:app`: new shared `ui/common/HarmonyOptionsControls.kt` (`ExposedDropdownMenuBox` for the wheel,
+`SingleChoiceSegmentedButtonRow` for Faithful/Softened) used by both the live Match Colors for an
+Object result step and `HistoryDetailScreen`'s OBJECT branch - both already recomputed suggestions
+from `(inputColorsArgb, wheel, balance)` via `HarmonyResultBody` (#11), so wiring the controls to
+that same state makes "updates immediately" true by construction. `HistoryRepository` gained
+`updateHarmonyOptions(entryId, wheel, balance)` (new `HistoryDao.updateHarmonyOptions` UPDATE
+query) so a change persists as the entry's last-used wheel/balance; `HistoryDetailViewModel`'s
+`entry` is a `Flow` off that same row, so after a write the Room invalidation callback redraws the
+screen with the persisted value - no separate optimistic-update state needed there.
+`MatchObjectViewModel.setWheel`/`setBalance` do update `_uiState` optimistically (no Room-backed
+Flow to fall back on mid-session) in addition to persisting, so the live result step feels instant
+too. Wheel/balance are still hardcoded to `PERCEPTUAL`/`FAITHFUL` as the *initial* choice on first
+save (issue #13 adds a real default).
+
+New tests in `HarmonyEngineTest`: `offsetsPerRelationshipAreCorrectOnEachWheel` now loops over all
+three wheels, computing each expected hue via `wheel.strategy.rotate(...)` directly rather than
+assuming HCT-space addition (the previous test's shape, now generalized); dedicated
+`traditionalWheelComplementOfYellowIsViolet`/`screenWheelComplementOfYellowIsBlue` per the issue's
+acceptance criteria; `softenedBalanceLowersChromaAndStaysInGamut`; `allGeneratedColorsAreInGamut`
+now sweeps every wheel/balance combination. `FakeHistoryDao` and `HistoryViewModelTest`'s
+`FakeHistoryRepository` both needed the new `updateHarmonyOptions` member to keep compiling.
+
+`./gradlew assembleDebug test` passes (7 `HarmonyEngineTest` cases total, up from 4). No UI test
+for the new dropdown/toggle (same Robolectric/JDK-26 gap noted since #3) - verified by reading
+through the state wiring and by the fact both screens already had a passing render path for
+`HarmonyResultBody` from #11.
+
 ## 2026-09-23 - Issue #11: Match colors for an object - HarmonyEngine on the Perceptual wheel
 
 New `Harmony.kt` (`:colorspace`, pure Kotlin): `HarmonyEngine.generate(referenceArgb, wheel:

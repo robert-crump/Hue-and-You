@@ -29,6 +29,9 @@ interface HistoryRepository {
 
     suspend fun renameEntry(entryId: Long, name: String)
 
+    /** Updates the wheel/balance an OBJECT entry was last viewed with, so reopening restores it. */
+    suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance)
+
     /** Deletes an entry and its thumbnail file. */
     suspend fun deleteEntry(entryId: Long)
 }
@@ -99,6 +102,10 @@ class DefaultHistoryRepository(
 
     override suspend fun renameEntry(entryId: Long, name: String) {
         dao.updateName(entryId, name)
+    }
+
+    override suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance) {
+        dao.updateHarmonyOptions(entryId, wheel, balance)
     }
 
     override suspend fun deleteEntry(entryId: Long) {

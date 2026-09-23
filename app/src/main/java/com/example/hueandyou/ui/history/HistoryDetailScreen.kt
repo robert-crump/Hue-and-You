@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.data.history.HistoryEntryType
+import com.example.hueandyou.ui.common.HarmonyOptionsControls
 import com.example.hueandyou.ui.common.HarmonyResultBody
 import com.example.hueandyou.ui.common.PaletteResultBody
 
@@ -80,11 +81,22 @@ fun HistoryDetailScreen(
             )
             when (current.type) {
                 HistoryEntryType.CLOTHING -> PaletteResultBody(argb = current.calibratedArgb, score = current.score)
-                HistoryEntryType.OBJECT -> HarmonyResultBody(
-                    inputColorsArgb = current.inputColorsArgb,
-                    wheel = requireNotNull(current.wheel),
-                    balance = requireNotNull(current.balance),
-                )
+                HistoryEntryType.OBJECT -> {
+                    val wheel = requireNotNull(current.wheel)
+                    val balance = requireNotNull(current.balance)
+                    HarmonyOptionsControls(
+                        wheel = wheel,
+                        balance = balance,
+                        onWheelChange = viewModel::setWheel,
+                        onBalanceChange = viewModel::setBalance,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                    HarmonyResultBody(
+                        inputColorsArgb = current.inputColorsArgb,
+                        wheel = wheel,
+                        balance = balance,
+                    )
+                }
             }
         }
     }

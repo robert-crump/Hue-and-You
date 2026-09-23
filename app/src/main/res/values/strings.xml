@@ -87,6 +87,12 @@
     <string name="harmony_relationship_analogous">Analogous</string>
     <string name="harmony_relationship_triadic">Triadic</string>
     <string name="harmony_relationship_tonal">Tonal</string>
+    <string name="harmony_wheel_label">Color wheel</string>
+    <string name="harmony_wheel_traditional">Traditional</string>
+    <string name="harmony_wheel_screen">Screen</string>
+    <string name="harmony_wheel_perceptual">Perceptual</string>
+    <string name="harmony_balance_faithful">Faithful</string>
+    <string name="harmony_balance_softened">Softened</string>
 
     <string name="navigate_back">Back</string>
 </resources>

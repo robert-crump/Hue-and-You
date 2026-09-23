@@ -67,6 +67,7 @@ import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.WhiteBalanceFailureReason
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.colorspace.formatHexColor
+import com.example.hueandyou.ui.common.HarmonyOptionsControls
 import com.example.hueandyou.ui.common.HarmonyResultBody
 import java.io.File
 import kotlin.math.roundToInt
@@ -146,6 +147,8 @@ fun MatchObjectScreen(
                     entryId = state.historyEntryId,
                     name = state.historyEntryName,
                     onRenameChange = viewModel::renameResult,
+                    onWheelChange = viewModel::setWheel,
+                    onBalanceChange = viewModel::setBalance,
                 )
             }
         }
@@ -337,6 +340,8 @@ private fun ResultStep(
     entryId: Long,
     name: String,
     onRenameChange: (String) -> Unit,
+    onWheelChange: (HarmonyWheel) -> Unit,
+    onBalanceChange: (HarmonyBalance) -> Unit,
 ) {
     var currentName by rememberSaveable(entryId) { mutableStateOf(name) }
 
@@ -355,6 +360,13 @@ private fun ResultStep(
             },
             label = { Text(stringResource(R.string.history_entry_name_label)) },
             modifier = Modifier.fillMaxWidth()
+        )
+        HarmonyOptionsControls(
+            wheel = wheel,
+            balance = balance,
+            onWheelChange = onWheelChange,
+            onBalanceChange = onBalanceChange,
+            modifier = Modifier.padding(top = 16.dp),
         )
         HarmonyResultBody(inputColorsArgb = inputColorsArgb, wheel = wheel, balance = balance)
     }

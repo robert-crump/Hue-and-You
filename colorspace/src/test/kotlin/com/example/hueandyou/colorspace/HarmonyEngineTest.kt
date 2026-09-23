@@ -18,26 +18,46 @@ class HarmonyEngineTest {
         0xFF0000FF.toInt(),
     )
 
+    private val yellowArgb = 0xFFFFFF00.toInt()
+
     @Test
-    fun offsetsPerRelationshipAreCorrectOnThePerceptualWheel() {
-        for (argb in sampleColors) {
-            val reference = argbToHct(argb)
-            val suggestions = HarmonyEngine.generate(argb, HarmonyWheel.PERCEPTUAL, HarmonyBalance.FAITHFUL)
+    fun offsetsPerRelationshipAreCorrectOnEachWheel() {
+        for (wheel in HarmonyWheel.entries) {
+            for (argb in sampleColors) {
+                val reference = argbToHct(argb)
+                val suggestions = HarmonyEngine.generate(argb, wheel, HarmonyBalance.FAITHFUL)
 
-            assertHue(reference.hue + 180.0, suggestions.hueOf(HarmonyRelationship.COMPLEMENTARY)[0])
+                fun expectedHue(offsetDegrees: Double) = wheel.strategy.rotate(reference.hue, offsetDegrees)
 
-            val splitComplementary = suggestions.hueOf(HarmonyRelationship.SPLIT_COMPLEMENTARY)
-            assertHue(reference.hue + 150.0, splitComplementary[0])
-            assertHue(reference.hue + 210.0, splitComplementary[1])
+                assertHue(expectedHue(180.0), suggestions.hueOf(HarmonyRelationship.COMPLEMENTARY)[0])
 
-            val analogous = suggestions.hueOf(HarmonyRelationship.ANALOGOUS)
-            assertHue(reference.hue - 30.0, analogous[0])
-            assertHue(reference.hue + 30.0, analogous[1])
+                val splitComplementary = suggestions.hueOf(HarmonyRelationship.SPLIT_COMPLEMENTARY)
+                assertHue(expectedHue(150.0), splitComplementary[0])
+                assertHue(expectedHue(210.0), splitComplementary[1])
 
-            val triadic = suggestions.hueOf(HarmonyRelationship.TRIADIC)
-            assertHue(reference.hue + 120.0, triadic[0])
-            assertHue(reference.hue + 240.0, triadic[1])
+                val analogous = suggestions.hueOf(HarmonyRelationship.ANALOGOUS)
+                assertHue(expectedHue(-30.0), analogous[0])
+                assertHue(expectedHue(30.0), analogous[1])
+
+                val triadic = suggestions.hueOf(HarmonyRelationship.TRIADIC)
+                assertHue(expectedHue(120.0), triadic[0])
+                assertHue(expectedHue(240.0), triadic[1])
+            }
         }
+    }
+
+    @Test
+    fun traditionalWheelComplementOfYellowIsViolet() {
+        val suggestions = HarmonyEngine.generate(yellowArgb, HarmonyWheel.TRADITIONAL, HarmonyBalance.FAITHFUL)
+        val complementHue = suggestions.hueOf(HarmonyRelationship.COMPLEMENTARY)[0]
+        assertTrue("expected a violet hue, got $complementHue", complementHue in 260.0..340.0)
+    }
+
+    @Test
+    fun screenWheelComplementOfYellowIsBlue() {
+        val suggestions = HarmonyEngine.generate(yellowArgb, HarmonyWheel.SCREEN, HarmonyBalance.FAITHFUL)
+        val complementHue = suggestions.hueOf(HarmonyRelationship.COMPLEMENTARY)[0]
+        assertTrue("expected a blue hue, got $complementHue", complementHue in 210.0..300.0)
     }
 
     @Test
@@ -81,16 +101,38 @@ class HarmonyEngineTest {
     }
 
     @Test
-    fun allGeneratedColorsAreInGamut() {
+    fun softenedBalanceLowersChromaAndStaysInGamut() {
         for (argb in sampleColors) {
-            val suggestions = HarmonyEngine.generate(argb, HarmonyWheel.PERCEPTUAL, HarmonyBalance.FAITHFUL)
+            val reference = argbToHct(argb)
+            val suggestions = HarmonyEngine.generate(argb, HarmonyWheel.PERCEPTUAL, HarmonyBalance.SOFTENED)
+
             for (suggestion in suggestions) {
+                if (suggestion.relationship == HarmonyRelationship.TONAL) continue
                 for (color in suggestion.colors) {
-                    assertEquals(0xFF, (color ushr 24) and 0xFF)
-                    val channelR = (color shr 16) and 0xFF
-                    val channelG = (color shr 8) and 0xFF
-                    val channelB = color and 0xFF
-                    assertTrue(channelR in 0..255 && channelG in 0..255 && channelB in 0..255)
+                    assertInGamut(color)
+                    val hct = argbToHct(color)
+                    // Gamut mapping can only ever reduce chroma further, never raise it.
+                    val maxExpectedChroma = reference.chroma * HarmonyConfig.SOFTENED_CHROMA_FACTOR + 0.5
+                    assertTrue(
+                        "chroma ${hct.chroma} exceeds softened max $maxExpectedChroma",
+                        hct.chroma <= maxExpectedChroma
+                    )
+                }
+            }
+        }
+    }
+
+    @Test
+    fun allGeneratedColorsAreInGamut() {
+        for (wheel in HarmonyWheel.entries) {
+            for (balance in HarmonyBalance.entries) {
+                for (argb in sampleColors) {
+                    val suggestions = HarmonyEngine.generate(argb, wheel, balance)
+                    for (suggestion in suggestions) {
+                        for (color in suggestion.colors) {
+                            assertInGamut(color)
+                        }
+                    }
                 }
             }
         }
@@ -105,5 +147,13 @@ class HarmonyEngineTest {
         if (diff > 180.0) diff = 360.0 - diff
         // Gamut mapping can nudge hue slightly for highly saturated colors pushed out of gamut.
         assertTrue("expected hue $normalizedExpected, got $actual", diff <= 2.5)
+    }
+
+    private fun assertInGamut(color: Int) {
+        assertEquals(0xFF, (color ushr 24) and 0xFF)
+        val channelR = (color shr 16) and 0xFF
+        val channelG = (color shr 8) and 0xFF
+        val channelB = color and 0xFF
+        assertTrue(channelR in 0..255 && channelG in 0..255 && channelB in 0..255)
     }
 }

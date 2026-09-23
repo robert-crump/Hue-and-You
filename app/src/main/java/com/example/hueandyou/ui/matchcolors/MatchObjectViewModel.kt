@@ -107,6 +107,18 @@ class MatchObjectViewModel(
         viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
     }
 
+    fun setWheel(wheel: HarmonyWheel) {
+        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
+        _uiState.value = state.copy(wheel = wheel)
+        viewModelScope.launch { historyRepository.updateHarmonyOptions(state.historyEntryId, wheel, state.balance) }
+    }
+
+    fun setBalance(balance: HarmonyBalance) {
+        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
+        _uiState.value = state.copy(balance = balance)
+        viewModelScope.launch { historyRepository.updateHarmonyOptions(state.historyEntryId, state.wheel, balance) }
+    }
+
     private fun decodeBitmap(contentResolver: ContentResolver, uri: Uri): Bitmap {
         val source = ImageDecoder.createSource(contentResolver, uri)
         return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
