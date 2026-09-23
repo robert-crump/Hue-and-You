@@ -1,5 +1,66 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #5: Calibrate and extract - white-sheet tap and dominant colors (happy path)
+
+Built the deep logic in `:colorspace` (pure Kotlin, so it's fully unit-testable without a
+device/emulator) plus the UI wiring in `:app` that replaces the old Rate Clothing placeholder.
+
+`:colorspace` additions:
+- `PixelSource` (interface: `width`/`height`/`pixelAt`) decouples the calibration/extraction
+  math from `android.graphics.Bitmap` - `:colorspace` is a pure-JVM module and can't reference
+  Android framework classes. `IntArrayPixelSource` is the flat-array implementation, used
+  directly by tests and (via `:app`'s new `Bitmap.toPixelSource()` extension, which bulk-copies
+  via `getPixels` rather than a slow pixel-by-pixel `getPixel` loop) by the real screen.
+- `WhiteBalanceCalibrator.calibrate(pixels, tapX, tapY)` samples a circular patch (radius =
+  `CalibrationConfig.WHITE_SAMPLE_RADIUS_FRACTION` of the image's short edge) in linear RGB,
+  averages each channel, and returns a `WhiteBalanceCorrection` (per-channel scale factors) that
+  maps that average to neutral gray - a diagonal, von-Kries-style correction, not a full CAT
+  matrix, since the issue only asked for RGB channel scaling. Returns a sealed
+  `WhiteBalanceResult` (`Success`/`Failure`); the only failure case wired up is "tap landed where
+  the sample circle has zero in-bounds pixels" - real failure *detection* (e.g. "that patch
+  wasn't actually white/gray") is explicitly a separate issue, so `Failure` only guards the
+  divide-by-zero/out-of-bounds edge case for now.
+- `ColorExtractor.extract(pixels, correction?, region?, exclusion?)` crops (optional
+  `RectRegion`), skips an optional `CircleRegion` (the white-sample patch), applies the
+  correction, and quantizes via `QuantizerCelebi` (Wu boxes + weighted k-means) from the
+  `material-color-utilities` dependency already in the version catalog - this is the same
+  quantizer Material You uses for wallpaper theming, and matches the issue's "MCU (Celebi)"
+  wording exactly, so no new dependency was needed. Colors below `MIN_COLOR_SHARE` are dropped
+  and the list is capped at `MAX_COLORS`; "clearly dominant" (`DOMINANT_MIN_SHARE` and
+  `DOMINANT_MIN_RATIO_TO_RUNNER_UP`) is computed from the *unfiltered* sorted list so a
+  runner-up that gets dropped by the share filter can't accidentally make a borderline top
+  color look more dominant than it is.
+- All six thresholds live in one `CalibrationConfig` object (const vals), each also exposed as
+  a default parameter on `calibrate`/`extract` so tests can override individual values without
+  touching global state.
+- New tests: `WhiteBalanceCalibratorTest` (warm-tinted synthetic white patch corrects to
+  R=G=B; tap fully outside the image fails cleanly) and `ColorExtractorTest` (two solid regions
+  return both colors at ~50/50 share; a solid image is flagged clearly-dominant at 100% share;
+  an excluded circular region's color never appears in the result, verified by filling that
+  region with a color - white - that would otherwise clear the share threshold).
+
+`:app` (`ui/rateclothing/`, replacing `RateClothingPlaceholderScreen.kt`): `RateClothingScreen`
+is a state machine (`RateClothingUiState`: `PickingPhoto` -> `LoadingPhoto` -> `Calibrating` ->
+`SelectingColor` or straight to `ShowingResult` if clearly dominant). Photo selection uses the
+system Photo Picker (`ActivityResultContracts.PickVisualMedia`, no runtime permission needed).
+The picked photo is decoded via `ImageDecoder` with `ALLOCATOR_SOFTWARE` (hardware bitmaps can't
+do pixel readback) and downscaled to a max 1024px side (`MAX_PHOTO_DIMENSION_PX`) so calibration/
+extraction stay fast on full-resolution camera photos - this is a practical decode-time concern,
+not one of the domain thresholds, so it's a local constant in the ViewModel rather than added to
+`CalibrationConfig`. The image is displayed at its exact aspect ratio (`Modifier.aspectRatio`)
+so tap coordinates scale linearly to bitmap pixels with no letterboxing math. Re-tapping just
+re-runs calibration and overwrites the previous result; the "Continue" button is only enabled
+once `calibration` is a `Success`, which is what enforces "extraction cannot run before a
+successful calibration" - confirmCalibration() also independently guards on the same cast, so a
+future caller of the ViewModel can't bypass it either. The clothing-result screen (matching
+against a saved profile) is out of scope here per the issue - `ShowingResult` just shows the
+calibrated swatch and its hex.
+
+`./gradlew assembleDebug test` passes. No UI/instrumented test for the tap gesture or Photo
+Picker flow itself (same Robolectric/JDK-26 limitation noted in the #3 entry, and still no
+emulator/device available in this environment) - verified by reading through the gesture math
+and state transitions instead. Verified no new manifest permissions were introduced.
+
 ## 2026-09-23 - Issue #4: Profile editor color picker and reordering
 
 Extended the Profile editor (`ProfileEditorScreen.kt`) from hex-only entry to also

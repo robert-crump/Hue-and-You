@@ -31,7 +31,7 @@ import com.example.hueandyou.R
 import com.example.hueandyou.ui.history.HistoryScreen
 import com.example.hueandyou.ui.matchcolors.MatchColorsPlaceholderScreen
 import com.example.hueandyou.ui.profiles.ProfileEditorScreen
-import com.example.hueandyou.ui.rateclothing.RateClothingPlaceholderScreen
+import com.example.hueandyou.ui.rateclothing.RateClothingScreen
 import com.example.hueandyou.ui.settings.SettingsScreen
 
 @Composable
@@ -89,7 +89,7 @@ fun HueAndYouNavHost() {
                             text = { Text(stringResource(R.string.history_fab_action_rate_clothing)) },
                             onClick = {
                                 showFabMenu = false
-                                navController.navigate(Destination.RateClothingPlaceholder.route)
+                                navController.navigate(Destination.RateClothing.route)
                             }
                         )
                         DropdownMenuItem(
@@ -142,8 +142,8 @@ fun HueAndYouNavHost() {
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
-            composable(Destination.RateClothingPlaceholder.route) {
-                RateClothingPlaceholderScreen(onNavigateBack = { navController.popBackStack() })
+            composable(Destination.RateClothing.route) {
+                RateClothingScreen(onNavigateBack = { navController.popBackStack() })
             }
             composable(Destination.MatchColorsPlaceholder.route) {
                 MatchColorsPlaceholderScreen(onNavigateBack = { navController.popBackStack() })

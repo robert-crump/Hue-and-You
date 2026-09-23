@@ -16,7 +16,7 @@ sealed class Destination(val route: String) {
         const val ARG_PROFILE_ID = "profileId"
         fun route(profileId: Long) = "profile_editor/$profileId"
     }
-    data object RateClothingPlaceholder : Destination("rate_clothing_placeholder")
+    data object RateClothing : Destination("rate_clothing")
     data object MatchColorsPlaceholder : Destination("match_colors_placeholder")
 }
 

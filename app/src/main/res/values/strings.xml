@@ -44,8 +44,14 @@
     <string name="delete_profile_dialog_body">This removes \"%1$s\" and its colors. This can\'t be undone.</string>
     <string name="delete_profile_dialog_confirm">Delete</string>
 
-    <string name="rate_clothing_placeholder_title">Rate clothing</string>
-    <string name="rate_clothing_placeholder_body">This screen is coming soon.</string>
+    <string name="rate_clothing_title">Rate clothing</string>
+    <string name="rate_clothing_white_sheet_reminder">Choose a photo that includes a plain white sheet of paper — it\'s used to calibrate colors.</string>
+    <string name="rate_clothing_pick_photo">Choose photo</string>
+    <string name="rate_clothing_tap_white_sheet">Tap the white sheet of paper in the photo</string>
+    <string name="rate_clothing_photo_content_description">Selected photo</string>
+    <string name="rate_clothing_calibration_failed">Couldn\'t sample that spot — try tapping again</string>
+    <string name="rate_clothing_confirm_calibration">Continue</string>
+    <string name="rate_clothing_select_color">Pick the clothing color</string>
 
     <string name="match_colors_placeholder_title">Match colors for an object</string>
     <string name="match_colors_placeholder_body">This screen is coming soon.</string>
