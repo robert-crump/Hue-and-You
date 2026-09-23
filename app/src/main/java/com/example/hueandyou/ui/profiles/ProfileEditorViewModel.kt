@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.colorspace.parseHexColor
 import com.example.hueandyou.data.profile.ColorKind
+import com.example.hueandyou.data.profile.MoveDirection
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,6 +38,10 @@ class ProfileEditorViewModel(
 
     fun removeColor(colorId: Long) {
         viewModelScope.launch { repository.removeColor(colorId) }
+    }
+
+    fun moveColor(colorId: Long, direction: MoveDirection) {
+        viewModelScope.launch { repository.moveColor(colorId, direction) }
     }
 
     fun deleteProfile(onDeleted: () -> Unit) {

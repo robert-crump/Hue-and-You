@@ -25,11 +25,18 @@
     <string name="profile_editor_add_color_content_description">Add color</string>
     <string name="profile_editor_remove_color_content_description">Remove color</string>
     <string name="profile_editor_delete_content_description">Delete profile</string>
+    <string name="profile_editor_move_up_content_description">Move up</string>
+    <string name="profile_editor_move_down_content_description">Move down</string>
 
     <string name="add_color_dialog_title_best">Add a Best Color</string>
     <string name="add_color_dialog_title_avoid">Add a Color to Avoid</string>
+    <string name="add_color_dialog_mode_hex">Hex</string>
+    <string name="add_color_dialog_mode_picker">Picker</string>
     <string name="add_color_dialog_hex_label">Hex code</string>
     <string name="add_color_dialog_invalid_hex">Enter a valid hex code, like #3A7DFF</string>
+    <string name="add_color_dialog_hue_label">Hue</string>
+    <string name="add_color_dialog_saturation_label">Saturation</string>
+    <string name="add_color_dialog_brightness_label">Brightness</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_add">Add</string>
 

@@ -1,6 +1,7 @@
 package com.example.hueandyou.ui.profiles
 
 import com.example.hueandyou.data.profile.ColorKind
+import com.example.hueandyou.data.profile.MoveDirection
 import com.example.hueandyou.data.profile.PaletteColor
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
@@ -56,6 +57,13 @@ class ProfileEditorViewModelTest {
     }
 
     @Test
+    fun moveColor_delegatesToRepository() {
+        viewModel.moveColor(colorId = 7L, direction = MoveDirection.DOWN)
+
+        assertEquals(listOf(7L to MoveDirection.DOWN), repository.movedColors)
+    }
+
+    @Test
     fun deleteProfile_removesFromRepositoryAndInvokesCallback() {
         var deletedCalled = false
 
@@ -68,6 +76,7 @@ class ProfileEditorViewModelTest {
 
 private class FakeProfileRepository : ProfileRepository {
     val addedColors = mutableListOf<Pair<Long, ColorKind>>()
+    val movedColors = mutableListOf<Pair<Long, MoveDirection>>()
     var deletedProfileId: Long? = null
     private val profiles = MutableStateFlow<Profile?>(
         Profile(
@@ -114,5 +123,9 @@ private class FakeProfileRepository : ProfileRepository {
             bestColors = current.bestColors.filterNot { it.id == colorId },
             avoidColors = current.avoidColors.filterNot { it.id == colorId }
         )
+    }
+
+    override suspend fun moveColor(colorId: Long, direction: MoveDirection) {
+        movedColors += colorId to direction
     }
 }

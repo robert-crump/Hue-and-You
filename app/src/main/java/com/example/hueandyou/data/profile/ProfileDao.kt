@@ -32,8 +32,20 @@ interface ProfileDao {
     @Insert
     suspend fun insertColor(color: PaletteColorEntity): Long
 
+    @Update
+    suspend fun updateColor(color: PaletteColorEntity)
+
     @Query("DELETE FROM palette_colors WHERE id = :colorId")
     suspend fun deleteColor(colorId: Long)
+
+    @Query("SELECT * FROM palette_colors WHERE id = :colorId")
+    suspend fun getColor(colorId: Long): PaletteColorEntity?
+
+    @Query(
+        "SELECT * FROM palette_colors WHERE profileId = :profileId AND kind = :kind " +
+            "ORDER BY position ASC"
+    )
+    suspend fun getColorsForKind(profileId: Long, kind: ColorKind): List<PaletteColorEntity>
 
     @Query(
         "SELECT COALESCE(MAX(position), -1) + 1 FROM palette_colors " +

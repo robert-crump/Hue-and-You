@@ -1,5 +1,44 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #4: Profile editor color picker and reordering
+
+Extended the Profile editor (`ProfileEditorScreen.kt`) from hex-only entry to also
+support a visual picker, and added reordering within each color list:
+
+- `AddColorDialog` now has a `SingleChoiceSegmentedButtonRow` ("Hex" / "Picker") toggle.
+  Picker mode drives three Material3 `Slider`s (hue 0-360, saturation 0-1, brightness
+  0-1) through `android.graphics.Color.HSVToColor` (no new dependency - this is plain
+  Android SDK, fine to use from `:app` since it's not the pure-JVM `:colorspace`
+  module) and shows a live swatch + the resulting hex via `colorspace.formatHexColor`.
+  Rather than plumbing a new argb-accepting path through the ViewModel/repository, the
+  picker just computes a guaranteed-valid hex string and reuses the existing
+  `addColor(kind, hex, invalidHexMessage)` call - kept the surface area of this change
+  to the dialog only.
+- Reordering is up/down icon buttons per row (not drag-and-drop - no reorder library
+  is in the version catalog, and up/down buttons are simpler to get right and to test
+  than implementing drag gestures from scratch for one issue). Buttons disable at each
+  list's boundary.
+- New `MoveDirection` enum (`UP`/`DOWN`) alongside `ColorKind`.
+  `ProfileDao` gained `getColor`, `getColorsForKind` (ordered by `position`), and
+  `updateColor`. `RoomProfileRepository.moveColor` reads the color's siblings within
+  its own `profileId + kind`, swaps `position` with the adjacent sibling, and no-ops at
+  either boundary. `ColorKind` isolation falls out for free since siblings are always
+  queried by `(profileId, kind)`. Order was already persisted via `position` and
+  already flows into `Profile.bestColors`/`avoidColors` (sorted in `toDomain()`), and
+  the Settings profile-card swatches already render that list in order - so no changes
+  were needed there for the "reflected on profile card" acceptance criterion, it was
+  already wired correctly by issue #3.
+- `FakeProfileDao` (test double) and `FakeProfileRepository` (in
+  `ProfileEditorViewModelTest`) both had to grow matching methods, since Kotlin
+  interfaces don't allow partial implementation - a reminder for future DAO/repository
+  interface changes that both test doubles need updating.
+
+`./gradlew assembleDebug test` passes (10 repository tests incl. 4 new move-boundary/
+kind-isolation cases, 4 ViewModel tests incl. 1 new delegation case). Verified no new
+permissions in the merged manifest. No UI/instrumented test for the picker sliders or
+button taps themselves (same Robolectric/JDK-26 limitation noted in the #3 entry, and
+still no emulator/device available in this environment).
+
 ## 2026-09-23 - Issue #3: Profiles (create, rename, delete, add/remove colors by hex)
 
 Wired up Room for the first time (deferred from issue #1/#2). Used **KSP**, not kapt:

@@ -8,13 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +25,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -42,7 +48,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
+import com.example.hueandyou.colorspace.formatHexColor
 import com.example.hueandyou.data.profile.ColorKind
+import com.example.hueandyou.data.profile.MoveDirection
 import com.example.hueandyou.data.profile.PaletteColor
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,14 +111,16 @@ fun ProfileEditorScreen(
                 title = stringResource(R.string.profile_editor_best_colors_title),
                 colors = currentProfile.bestColors,
                 onAddClick = { addColorKind = ColorKind.BEST },
-                onRemoveColor = { viewModel.removeColor(it) }
+                onRemoveColor = { viewModel.removeColor(it) },
+                onMoveColor = { colorId, direction -> viewModel.moveColor(colorId, direction) }
             )
 
             ColorSection(
                 title = stringResource(R.string.profile_editor_avoid_colors_title),
                 colors = currentProfile.avoidColors,
                 onAddClick = { addColorKind = ColorKind.AVOID },
-                onRemoveColor = { viewModel.removeColor(it) }
+                onRemoveColor = { viewModel.removeColor(it) },
+                onMoveColor = { colorId, direction -> viewModel.moveColor(colorId, direction) }
             )
         }
     }
@@ -157,7 +167,8 @@ private fun ColorSection(
     title: String,
     colors: List<PaletteColor>,
     onAddClick: () -> Unit,
-    onRemoveColor: (Long) -> Unit
+    onRemoveColor: (Long) -> Unit,
+    onMoveColor: (colorId: Long, direction: MoveDirection) -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(
@@ -183,7 +194,7 @@ private fun ColorSection(
             )
         } else {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(colors, key = { it.id }) { color ->
+                itemsIndexed(colors, key = { _, color -> color.id }) { index, color ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -197,11 +208,33 @@ private fun ColorSection(
                                 .background(Color(color.argb))
                         )
                         Text(
-                            text = com.example.hueandyou.colorspace.formatHexColor(color.argb),
+                            text = formatHexColor(color.argb),
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(start = 12.dp)
                         )
+                        IconButton(
+                            onClick = { onMoveColor(color.id, MoveDirection.UP) },
+                            enabled = index > 0
+                        ) {
+                            Icon(
+                                Icons.Filled.KeyboardArrowUp,
+                                contentDescription = stringResource(
+                                    R.string.profile_editor_move_up_content_description
+                                )
+                            )
+                        }
+                        IconButton(
+                            onClick = { onMoveColor(color.id, MoveDirection.DOWN) },
+                            enabled = index < colors.lastIndex
+                        ) {
+                            Icon(
+                                Icons.Filled.KeyboardArrowDown,
+                                contentDescription = stringResource(
+                                    R.string.profile_editor_move_down_content_description
+                                )
+                            )
+                        }
                         IconButton(onClick = { onRemoveColor(color.id) }) {
                             Icon(
                                 Icons.Filled.Close,
@@ -217,15 +250,27 @@ private fun ColorSection(
     }
 }
 
+private enum class ColorEntryMode { HEX, PICKER }
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddColorDialog(
     kind: ColorKind,
     onDismiss: () -> Unit,
     onAdd: (hex: String, invalidHexMessage: String) -> String?
 ) {
+    var mode by rememberSaveable { mutableStateOf(ColorEntryMode.HEX) }
     var hex by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var hue by rememberSaveable { mutableStateOf(0f) }
+    var saturation by rememberSaveable { mutableStateOf(1f) }
+    var brightness by rememberSaveable { mutableStateOf(1f) }
     val invalidHexMessage = stringResource(R.string.add_color_dialog_invalid_hex)
+
+    val pickedArgb = remember(hue, saturation, brightness) {
+        android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, brightness))
+    }
+    val pickedHex = remember(pickedArgb) { formatHexColor(pickedArgb) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -242,23 +287,71 @@ private fun AddColorDialog(
         },
         text = {
             Column {
-                OutlinedTextField(
-                    value = hex,
-                    onValueChange = {
-                        hex = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.add_color_dialog_hex_label)) },
-                    isError = error != null
-                )
-                error?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.error)
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = mode == ColorEntryMode.HEX,
+                        onClick = { mode = ColorEntryMode.HEX },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text(stringResource(R.string.add_color_dialog_mode_hex))
+                    }
+                    SegmentedButton(
+                        selected = mode == ColorEntryMode.PICKER,
+                        onClick = { mode = ColorEntryMode.PICKER },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text(stringResource(R.string.add_color_dialog_mode_picker))
+                    }
+                }
+
+                if (mode == ColorEntryMode.HEX) {
+                    OutlinedTextField(
+                        value = hex,
+                        onValueChange = {
+                            hex = it
+                            error = null
+                        },
+                        label = { Text(stringResource(R.string.add_color_dialog_hex_label)) },
+                        isError = error != null,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                    error?.let {
+                        Text(text = it, color = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    Column(modifier = Modifier.padding(top = 12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(pickedArgb))
+                            )
+                            Text(text = pickedHex, modifier = Modifier.padding(start = 12.dp))
+                        }
+                        Text(
+                            text = stringResource(R.string.add_color_dialog_hue_label),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Slider(value = hue, onValueChange = { hue = it }, valueRange = 0f..360f)
+                        Text(
+                            text = stringResource(R.string.add_color_dialog_saturation_label),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Slider(value = saturation, onValueChange = { saturation = it }, valueRange = 0f..1f)
+                        Text(
+                            text = stringResource(R.string.add_color_dialog_brightness_label),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Slider(value = brightness, onValueChange = { brightness = it }, valueRange = 0f..1f)
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                val result = onAdd(hex, invalidHexMessage)
+                val hexToAdd = if (mode == ColorEntryMode.PICKER) pickedHex else hex
+                val result = onAdd(hexToAdd, invalidHexMessage)
                 if (result == null) {
                     onDismiss()
                 } else {

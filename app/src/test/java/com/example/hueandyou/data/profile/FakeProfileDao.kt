@@ -50,10 +50,22 @@ class FakeProfileDao : ProfileDao {
         return id
     }
 
+    override suspend fun updateColor(color: PaletteColorEntity) {
+        colors[color.id] = color
+        emit()
+    }
+
     override suspend fun deleteColor(colorId: Long) {
         colors.remove(colorId)
         emit()
     }
+
+    override suspend fun getColor(colorId: Long): PaletteColorEntity? = colors[colorId]
+
+    override suspend fun getColorsForKind(profileId: Long, kind: ColorKind): List<PaletteColorEntity> =
+        colors.values
+            .filter { it.profileId == profileId && it.kind == kind }
+            .sortedBy { it.position }
 
     override suspend fun nextPosition(profileId: Long, kind: ColorKind): Int =
         (

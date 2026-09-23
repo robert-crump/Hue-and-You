@@ -11,6 +11,7 @@ interface ProfileRepository {
     suspend fun deleteProfile(profileId: Long)
     suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long
     suspend fun removeColor(colorId: Long)
+    suspend fun moveColor(colorId: Long, direction: MoveDirection)
 }
 
 class RoomProfileRepository(
@@ -49,5 +50,19 @@ class RoomProfileRepository(
 
     override suspend fun removeColor(colorId: Long) {
         dao.deleteColor(colorId)
+    }
+
+    override suspend fun moveColor(colorId: Long, direction: MoveDirection) {
+        val color = dao.getColor(colorId) ?: return
+        val siblings = dao.getColorsForKind(color.profileId, color.kind)
+        val index = siblings.indexOfFirst { it.id == colorId }
+        if (index < 0) return
+        val targetIndex = if (direction == MoveDirection.UP) index - 1 else index + 1
+        if (targetIndex < 0 || targetIndex >= siblings.size) return
+
+        val target = siblings[targetIndex]
+        dao.updateColor(color.copy(position = target.position))
+        dao.updateColor(target.copy(position = color.position))
+        dao.getProfile(color.profileId)?.let { dao.updateProfile(it.copy(updatedAt = currentTimeMillis())) }
     }
 }
