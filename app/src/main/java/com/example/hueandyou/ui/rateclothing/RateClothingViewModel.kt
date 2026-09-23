@@ -36,6 +36,10 @@ class RateClothingViewModel : ViewModel() {
         _uiState.value = state.copy(calibration = result)
     }
 
+    fun chooseNewPhoto() {
+        _uiState.value = RateClothingUiState.PickingPhoto
+    }
+
     fun confirmCalibration() {
         val state = _uiState.value as? RateClothingUiState.Calibrating ?: return
         val success = state.calibration as? WhiteBalanceResult.Success ?: return

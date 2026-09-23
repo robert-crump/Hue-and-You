@@ -1,5 +1,47 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #6: Calibration failures - clipped, too dark, not white
+
+Added real failure *detection* to `WhiteBalanceCalibrator.calibrate` in `:colorspace` (issue #5
+only guarded the zero-sampled-pixels edge case; this issue is the "that patch wasn't actually
+white/gray" detection deferred there). Three new `WhiteBalanceFailureReason` values, checked in
+this order after the existing `NO_SAMPLED_PIXELS` guard:
+- `CLIPPED`: while summing the sample circle's pixels, also counts pixels with any raw channel
+  (0-255 scale, not linear) at/above `CalibrationConfig.CLIPPED_CHANNEL_THRESHOLD` (250). Fails
+  once that count's share of the sample exceeds `CLIPPED_PIXEL_FRACTION_THRESHOLD` (0.05) - both
+  are the issue's own starting-guess numbers.
+- `TOO_DARK`: converts the sample's averaged linear RGB to Lab and fails if `L` is below
+  `MIN_WHITE_LUMINANCE_L` (50.0, a starting guess - a lit white sheet should read far brighter
+  than mid-gray).
+- `NOT_WHITE`: fails if that same Lab point's chroma (`sqrt(a^2+b^2)`) exceeds
+  `MAX_WHITE_CHROMA` (15.0, a starting guess) - reuses `linearRgbToLab` from issue #2, no new
+  color math needed.
+All four thresholds are `CalibrationConfig` consts, each also a `calibrate(...)` default
+parameter (same pattern as the existing `sampleRadiusFraction`), so tests can override
+individually. Picked the threshold values against the actual Lab math (via a throwaway Python
+port of the sRGB->Lab constants, checked against `ColorConversions.kt` line for line) rather
+than guessing blind, so the existing "warm-tinted white" happy-path test and the three new
+failure tests all land with real margin, not by luck.
+
+Had to retune the existing `warmTintedWhitePatchIsCorrectedToNeutral` test fixture: its old
+color (`0xFFFFE0C0`, R=255) was itself clipped and had chroma ~20 - both of which now correctly
+fail before this issue, since nothing previously checked for either. Swapped it for a milder
+warm off-white (`0xFFF5E6D3`, L~92, chroma~11) that's still clearly warm-tinted but comfortably
+inside both new thresholds - this is a fixture fix caused by adding real detection, not a
+weakening of the test.
+
+UI (`:app`, `ui/rateclothing/`): `CalibratingStep`'s failure `Text` now switches on
+`WhiteBalanceFailureReason` to one of four distinct string resources (clipped/too-dark/not-white
+messages, plus the existing generic one for `NO_SAMPLED_PIXELS`) instead of one generic message
+for every failure. Added a second button, "Choose a different photo"
+(`RateClothingViewModel.chooseNewPhoto()` resets to `PickingPhoto`), next to the existing
+Continue button - re-tapping already worked for free (the photo stays on screen and `onTap` just
+overwrites `calibration`), so this covers the acceptance criterion's other half ("re-tap or
+choose a new photo") without new state-machine states.
+
+`./gradlew assembleDebug test` passes (3 new calibrator failure tests, 1 existing test fixture
+retuned). Verified no new manifest permissions were introduced.
+
 ## 2026-09-23 - Issue #5: Calibrate and extract - white-sheet tap and dominant colors (happy path)
 
 Built the deep logic in `:colorspace` (pure Kotlin, so it's fully unit-testable without a
@@ -195,33 +237,3 @@ and not blocked by the AGP-built-in-Kotlin gotcha below, since that gotcha only 
 Android (AGP) modules; a non-Android module still needs the ordinary Kotlin JVM plugin.
 
 `./gradlew assembleDebug test` (root) and `./gradlew :colorspace:test` both pass.
-
-## 2026-09-23 - Issue #1: App shell (navigation, dynamic color, History empty state, FAB)
-
-Implemented the runnable app shell:
-- Wired the agreed stack: Compose + Material3, Navigation Compose, Room (runtime/ktx only,
-  no KSP/compiler yet - no entities exist), kotlinx.serialization, DataStore (preferences),
-  and Material Color Utilities (me.tatarka.google.material:material-color-utilities, the
-  only real Maven Central artifact for the Java port of Google's library).
-- Added HueAndYouApplication + a manual DI AppContainer (holds a DataStore<Preferences>).
-- MainActivity hosts a NavHost with History and Settings bottom-nav destinations, plus two
-  placeholder destinations ("Rate clothing", "Match colors for an object") reached from a
-  FAB dropdown menu on the History tab.
-- Theme.kt uses dynamicLightColorScheme/dynamicDarkColorScheme (device is always API 31+,
-  so dynamic color is unconditionally available) with a static fallback.
-- History screen shows an empty state (icon + title + explanatory body text).
-- Removed the legacy View-based Material Components theme/colors.xml since the app is
-  Compose-only now.
-
-Key gotcha for future issues: this repo's AGP (9.2.1) has *built-in* Kotlin support - do
-NOT apply the `org.jetbrains.kotlin.android` plugin, it now fails the build outright
-("no longer required for Kotlin support since AGP 9.0"). Only apply
-`org.jetbrains.kotlin.plugin.compose` / `.plugin.serialization` when needed, version-pinned
-via libs.versions.toml (kotlin = "2.4.20"). Also: androidx.compose.material3.TopAppBar is
-still `@ExperimentalMaterial3Api` on the compose-bom version in use (2026.09.00) - needs
-`@OptIn(ExperimentalMaterial3Api::class)`.
-
-`./gradlew assembleDebug test` passes. Verified no INTERNET permission in the merged
-manifest. Room's compiler/KSP setup is deliberately deferred to whichever issue first adds
-a real @Entity/@Dao (likely issue #9, History auto-save) - wiring KSP now without any
-annotated classes to process would add unverified version-matching risk for no benefit.

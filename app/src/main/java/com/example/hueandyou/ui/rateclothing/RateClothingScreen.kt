@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.ExtractedColor
+import com.example.hueandyou.colorspace.WhiteBalanceFailureReason
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.colorspace.formatHexColor
 import kotlin.math.roundToInt
@@ -106,6 +107,7 @@ fun RateClothingScreen(
                     calibration = state.calibration,
                     onTap = viewModel::onTap,
                     onConfirm = viewModel::confirmCalibration,
+                    onChooseNewPhoto = viewModel::chooseNewPhoto,
                 )
                 is RateClothingUiState.SelectingColor -> SelectingColorStep(
                     colors = state.colors,
@@ -149,6 +151,7 @@ private fun CalibratingStep(
     calibration: WhiteBalanceResult?,
     onTap: (x: Int, y: Int) -> Unit,
     onConfirm: () -> Unit,
+    onChooseNewPhoto: () -> Unit,
 ) {
     var displaySize by remember { mutableStateOf(IntSize.Zero) }
     val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
@@ -203,19 +206,33 @@ private fun CalibratingStep(
         }
         if (calibration is WhiteBalanceResult.Failure) {
             Text(
-                text = stringResource(R.string.rate_clothing_calibration_failed),
+                text = stringResource(calibrationFailureMessage(calibration.reason)),
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 8.dp)
             )
         }
-        Button(
-            onClick = onConfirm,
-            enabled = calibration is WhiteBalanceResult.Success,
-            modifier = Modifier.padding(top = 16.dp)
-        ) {
-            Text(stringResource(R.string.rate_clothing_confirm_calibration))
+        Row(modifier = Modifier.padding(top = 16.dp)) {
+            Button(
+                onClick = onConfirm,
+                enabled = calibration is WhiteBalanceResult.Success,
+            ) {
+                Text(stringResource(R.string.rate_clothing_confirm_calibration))
+            }
+            Button(
+                onClick = onChooseNewPhoto,
+                modifier = Modifier.padding(start = 8.dp)
+            ) {
+                Text(stringResource(R.string.rate_clothing_choose_different_photo))
+            }
         }
     }
+}
+
+private fun calibrationFailureMessage(reason: WhiteBalanceFailureReason): Int = when (reason) {
+    WhiteBalanceFailureReason.NO_SAMPLED_PIXELS -> R.string.rate_clothing_calibration_failed
+    WhiteBalanceFailureReason.CLIPPED -> R.string.rate_clothing_calibration_failed_clipped
+    WhiteBalanceFailureReason.TOO_DARK -> R.string.rate_clothing_calibration_failed_too_dark
+    WhiteBalanceFailureReason.NOT_WHITE -> R.string.rate_clothing_calibration_failed_not_white
 }
 
 @Composable

@@ -50,7 +50,11 @@
     <string name="rate_clothing_tap_white_sheet">Tap the white sheet of paper in the photo</string>
     <string name="rate_clothing_photo_content_description">Selected photo</string>
     <string name="rate_clothing_calibration_failed">Couldn\'t sample that spot — try tapping again</string>
+    <string name="rate_clothing_calibration_failed_clipped">That spot is overexposed (washed out to pure white), so it can\'t be used to calibrate. Try tapping a less bright part of the sheet, or take/pick a new photo with less glare.</string>
+    <string name="rate_clothing_calibration_failed_too_dark">That spot looks too dark to be the white sheet. Try tapping a brighter part of it, or choose a better-lit photo.</string>
+    <string name="rate_clothing_calibration_failed_not_white">That spot doesn\'t look white — it\'s too strongly colored. Try tapping directly on the white sheet.</string>
     <string name="rate_clothing_confirm_calibration">Continue</string>
+    <string name="rate_clothing_choose_different_photo">Choose a different photo</string>
     <string name="rate_clothing_select_color">Pick the clothing color</string>
 
     <string name="match_colors_placeholder_title">Match colors for an object</string>

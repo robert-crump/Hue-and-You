@@ -8,6 +8,18 @@ object CalibrationConfig {
     /** Radius of the circular white-sheet sample, as a fraction of the image's short edge. */
     const val WHITE_SAMPLE_RADIUS_FRACTION = 0.03
 
+    /** A channel value (0-255) at or above this is considered blown out/clipped. */
+    const val CLIPPED_CHANNEL_THRESHOLD = 250
+
+    /** The sample fails as [WhiteBalanceFailureReason.CLIPPED] once more than this share of its pixels are clipped. */
+    const val CLIPPED_PIXEL_FRACTION_THRESHOLD = 0.05
+
+    /** The sample fails as [WhiteBalanceFailureReason.TOO_DARK] below this average Lab lightness (0-100). */
+    const val MIN_WHITE_LUMINANCE_L = 50.0
+
+    /** The sample fails as [WhiteBalanceFailureReason.NOT_WHITE] above this average Lab chroma. */
+    const val MAX_WHITE_CHROMA = 15.0
+
     /** Number of clusters requested from the quantizer, before the share filter and cap below. */
     const val QUANTIZER_CLUSTER_COUNT = 16
 
