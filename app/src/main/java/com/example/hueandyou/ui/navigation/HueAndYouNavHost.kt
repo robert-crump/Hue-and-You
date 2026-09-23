@@ -143,7 +143,12 @@ fun HueAndYouNavHost() {
                 )
             }
             composable(Destination.RateClothing.route) {
-                RateClothingScreen(onNavigateBack = { navController.popBackStack() })
+                RateClothingScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToProfileSettings = {
+                        navController.navigate(Destination.Settings.route(scrollToProfiles = true))
+                    }
+                )
             }
             composable(Destination.MatchColorsPlaceholder.route) {
                 MatchColorsPlaceholderScreen(onNavigateBack = { navController.popBackStack() })

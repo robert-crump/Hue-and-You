@@ -22,9 +22,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -56,10 +60,14 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
+import com.example.hueandyou.colorspace.ColorMatch
+import com.example.hueandyou.colorspace.ColorMatchBand
 import com.example.hueandyou.colorspace.ExtractedColor
+import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.WhiteBalanceFailureReason
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.colorspace.formatHexColor
+import com.example.hueandyou.data.profile.Profile
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -67,7 +75,8 @@ import kotlin.math.roundToInt
 @Composable
 fun RateClothingScreen(
     onNavigateBack: () -> Unit,
-    viewModel: RateClothingViewModel = viewModel(),
+    onNavigateToProfileSettings: () -> Unit,
+    viewModel: RateClothingViewModel = viewModel(factory = RateClothingViewModel.factory(LocalContext.current)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -105,6 +114,15 @@ fun RateClothingScreen(
                 .padding(innerPadding)
         ) {
             when (val state = uiState) {
+                is RateClothingUiState.LoadingProfiles -> LoadingStep()
+                is RateClothingUiState.NoProfile -> NoProfileDialog(
+                    onCancel = onNavigateBack,
+                    onGoToSettings = onNavigateToProfileSettings,
+                )
+                is RateClothingUiState.SelectingProfile -> SelectingProfileStep(
+                    profiles = state.profiles,
+                    onSelect = viewModel::selectProfile,
+                )
                 is RateClothingUiState.PickingPhoto -> PickPhotoStep(
                     onTakePhoto = {
                         val uri = createCameraPhotoUri(context)
@@ -129,7 +147,53 @@ fun RateClothingScreen(
                     colors = state.colors,
                     onSelect = viewModel::selectColor,
                 )
-                is RateClothingUiState.ShowingResult -> ResultStep(argb = state.argb)
+                is RateClothingUiState.ShowingResult -> ResultStep(argb = state.argb, score = state.score)
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoProfileDialog(onCancel: () -> Unit, onGoToSettings: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text(stringResource(R.string.rate_clothing_no_profile_title)) },
+        text = { Text(stringResource(R.string.rate_clothing_no_profile_body)) },
+        confirmButton = {
+            TextButton(onClick = onGoToSettings) {
+                Text(stringResource(R.string.rate_clothing_go_to_settings))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel) {
+                Text(stringResource(R.string.dialog_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun SelectingProfileStep(profiles: List<Profile>, onSelect: (Profile) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.rate_clothing_select_profile_title),
+            style = MaterialTheme.typography.bodyLarge
+        )
+        LazyColumn(modifier = Modifier.padding(top = 16.dp)) {
+            items(profiles, key = { it.id }) { profile ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(profile) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(text = profile.name, style = MaterialTheme.typography.titleMedium)
+                }
             }
         }
     }
@@ -300,16 +364,21 @@ private fun SelectingColorStep(
 }
 
 @Composable
-private fun ResultStep(argb: Int) {
+private fun ResultStep(argb: Int, score: PaletteScore) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(
+            text = stringResource(R.string.rate_clothing_measured_color_label),
+            style = MaterialTheme.typography.titleMedium
+        )
         Box(
             modifier = Modifier
+                .padding(top = 8.dp)
                 .size(120.dp)
                 .clip(CircleShape)
                 .background(Color(argb))
@@ -317,7 +386,68 @@ private fun ResultStep(argb: Int) {
         Text(
             text = formatHexColor(argb),
             style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(top = 16.dp)
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        if (score.closerToAvoid) {
+            Text(
+                text = stringResource(R.string.rate_clothing_closer_to_avoid_warning),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = 24.dp)
+            )
+        }
+
+        score.nearestBest?.let { match ->
+            ColorMatchRow(labelRes = R.string.rate_clothing_nearest_best_label, match = match)
+        }
+        score.nearestAvoid?.let { match ->
+            ColorMatchRow(labelRes = R.string.rate_clothing_nearest_avoid_label, match = match)
+        }
+
+        Text(
+            text = stringResource(R.string.rate_clothing_best_guess_disclaimer),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = 24.dp)
         )
     }
+}
+
+@Composable
+private fun ColorMatchRow(labelRes: Int, match: ColorMatch) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp)
+    ) {
+        Text(text = stringResource(labelRes), style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier.padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(match.argb))
+            )
+            Column(modifier = Modifier.padding(start = 12.dp)) {
+                Text(text = formatHexColor(match.argb))
+                Text(
+                    text = "ΔE %.1f — %s".format(
+                        match.deltaE,
+                        stringResource(colorMatchBandLabel(match.band))
+                    ),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+private fun colorMatchBandLabel(band: ColorMatchBand): Int = when (band) {
+    ColorMatchBand.MATCH -> R.string.color_match_band_match
+    ColorMatchBand.CLOSE -> R.string.color_match_band_close
+    ColorMatchBand.RELATED -> R.string.color_match_band_related
+    ColorMatchBand.FAR -> R.string.color_match_band_far
 }

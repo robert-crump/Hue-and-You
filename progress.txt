@@ -1,5 +1,66 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #8: Rate clothing - profile selection, PaletteScorer and result screen
+
+Closed the loop on the Rate Clothing flow: profile choice at the start, scoring the measured
+color against that profile, and a real result screen (replacing the old "swatch + hex" stub
+from issue #5).
+
+`PaletteScorer` (new, `:colorspace`, pure Kotlin): `PaletteScorer.score(measuredArgb,
+bestColors, avoidColors)` takes plain `List<Int>` ARGB lists rather than the app module's
+`Profile`/`PaletteColor` domain types - `:colorspace` is a pure-JVM module and can't depend on
+`:app`, matching the existing `ColorExtractor`/`WhiteBalanceCalibrator` pattern of talking in
+primitives at the module boundary. Converts the measured color to Lab once and finds each
+side's nearest match by ΔE00 (`ciede2000`, from issue #2); either side is `null` when its list
+is empty, and `closerToAvoid` is only ever true when *both* sides have a match and Avoid's ΔE
+is strictly smaller - an empty Best list can't make "closer to Avoid" true by default, since
+there's nothing to be closer *than*. Bands live in a new `ColorMatchBand` enum with the
+boundary constants and the classifying function on its companion, in the same file as
+`PaletteScorer` - "one place" per the issue, and colocated rather than folded into
+`CalibrationConfig` since these thresholds are about matching against a profile, not about
+calibration/extraction. Boundaries per the issue's own numbers: ΔE ≤ 3 match, ≤ 8 close, ≤ 15
+related, > 15 far (all inclusive at the upper edge, tested directly at each boundary value).
+
+`:app` wiring: `RateClothingViewModel` now takes a `ProfileRepository` (via the same
+`companion object factory(context)` + `viewModelFactory { initializer { ... } }` pattern
+`ProfilesViewModel`/`ProfileEditorViewModel` already use) and starts in a new
+`LoadingProfiles` state. `init` reads `observeProfiles().first()` once (a snapshot for this
+rating session, not a live subscription - the profile list isn't expected to change mid-flow)
+and branches to `NoProfile`, or straight past selection into `PickingPhoto` with
+`selectedProfile` set when there's exactly one profile, or `SelectingProfile(profiles)` when
+there are several; `selectProfile(profile)` (called on user tap) does the same
+"stash-then-advance-to-PickingPhoto" transition. Both `confirmCalibration()`'s
+clearly-dominant path and `selectColor()` now funnel through a shared `resultFor(argb)` that
+runs `PaletteScorer.score` against the stashed `selectedProfile` (or an all-null/false
+`PaletteScore` if somehow still unset) and produces `ShowingResult(argb, score)` -
+`RateClothingUiState.ShowingResult` gained that `score: PaletteScore` field.
+
+UI (`ui/rateclothing/RateClothingScreen.kt`): `NoProfile` renders an `AlertDialog` (title +
+body + "Cancel"/"Go to Settings" buttons, both dismissing) rather than a full screen, since the
+issue frames it as a dialog, not a step; "Cancel" reuses the screen's existing
+`onNavigateBack`, and the new `onNavigateToProfileSettings` callback (screen gained this
+parameter) is wired in `HueAndYouNavHost` to `Destination.Settings.route(scrollToProfiles =
+true)` - the deep-link route issue #3 built for exactly this. `SelectingProfile` is a plain
+tappable name list, matching the existing `SelectingColorStep` list pattern. `ResultStep` now
+shows the measured swatch+hex (unchanged from before, just relabeled), then an error-colored
+"closer to Avoid" warning when `score.closerToAvoid`, then a `ColorMatchRow` (swatch + hex + "ΔE
+x.x — <band>") for each of `nearestBest`/`nearestAvoid` that isn't null, then the "best guess"
+disclaimer at the bottom - the whole column is now `verticalScroll`-wrapped since this can run
+longer than one screen on small devices. Band labels are their own four string resources
+(`color_match_band_*`) via a small `colorMatchBandLabel` mapping function, same shape as the
+existing `calibrationFailureMessage` mapping for `WhiteBalanceFailureReason`.
+
+New tests: `PaletteScorerTest` (`:colorspace`) - band boundaries at each threshold edge,
+nearest-color selection among several candidates, `closerToAvoid` true/false in both
+directions, and all three empty-list combinations (empty Best, empty Avoid, both empty).
+
+`./gradlew assembleDebug test` passes (7 new `PaletteScorerTest` cases). No UI/instrumented
+test for the profile dialog/list taps or the result screen layout itself (same
+Robolectric/JDK-26 limitation noted in the #3 entry, and still no emulator/device available in
+this environment) - verified by reading through the state machine and Compose tree instead.
+Verified no new manifest permissions were introduced (no manifest-affecting changes in this
+issue).
+
 ## 2026-09-23 - Issue #7: Camera capture as photo source
 
 Added "Take photo" alongside the existing gallery picker on `PickPhotoStep` (`:app`,
@@ -145,106 +206,3 @@ calibrated swatch and its hex.
 Picker flow itself (same Robolectric/JDK-26 limitation noted in the #3 entry, and still no
 emulator/device available in this environment) - verified by reading through the gesture math
 and state transitions instead. Verified no new manifest permissions were introduced.
-
-## 2026-09-23 - Issue #4: Profile editor color picker and reordering
-
-Extended the Profile editor (`ProfileEditorScreen.kt`) from hex-only entry to also
-support a visual picker, and added reordering within each color list:
-
-- `AddColorDialog` now has a `SingleChoiceSegmentedButtonRow` ("Hex" / "Picker") toggle.
-  Picker mode drives three Material3 `Slider`s (hue 0-360, saturation 0-1, brightness
-  0-1) through `android.graphics.Color.HSVToColor` (no new dependency - this is plain
-  Android SDK, fine to use from `:app` since it's not the pure-JVM `:colorspace`
-  module) and shows a live swatch + the resulting hex via `colorspace.formatHexColor`.
-  Rather than plumbing a new argb-accepting path through the ViewModel/repository, the
-  picker just computes a guaranteed-valid hex string and reuses the existing
-  `addColor(kind, hex, invalidHexMessage)` call - kept the surface area of this change
-  to the dialog only.
-- Reordering is up/down icon buttons per row (not drag-and-drop - no reorder library
-  is in the version catalog, and up/down buttons are simpler to get right and to test
-  than implementing drag gestures from scratch for one issue). Buttons disable at each
-  list's boundary.
-- New `MoveDirection` enum (`UP`/`DOWN`) alongside `ColorKind`.
-  `ProfileDao` gained `getColor`, `getColorsForKind` (ordered by `position`), and
-  `updateColor`. `RoomProfileRepository.moveColor` reads the color's siblings within
-  its own `profileId + kind`, swaps `position` with the adjacent sibling, and no-ops at
-  either boundary. `ColorKind` isolation falls out for free since siblings are always
-  queried by `(profileId, kind)`. Order was already persisted via `position` and
-  already flows into `Profile.bestColors`/`avoidColors` (sorted in `toDomain()`), and
-  the Settings profile-card swatches already render that list in order - so no changes
-  were needed there for the "reflected on profile card" acceptance criterion, it was
-  already wired correctly by issue #3.
-- `FakeProfileDao` (test double) and `FakeProfileRepository` (in
-  `ProfileEditorViewModelTest`) both had to grow matching methods, since Kotlin
-  interfaces don't allow partial implementation - a reminder for future DAO/repository
-  interface changes that both test doubles need updating.
-
-`./gradlew assembleDebug test` passes (10 repository tests incl. 4 new move-boundary/
-kind-isolation cases, 4 ViewModel tests incl. 1 new delegation case). Verified no new
-permissions in the merged manifest. No UI/instrumented test for the picker sliders or
-button taps themselves (same Robolectric/JDK-26 limitation noted in the #3 entry, and
-still no emulator/device available in this environment).
-
-## 2026-09-23 - Issue #3: Profiles (create, rename, delete, add/remove colors by hex)
-
-Wired up Room for the first time (deferred from issue #1/#2). Used **KSP**, not kapt:
-tested `com.google.devtools.ksp` against this repo's Kotlin 2.4.20 even though the KSP
-plugin portal's newest published pairing is `2.3.12` (KSP has apparently decoupled its own
-versioning from a strict per-Kotlin-version pairing as of its 2.3.x line) - `:app:kspDebugKotlin`
-and a full `assembleDebug test` both succeeded, so this is confirmed working, not just
-theorized. Added `libs.plugins.ksp` (root `build.gradle.kts` applies it `apply false`,
-`:app` applies it for real) and `ksp(libs.androidx.room.compiler)`.
-
-Data layer lives under `com.example.hueandyou.data.profile` in `:app` (needs a live
-Android `Context` for `Room.databaseBuilder`, so it couldn't go in the pure-JVM
-`:colorspace` module):
-- `ProfileEntity` / `PaletteColorEntity` (`Room`, FK cascade-delete from profile to its
-  colors) + `Converters` (ColorKind <-> String) + `ProfileWithColors` (`@Relation`).
-- `ProfileDao`: flows for the profile list and a single profile-with-colors, plus
-  suspend CRUD; `nextPosition(profileId, kind)` computes the next append position so Best
-  and Avoid colors keep independent, stable orderings.
-- `ProfileRepository` (interface) / `RoomProfileRepository` (impl): the only place that
-  knows about Room - it maps `ProfileWithColors` to the plain `Profile`/`PaletteColor`
-  domain types the UI sees, splitting/sorting colors by kind+position. Timestamps come
-  from an injectable `currentTimeMillis: () -> Long` (defaults to `System::currentTimeMillis`)
-  specifically so tests can control `createdAt`/`updatedAt` deterministically.
-- `AppContainer`/`DefaultAppContainer` now also builds the (lazy, singleton) `RoomDatabase`
-  and exposes `profileRepository`.
-
-UI: `SettingsScreen` now renders a "Profiles" `LazyColumn` section (header + add button +
-per-profile cards with name and Best-color swatches) instead of the old placeholder text;
-`ProfileEditorScreen` (new) has the name field, two color sections (Best / Avoid) each with
-an add-by-hex dialog (validated via `colorspace.parseHexColor`, inline error on bad input)
-and a per-color remove button, plus a delete-profile flow gated by an `AlertDialog`
-confirmation. Both screens get their ViewModel via a small `viewModelFactory { initializer
-{ ... } }` companion function that reaches into `HueAndYouApplication.container` - this
-project still has no DI framework, so this is the established manual-DI pattern going
-forward for any screen needing repository access (`SettingsViewModel` placeholder class
-was deleted, replaced by `ProfilesViewModel`).
-
-Navigation: `Destination.Settings` route gained an optional `scrollToProfiles` bool query
-arg (`Destination.Settings.route(scrollToProfiles = true)`) so other screens can deep-link
-into Settings pre-scrolled to the Profiles section (this is what issue #8's "no profile"
-dialog on Rate Clothing will need - not built here, just the addressable route + the
-`LaunchedEffect` that calls `listState.animateScrollToItem(0)` when the flag is set).
-Added `Destination.ProfileEditor` (`profile_editor/{profileId}`, `NavType.LongType`).
-Important: `TopLevelDestination` needed a separate `navRoute` field from `destination.route`
-- the latter is the *template* string (with `{scrollToProfiles}` literally in it) used to
-register the composable, and is not itself a navigable route once a destination takes args.
-
-Testing gotcha worth recording: tried Robolectric (`4.17`) for a real in-memory-SQLite Room
-DAO test first, since that would exercise the actual `@ForeignKey`/`@Relation` annotations
-end to end. It failed hard on this machine's JDK (Gradle's launcher/toolchain JVM is 26.0.1)
-with `IllegalAccessException: module java.base does not export jdk.internal.access` inside
-Robolectric's `FileDescriptorInterceptor` - a JDK-internals shim Robolectric 4.17 doesn't yet
-support on JDK 26. Rather than fight `--add-opens` flags for an unsupported JDK/Robolectric
-combination, switched to a hand-written `FakeProfileDao` (in-memory, implements the real
-`ProfileDao` interface) and tests `RoomProfileRepository` against that - this covers the
-repository's own logic (timestamping, position assignment, kind-splitting, mapping to domain
-types) but does NOT verify Room's own cascade-delete/relation-query behavior against real
-SQLite. If a future issue needs that guarantee, it'll need either an instrumented test
-(`connectedAndroidTest`, needs a device/emulator - none available in this environment) or a
-retry of Robolectric once it/the JDK situation here changes.
-
-`./gradlew assembleDebug test` passes (7 new tests: 5 repository, 2 ViewModel hex/delete
-logic). Verified no new permissions in the merged manifest.
