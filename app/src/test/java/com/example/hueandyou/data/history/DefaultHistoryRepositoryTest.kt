@@ -2,6 +2,8 @@ package com.example.hueandyou.data.history
 
 import com.example.hueandyou.colorspace.ColorMatch
 import com.example.hueandyou.colorspace.ColorMatchBand
+import com.example.hueandyou.colorspace.HarmonyBalance
+import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.data.profile.PaletteColor
 import com.example.hueandyou.data.profile.Profile
@@ -151,6 +153,41 @@ class DefaultHistoryRepositoryTest {
         repository.deleteEntry(999L)
 
         assertTrue(thumbnailStore.deletedPaths.isEmpty())
+    }
+
+    @Test
+    fun saveObjectResult_usesDefaultTypeAndDateNameAndStoresInputColors() = runBlocking {
+        val colors = listOf(0xFF112233.toInt(), 0xFF445566.toInt())
+
+        val entry = repository.saveObjectResult(
+            thumbnailPath = "thumb.jpg",
+            inputColorsArgb = colors,
+            wheel = HarmonyWheel.PERCEPTUAL,
+            balance = HarmonyBalance.FAITHFUL,
+        )
+
+        assertEquals(defaultHistoryEntryName(HistoryEntryType.OBJECT, clock), entry.name)
+        assertEquals(HistoryEntryType.OBJECT, entry.type)
+        assertEquals(colors, entry.inputColorsArgb)
+        assertEquals(HarmonyWheel.PERCEPTUAL, entry.wheel)
+        assertEquals(HarmonyBalance.FAITHFUL, entry.balance)
+    }
+
+    @Test
+    fun saveObjectResult_roundTripsThroughStorage() = runBlocking {
+        val colors = listOf(0xFF112233.toInt(), 0xFF445566.toInt(), 0xFF778899.toInt())
+
+        val entry = repository.saveObjectResult(
+            thumbnailPath = "thumb.jpg",
+            inputColorsArgb = colors,
+            wheel = HarmonyWheel.PERCEPTUAL,
+            balance = HarmonyBalance.FAITHFUL,
+        )
+
+        val stored = repository.observeEntry(entry.id).first()!!
+        assertEquals(colors, stored.inputColorsArgb)
+        assertEquals(HarmonyWheel.PERCEPTUAL, stored.wheel)
+        assertEquals(HarmonyBalance.FAITHFUL, stored.balance)
     }
 }
 

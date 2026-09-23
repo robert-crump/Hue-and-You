@@ -30,7 +30,7 @@ import androidx.navigation.navArgument
 import com.example.hueandyou.R
 import com.example.hueandyou.ui.history.HistoryDetailScreen
 import com.example.hueandyou.ui.history.HistoryScreen
-import com.example.hueandyou.ui.matchcolors.MatchColorsPlaceholderScreen
+import com.example.hueandyou.ui.matchcolors.MatchObjectScreen
 import com.example.hueandyou.ui.profiles.ProfileEditorScreen
 import com.example.hueandyou.ui.rateclothing.RateClothingScreen
 import com.example.hueandyou.ui.settings.SettingsScreen
@@ -97,7 +97,7 @@ fun HueAndYouNavHost() {
                             text = { Text(stringResource(R.string.history_fab_action_match_colors)) },
                             onClick = {
                                 showFabMenu = false
-                                navController.navigate(Destination.MatchColorsPlaceholder.route)
+                                navController.navigate(Destination.MatchObject.route)
                             }
                         )
                     }
@@ -167,8 +167,8 @@ fun HueAndYouNavHost() {
                     }
                 )
             }
-            composable(Destination.MatchColorsPlaceholder.route) {
-                MatchColorsPlaceholderScreen(onNavigateBack = { navController.popBackStack() })
+            composable(Destination.MatchObject.route) {
+                MatchObjectScreen(onNavigateBack = { navController.popBackStack() })
             }
         }
     }

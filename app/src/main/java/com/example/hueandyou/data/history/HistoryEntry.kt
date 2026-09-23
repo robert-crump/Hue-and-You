@@ -2,6 +2,8 @@ package com.example.hueandyou.data.history
 
 import com.example.hueandyou.colorspace.ColorMatch
 import com.example.hueandyou.colorspace.ColorMatchBand
+import com.example.hueandyou.colorspace.HarmonyBalance
+import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
 import java.time.Instant
 import java.time.ZoneId
@@ -19,7 +21,13 @@ data class HistoryEntry(
     val profileName: String?,
     val bestColorsArgb: List<Int>,
     val avoidColorsArgb: List<Int>,
-    val score: PaletteScore
+    val score: PaletteScore,
+    /** Object-only: the colors selected from the photo. Empty for [HistoryEntryType.CLOTHING]. */
+    val inputColorsArgb: List<Int> = emptyList(),
+    /** Object-only: null for [HistoryEntryType.CLOTHING]. */
+    val wheel: HarmonyWheel? = null,
+    /** Object-only: null for [HistoryEntryType.CLOTHING]. */
+    val balance: HarmonyBalance? = null,
 )
 
 internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
@@ -42,7 +50,10 @@ internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
         profileName = profileName,
         bestColorsArgb = bestColorsArgb,
         avoidColorsArgb = avoidColorsArgb,
-        score = PaletteScore(nearestBest, nearestAvoid, closerToAvoid)
+        score = PaletteScore(nearestBest, nearestAvoid, closerToAvoid),
+        inputColorsArgb = inputColorsArgb,
+        wheel = wheel,
+        balance = balance,
     )
 }
 
@@ -61,7 +72,10 @@ internal fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
     nearestBestDeltaE = score.nearestBest?.deltaE,
     nearestAvoidArgb = score.nearestAvoid?.argb,
     nearestAvoidDeltaE = score.nearestAvoid?.deltaE,
-    closerToAvoid = score.closerToAvoid
+    closerToAvoid = score.closerToAvoid,
+    inputColorsArgb = inputColorsArgb,
+    wheel = wheel,
+    balance = balance,
 )
 
 private val defaultNameDateFormatter: DateTimeFormatter =

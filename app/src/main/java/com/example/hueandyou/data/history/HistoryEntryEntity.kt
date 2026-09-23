@@ -2,6 +2,8 @@ package com.example.hueandyou.data.history
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.hueandyou.colorspace.HarmonyBalance
+import com.example.hueandyou.colorspace.HarmonyWheel
 
 @Entity(tableName = "history_entries")
 data class HistoryEntryEntity(
@@ -19,5 +21,11 @@ data class HistoryEntryEntity(
     val nearestBestDeltaE: Double?,
     val nearestAvoidArgb: Int?,
     val nearestAvoidDeltaE: Double?,
-    val closerToAvoid: Boolean
+    val closerToAvoid: Boolean,
+    /** Object-only: the colors selected from the photo. Empty for [HistoryEntryType.CLOTHING]. */
+    val inputColorsArgb: List<Int> = emptyList(),
+    /** Object-only: null for [HistoryEntryType.CLOTHING]. */
+    val wheel: HarmonyWheel? = null,
+    /** Object-only: null for [HistoryEntryType.CLOTHING]. */
+    val balance: HarmonyBalance? = null,
 )

@@ -78,8 +78,15 @@
     <string name="color_match_band_related">Related</string>
     <string name="color_match_band_far">Far</string>
 
-    <string name="match_colors_placeholder_title">Match colors for an object</string>
-    <string name="match_colors_placeholder_body">This screen is coming soon.</string>
+    <string name="match_object_title">Match colors for an object</string>
+    <string name="match_object_select_colors_title">Select one or more colors from the object</string>
+    <string name="match_object_continue">Continue</string>
+    <string name="match_object_input_color_label">Selected color</string>
+    <string name="harmony_relationship_complementary">Complementary</string>
+    <string name="harmony_relationship_split_complementary">Split-complementary</string>
+    <string name="harmony_relationship_analogous">Analogous</string>
+    <string name="harmony_relationship_triadic">Triadic</string>
+    <string name="harmony_relationship_tonal">Tonal</string>
 
     <string name="navigate_back">Back</string>
 </resources>

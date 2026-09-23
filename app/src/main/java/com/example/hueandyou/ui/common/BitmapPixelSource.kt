@@ -1,4 +1,4 @@
-package com.example.hueandyou.ui.rateclothing
+package com.example.hueandyou.ui.common
 
 import android.graphics.Bitmap
 import com.example.hueandyou.colorspace.IntArrayPixelSource

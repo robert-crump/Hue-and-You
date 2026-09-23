@@ -1,5 +1,7 @@
 package com.example.hueandyou.data.history
 
+import com.example.hueandyou.colorspace.HarmonyBalance
+import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.data.profile.Profile
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +17,14 @@ interface HistoryRepository {
         calibratedArgb: Int,
         profile: Profile?,
         score: PaletteScore
+    ): HistoryEntry
+
+    /** Saves a Match Colors for an Object result as a new history entry and returns it. */
+    suspend fun saveObjectResult(
+        thumbnailPath: String,
+        inputColorsArgb: List<Int>,
+        wheel: HarmonyWheel,
+        balance: HarmonyBalance,
     ): HistoryEntry
 
     suspend fun renameEntry(entryId: Long, name: String)
@@ -54,6 +64,34 @@ class DefaultHistoryRepository(
             bestColorsArgb = profile?.bestColors.orEmpty().map { it.argb },
             avoidColorsArgb = profile?.avoidColors.orEmpty().map { it.argb },
             score = score
+        )
+        val id = dao.insert(entry.toEntity())
+        return entry.copy(id = id)
+    }
+
+    override suspend fun saveObjectResult(
+        thumbnailPath: String,
+        inputColorsArgb: List<Int>,
+        wheel: HarmonyWheel,
+        balance: HarmonyBalance,
+    ): HistoryEntry {
+        require(inputColorsArgb.isNotEmpty()) { "At least one input color is required" }
+        val now = currentTimeMillis()
+        val entry = HistoryEntry(
+            id = 0,
+            type = HistoryEntryType.OBJECT,
+            name = defaultHistoryEntryName(HistoryEntryType.OBJECT, now),
+            createdAt = now,
+            thumbnailPath = thumbnailPath,
+            calibratedArgb = inputColorsArgb.first(),
+            profileId = null,
+            profileName = null,
+            bestColorsArgb = emptyList(),
+            avoidColorsArgb = emptyList(),
+            score = PaletteScore(nearestBest = null, nearestAvoid = null, closerToAvoid = false),
+            inputColorsArgb = inputColorsArgb,
+            wheel = wheel,
+            balance = balance,
         )
         val id = dao.insert(entry.toEntity())
         return entry.copy(id = id)

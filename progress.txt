@@ -1,5 +1,63 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-23 - Issue #11: Match colors for an object - HarmonyEngine on the Perceptual wheel
+
+New `Harmony.kt` (`:colorspace`, pure Kotlin): `HarmonyEngine.generate(referenceArgb, wheel:
+HarmonyWheel, balance: HarmonyBalance)` returns one `HarmonySuggestion` (a `HarmonyRelationship`
+plus its `colors: List<Int>`) per relationship - Complementary (+180 deg), Split-complementary
+(+150/+210), Analogous (-30/+30), Triadic (+120/+240), Tonal (tones 30/50/70/90 at the reference's
+own hue/chroma, excluding whichever tone is closest to the reference's actual tone). Both "wheel"
+and "balance" are small strategy interfaces (`ColorWheelStrategy.rotate(hue, degrees)`,
+`BalanceMode.apply(reference, hue)`) with a single implementation each for this slice
+(`PerceptualWheel` rotates directly in HCT hue; `FaithfulBalance` copies the reference's tone and
+chroma onto the rotated hue) - issue #12 (Traditional/Screen wheels, Softened balance) adds more
+implementations without touching `HarmonyEngine` itself. `HarmonyWheel`/`HarmonyBalance` enums wrap
+those strategy objects and are what gets persisted/selected, same shape as picking a `TypeConverter`-
+friendly enum over storing a polymorphic type. Gamut clamping is inherited for free from the
+existing `hctToArgb` (Material Color Utilities' in-gamut solver), not reimplemented here.
+
+`data/history`: extended (not replaced) the existing `HistoryEntryEntity`/`HistoryEntry` - new
+`inputColorsArgb: List<Int>` (empty for CLOTHING), `wheel`/`balance: HarmonyWheel?`/`HarmonyBalance?`
+(null for CLOTHING), all with defaults so every existing CLOTHING call site and test compiles
+unchanged. `calibratedArgb`/`score` stay non-null for OBJECT rows too (first selected color /
+all-null `PaletteScore`) rather than becoming nullable everywhere, since they're simply never read
+for OBJECT entries (the detail screen branches on `entry.type` before touching them). Two new
+`HarmonyConverters`-style nullable `TypeConverter`s in `HistoryConverters` for the enums; existing
+`List<Int>` converter reused as-is for `inputColorsArgb`. `HistoryRepository` gained
+`saveObjectResult(thumbnailPath, inputColorsArgb, wheel, balance)`, parallel to
+`saveClothingResult`. Database version bumped 2 -> 3 (still `fallbackToDestructiveMigration`, no
+shipped install base).
+
+`:app` UI: replaced `MatchColorsPlaceholderScreen`/`Destination.MatchColorsPlaceholder` with a real
+`ui/matchcolors/` flow (`MatchObjectViewModel`/`MatchObjectUiState`/`MatchObjectScreen`,
+`Destination.MatchObject`) - photo -> white-sheet tap (same `WhiteBalanceCalibrator`/
+`ColorExtractor` pipeline as Rate Clothing, no profile step) -> a `SelectingColors` step with a
+`Checkbox` per extracted color (multi-select, unlike Rate Clothing's single-pick - always shown,
+even when one color is clearly dominant, since the issue asks for multi-select explicitly) ->
+`confirmColorSelection()` saves to History and shows results. Wheel/balance are hardcoded to
+`PERCEPTUAL`/`FAITHFUL` for now (issue #13 adds a Settings default and a per-screen picker on top
+of this). Moved `Bitmap.toPixelSource()` out of `ui/rateclothing/` into `ui/common/` since both
+flows need it now. New `ui/common/HarmonyResultView.kt` (`HarmonyResultBody`) renders one section
+per input color, each recomputing its suggestions live via `HarmonyEngine.generate` from the raw
+`(inputColorsArgb, wheel, balance)` rather than any stored/precomputed swatch - shared by the live
+result step and `HistoryDetailScreen`'s OBJECT branch, so "reopening recomputes suggestions from
+stored input colors" is true by construction (same pattern `PaletteResultBody` already established
+for CLOTHING, just recomputing more than `ColorMatchBand`). `HistoryDetailScreen` now switches on
+`entry.type` between `PaletteResultBody` (CLOTHING) and `HarmonyResultBody` (OBJECT).
+
+New tests: `HarmonyEngineTest` (`:colorspace`) - hue offset correctness per relationship (2.5 deg
+tolerance, since gamut mapping can nudge hue slightly for highly saturated reference colors pushed
+out of gamut at the rotated hue), tonal excludes the tone closest to the reference and keeps hue/
+chroma, Faithful keeps tone exactly and never raises chroma, and every generated color round-trips
+to a valid in-gamut ARGB int. `DefaultHistoryRepositoryTest` gained two `saveObjectResult` cases
+(default name/type, and a storage round-trip for input colors + wheel + balance).
+
+`./gradlew assembleDebug test` passes (4 new `HarmonyEngineTest` cases, 2 new
+`DefaultHistoryRepositoryTest` cases). No UI/instrumented test for the new screen or the
+multi-select checkboxes (same Robolectric/JDK-26 limitation noted since the #3 entry, still no
+emulator/device in this environment) - verified by reading through the state machine and Compose
+tree instead, mirroring Rate Clothing's own photo-flow screens which have the same gap.
+
 ## 2026-09-23 - Issue #10: History - rename and delete with undo
 
 Rename (AC "user can rename an entry from the History list") was already fully implemented as
@@ -179,89 +237,3 @@ Robolectric/JDK-26 limitation noted in the #3 entry, and still no emulator/devic
 this environment) - verified by reading through the state machine and Compose tree instead.
 Verified no new manifest permissions were introduced (no manifest-affecting changes in this
 issue).
-
-## 2026-09-23 - Issue #7: Camera capture as photo source
-
-Added "Take photo" alongside the existing gallery picker on `PickPhotoStep` (`:app`,
-`ui/rateclothing/RateClothingScreen.kt`) - no custom in-app camera, per the issue, just the
-system camera app via the standard `ActivityResultContracts.TakePicture()` contract, which
-(unlike `TakePicturePreview()`) writes the full-resolution photo to a URI instead of handing
-back a small thumbnail `Bitmap` - full resolution matters here since the same photo is later
-sampled pixel-by-pixel for white-balance calibration and dominant-color extraction.
-
-`TakePicture()` needs a destination `content://` URI up front, which needs a `FileProvider`:
-added `androidx.core.content.FileProvider` to `AndroidManifest.xml` (authority
-`${applicationId}.fileprovider`, `exported="false"`, `grantUriPermissions="true"`) plus
-`res/xml/file_paths.xml` declaring one `cache-path` (`camera_captures/`). No new runtime
-permission needed - launching the system camera via an implicit `TakePicture` intent doesn't
-require `android.permission.CAMERA` (that's only for apps driving the camera hardware
-directly via camera2/CameraX), confirmed by diffing the merged manifest before/after: the
-only addition is the `<provider>` entry itself.
-
-`createCameraPhotoUri()` (in `RateClothingScreen.kt`, next to `PickPhotoStep` since it needs
-a live `Context`) creates a fresh temp file under `cacheDir/camera_captures/` per capture
-attempt and wraps it via `FileProvider.getUriForFile`. The screen holds the pending URI in
-`remember { mutableStateOf<Uri?>(null) }` since the `TakePicture()` callback only receives a
-`Boolean` success flag, not the URI itself - on `success == true` it's handed to the existing
-`viewModel.onPhotoPicked(contentResolver, uri)`, the same entry point the gallery picker
-already uses, so the ViewModel needed zero changes (it already treats "photo" as "some URI I
-can open via `ContentResolver`", regardless of source). On cancel (`success == false`) the
-pending URI is just dropped and the screen stays on `PickingPhoto` - satisfies "cancelling
-the camera returns to the photo step without error" for free, no new state needed.
-
-`PickPhotoStep` now takes both `onTakePhoto` and `onPickPhoto` and shows both buttons
-unconditionally, so `RateClothingViewModel.chooseNewPhoto()` (the "choose a different photo"
-recovery path added in issue #6) automatically offers the camera too, since it just resets
-back to the same `PickingPhoto` state - no separate wiring needed for that acceptance
-criterion either. Renamed the existing gallery-pick string (`rate_clothing_pick_photo`,
-"Choose photo" -> "Pick from gallery") and added `rate_clothing_take_photo` ("Take photo") to
-match the issue's own button wording.
-
-`./gradlew assembleDebug test` passes (no new unit tests - this is compose UI wiring over
-Android framework classes, `ContentResolver`/camera intents/`FileProvider`, same
-Robolectric/JDK-26 limitation noted in the #3 entry, and still no emulator/device available
-in this environment to exercise it end to end). Verified via merged-manifest diff that the
-only new manifest content is the `FileProvider` `<provider>` entry - no new permissions.
-
-## 2026-09-23 - Issue #6: Calibration failures - clipped, too dark, not white
-
-Added real failure *detection* to `WhiteBalanceCalibrator.calibrate` in `:colorspace` (issue #5
-only guarded the zero-sampled-pixels edge case; this issue is the "that patch wasn't actually
-white/gray" detection deferred there). Three new `WhiteBalanceFailureReason` values, checked in
-this order after the existing `NO_SAMPLED_PIXELS` guard:
-- `CLIPPED`: while summing the sample circle's pixels, also counts pixels with any raw channel
-  (0-255 scale, not linear) at/above `CalibrationConfig.CLIPPED_CHANNEL_THRESHOLD` (250). Fails
-  once that count's share of the sample exceeds `CLIPPED_PIXEL_FRACTION_THRESHOLD` (0.05) - both
-  are the issue's own starting-guess numbers.
-- `TOO_DARK`: converts the sample's averaged linear RGB to Lab and fails if `L` is below
-  `MIN_WHITE_LUMINANCE_L` (50.0, a starting guess - a lit white sheet should read far brighter
-  than mid-gray).
-- `NOT_WHITE`: fails if that same Lab point's chroma (`sqrt(a^2+b^2)`) exceeds
-  `MAX_WHITE_CHROMA` (15.0, a starting guess) - reuses `linearRgbToLab` from issue #2, no new
-  color math needed.
-All four thresholds are `CalibrationConfig` consts, each also a `calibrate(...)` default
-parameter (same pattern as the existing `sampleRadiusFraction`), so tests can override
-individually. Picked the threshold values against the actual Lab math (via a throwaway Python
-port of the sRGB->Lab constants, checked against `ColorConversions.kt` line for line) rather
-than guessing blind, so the existing "warm-tinted white" happy-path test and the three new
-failure tests all land with real margin, not by luck.
-
-Had to retune the existing `warmTintedWhitePatchIsCorrectedToNeutral` test fixture: its old
-color (`0xFFFFE0C0`, R=255) was itself clipped and had chroma ~20 - both of which now correctly
-fail before this issue, since nothing previously checked for either. Swapped it for a milder
-warm off-white (`0xFFF5E6D3`, L~92, chroma~11) that's still clearly warm-tinted but comfortably
-inside both new thresholds - this is a fixture fix caused by adding real detection, not a
-weakening of the test.
-
-UI (`:app`, `ui/rateclothing/`): `CalibratingStep`'s failure `Text` now switches on
-`WhiteBalanceFailureReason` to one of four distinct string resources (clipped/too-dark/not-white
-messages, plus the existing generic one for `NO_SAMPLED_PIXELS`) instead of one generic message
-for every failure. Added a second button, "Choose a different photo"
-(`RateClothingViewModel.chooseNewPhoto()` resets to `PickingPhoto`), next to the existing
-Continue button - re-tapping already worked for free (the photo stays on screen and `onTap` just
-overwrites `calibration`), so this covers the acceptance criterion's other half ("re-tap or
-choose a new photo") without new state-machine states.
-
-`./gradlew assembleDebug test` passes (3 new calibrator failure tests, 1 existing test fixture
-retuned). Verified no new manifest permissions were introduced.
-

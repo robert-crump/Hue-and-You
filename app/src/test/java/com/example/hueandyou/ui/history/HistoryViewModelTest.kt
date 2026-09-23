@@ -1,5 +1,7 @@
 package com.example.hueandyou.ui.history
 
+import com.example.hueandyou.colorspace.HarmonyBalance
+import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
@@ -122,6 +124,13 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         calibratedArgb: Int,
         profile: Profile?,
         score: PaletteScore
+    ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
+
+    override suspend fun saveObjectResult(
+        thumbnailPath: String,
+        inputColorsArgb: List<Int>,
+        wheel: HarmonyWheel,
+        balance: HarmonyBalance,
     ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
     override suspend fun renameEntry(entryId: Long, name: String) {

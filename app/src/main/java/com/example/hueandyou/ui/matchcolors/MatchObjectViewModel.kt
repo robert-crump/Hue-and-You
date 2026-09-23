@@ -1,4 +1,4 @@
-package com.example.hueandyou.ui.rateclothing
+package com.example.hueandyou.ui.matchcolors
 
 import android.content.ContentResolver
 import android.content.Context
@@ -12,127 +12,99 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.colorspace.ColorExtractor
-import com.example.hueandyou.colorspace.PaletteScore
-import com.example.hueandyou.colorspace.PaletteScorer
+import com.example.hueandyou.colorspace.HarmonyBalance
+import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.WhiteBalanceCalibrator
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
-import com.example.hueandyou.data.profile.Profile
-import com.example.hueandyou.data.profile.ProfileRepository
 import com.example.hueandyou.ui.common.toPixelSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
+private val DEFAULT_WHEEL = HarmonyWheel.PERCEPTUAL
+private val DEFAULT_BALANCE = HarmonyBalance.FAITHFUL
 
-class RateClothingViewModel(
-    private val profileRepository: ProfileRepository,
+class MatchObjectViewModel(
     private val historyRepository: HistoryRepository,
     private val thumbnailStore: ThumbnailStore,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow<RateClothingUiState>(RateClothingUiState.LoadingProfiles)
-    val uiState: StateFlow<RateClothingUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow<MatchObjectUiState>(MatchObjectUiState.PickingPhoto)
+    val uiState: StateFlow<MatchObjectUiState> = _uiState.asStateFlow()
 
-    private var selectedProfile: Profile? = null
     private var currentBitmap: Bitmap? = null
 
-    init {
-        viewModelScope.launch {
-            val profiles = profileRepository.observeProfiles().first()
-            _uiState.value = when {
-                profiles.isEmpty() -> RateClothingUiState.NoProfile
-                profiles.size == 1 -> {
-                    selectedProfile = profiles.first()
-                    RateClothingUiState.PickingPhoto
-                }
-                else -> RateClothingUiState.SelectingProfile(profiles)
-            }
-        }
-    }
-
-    fun selectProfile(profile: Profile) {
-        selectedProfile = profile
-        _uiState.value = RateClothingUiState.PickingPhoto
-    }
-
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
-        _uiState.value = RateClothingUiState.LoadingPhoto
+        _uiState.value = MatchObjectUiState.LoadingPhoto
         viewModelScope.launch {
             val bitmap = withContext(Dispatchers.Default) { decodeBitmap(contentResolver, uri) }
             currentBitmap = bitmap
-            _uiState.value = RateClothingUiState.Calibrating(bitmap)
+            _uiState.value = MatchObjectUiState.Calibrating(bitmap)
         }
     }
 
     fun onTap(x: Int, y: Int) {
-        val state = _uiState.value as? RateClothingUiState.Calibrating ?: return
+        val state = _uiState.value as? MatchObjectUiState.Calibrating ?: return
         val result = WhiteBalanceCalibrator.calibrate(state.bitmap.toPixelSource(), x, y)
         _uiState.value = state.copy(calibration = result)
     }
 
     fun chooseNewPhoto() {
-        _uiState.value = RateClothingUiState.PickingPhoto
+        _uiState.value = MatchObjectUiState.PickingPhoto
     }
 
     fun confirmCalibration() {
-        val state = _uiState.value as? RateClothingUiState.Calibrating ?: return
+        val state = _uiState.value as? MatchObjectUiState.Calibrating ?: return
         val success = state.calibration as? WhiteBalanceResult.Success ?: return
         val extraction = ColorExtractor.extract(
             pixels = state.bitmap.toPixelSource(),
             correction = success.correction,
             exclusion = success.sampledRegion,
         )
-        if (extraction.isClearlyDominant && extraction.colors.isNotEmpty()) {
-            showResult(extraction.colors.first().argb)
+        _uiState.value = MatchObjectUiState.SelectingColors(extraction.colors)
+    }
+
+    fun toggleColorSelection(argb: Int) {
+        val state = _uiState.value as? MatchObjectUiState.SelectingColors ?: return
+        val selected = if (argb in state.selectedArgb) {
+            state.selectedArgb - argb
         } else {
-            _uiState.value = RateClothingUiState.SelectingColor(extraction.colors)
+            state.selectedArgb + argb
         }
+        _uiState.value = state.copy(selectedArgb = selected)
     }
 
-    fun selectColor(argb: Int) {
-        showResult(argb)
-    }
-
-    fun renameResult(name: String) {
-        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
-        viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
-    }
-
-    private fun showResult(argb: Int) {
-        val profile = selectedProfile
-        val score = scoreFor(argb, profile)
+    fun confirmColorSelection() {
+        val state = _uiState.value as? MatchObjectUiState.SelectingColors ?: return
+        if (state.selectedArgb.isEmpty()) return
         val bitmap = requireNotNull(currentBitmap)
+        val inputColors = state.selectedArgb.toList()
         viewModelScope.launch {
             val thumbnailPath = thumbnailStore.save(bitmap)
-            val entry = historyRepository.saveClothingResult(
+            val entry = historyRepository.saveObjectResult(
                 thumbnailPath = thumbnailPath,
-                calibratedArgb = argb,
-                profile = profile,
-                score = score,
+                inputColorsArgb = inputColors,
+                wheel = DEFAULT_WHEEL,
+                balance = DEFAULT_BALANCE,
             )
-            _uiState.value = RateClothingUiState.ShowingResult(
-                argb = argb,
-                score = score,
+            _uiState.value = MatchObjectUiState.ShowingResult(
+                inputColorsArgb = entry.inputColorsArgb,
+                wheel = DEFAULT_WHEEL,
+                balance = DEFAULT_BALANCE,
                 historyEntryId = entry.id,
                 historyEntryName = entry.name,
             )
         }
     }
 
-    private fun scoreFor(argb: Int, profile: Profile?): PaletteScore = if (profile != null) {
-        PaletteScorer.score(
-            measuredArgb = argb,
-            bestColors = profile.bestColors.map { it.argb },
-            avoidColors = profile.avoidColors.map { it.argb },
-        )
-    } else {
-        PaletteScore(nearestBest = null, nearestAvoid = null, closerToAvoid = false)
+    fun renameResult(name: String) {
+        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
+        viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
     }
 
     private fun decodeBitmap(contentResolver: ContentResolver, uri: Uri): Bitmap {
@@ -154,8 +126,7 @@ class RateClothingViewModel(
         fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val container = (context.applicationContext as HueAndYouApplication).container
-                RateClothingViewModel(
-                    profileRepository = container.profileRepository,
+                MatchObjectViewModel(
                     historyRepository = container.historyRepository,
                     thumbnailStore = container.thumbnailStore,
                 )

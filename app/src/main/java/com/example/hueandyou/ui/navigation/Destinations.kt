@@ -21,7 +21,7 @@ sealed class Destination(val route: String) {
         fun route(profileId: Long) = "profile_editor/$profileId"
     }
     data object RateClothing : Destination("rate_clothing")
-    data object MatchColorsPlaceholder : Destination("match_colors_placeholder")
+    data object MatchObject : Destination("match_object")
 }
 
 data class TopLevelDestination(

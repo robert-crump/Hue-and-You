@@ -28,6 +28,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
+import com.example.hueandyou.data.history.HistoryEntryType
+import com.example.hueandyou.ui.common.HarmonyResultBody
 import com.example.hueandyou.ui.common.PaletteResultBody
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -76,7 +78,14 @@ fun HistoryDetailScreen(
                 label = { Text(stringResource(R.string.history_entry_name_label)) },
                 modifier = Modifier.fillMaxWidth()
             )
-            PaletteResultBody(argb = current.calibratedArgb, score = current.score)
+            when (current.type) {
+                HistoryEntryType.CLOTHING -> PaletteResultBody(argb = current.calibratedArgb, score = current.score)
+                HistoryEntryType.OBJECT -> HarmonyResultBody(
+                    inputColorsArgb = current.inputColorsArgb,
+                    wheel = requireNotNull(current.wheel),
+                    balance = requireNotNull(current.balance),
+                )
+            }
         }
     }
 }
