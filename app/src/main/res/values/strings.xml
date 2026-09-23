@@ -117,4 +117,15 @@
     <string name="harmony_balance_softened">Softened</string>
 
     <string name="navigate_back">Back</string>
+
+    <string name="settings_backup_section_title">Backup</string>
+    <string name="settings_backup_export">Export backup</string>
+    <string name="settings_backup_import">Import backup</string>
+    <string name="settings_backup_export_success">Backup saved</string>
+    <string name="settings_backup_export_failed">Couldn\'t save the backup</string>
+    <string name="settings_backup_import_read_failed">Couldn\'t read that file</string>
+    <string name="settings_backup_import_confirm_title">Replace all data?</string>
+    <string name="settings_backup_import_confirm_body">Importing this backup replaces all profiles, history, and settings currently on this device. This can\'t be undone.</string>
+    <string name="settings_backup_import_confirm_action">Replace</string>
+    <string name="settings_backup_import_success">Backup restored</string>
 </resources>

@@ -5,6 +5,10 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.room.Room
+import com.example.hueandyou.data.backup.BackupRepository
+import com.example.hueandyou.data.backup.DefaultBackupRepository
+import com.example.hueandyou.data.backup.JsonBackupSerializer
+import com.example.hueandyou.data.backup.RoomTransactionRunner
 import com.example.hueandyou.data.history.DefaultHistoryRepository
 import com.example.hueandyou.data.history.FileThumbnailStore
 import com.example.hueandyou.data.history.HistoryRepository
@@ -32,6 +36,7 @@ interface AppContainer {
     val thumbnailStore: ThumbnailStore
     val settingsRepository: SettingsRepository
     val shareCardRenderer: ShareCardRenderer
+    val backupRepository: BackupRepository
 }
 
 class DefaultAppContainer(context: Context) : AppContainer {
@@ -61,5 +66,16 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     override val shareCardRenderer: ShareCardRenderer by lazy {
         FileShareCardRenderer(context)
+    }
+
+    override val backupRepository: BackupRepository by lazy {
+        DefaultBackupRepository(
+            profileDao = database.profileDao(),
+            historyDao = database.historyDao(),
+            settingsRepository = settingsRepository,
+            thumbnailStore = thumbnailStore,
+            serializer = JsonBackupSerializer(),
+            transactionRunner = RoomTransactionRunner(database),
+        )
     }
 }

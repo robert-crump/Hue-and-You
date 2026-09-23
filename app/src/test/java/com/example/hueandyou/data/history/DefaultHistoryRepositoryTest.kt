@@ -200,4 +200,10 @@ private class FakeThumbnailStore : com.example.hueandyou.data.history.ThumbnailS
     override suspend fun delete(path: String) {
         deletedPaths += path
     }
+
+    override suspend fun readBytes(path: String): ByteArray =
+        throw UnsupportedOperationException("not used by this test")
+
+    override suspend fun writeBytes(bytes: ByteArray): String =
+        throw UnsupportedOperationException("not used by this test")
 }

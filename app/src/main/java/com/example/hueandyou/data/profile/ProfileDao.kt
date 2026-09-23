@@ -29,8 +29,16 @@ interface ProfileDao {
     @Query("DELETE FROM profiles WHERE id = :profileId")
     suspend fun deleteProfile(profileId: Long)
 
+    /** Deletes every profile (and, via cascade, every color). Used to restore a backup. */
+    @Query("DELETE FROM profiles")
+    suspend fun deleteAllProfiles()
+
     @Insert
     suspend fun insertColor(color: PaletteColorEntity): Long
+
+    /** Bulk insert used when restoring a backup. */
+    @Insert
+    suspend fun insertColors(colors: List<PaletteColorEntity>)
 
     @Update
     suspend fun updateColor(color: PaletteColorEntity)

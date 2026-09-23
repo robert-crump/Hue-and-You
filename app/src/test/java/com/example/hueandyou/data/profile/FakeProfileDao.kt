@@ -43,11 +43,25 @@ class FakeProfileDao : ProfileDao {
         emit()
     }
 
+    override suspend fun deleteAllProfiles() {
+        profiles.clear()
+        colors.clear()
+        emit()
+    }
+
     override suspend fun insertColor(color: PaletteColorEntity): Long {
         val id = nextColorId++
         colors[id] = color.copy(id = id)
         emit()
         return id
+    }
+
+    override suspend fun insertColors(colors: List<PaletteColorEntity>) {
+        colors.forEach { color ->
+            val id = nextColorId++
+            this.colors[id] = color.copy(id = id)
+        }
+        emit()
     }
 
     override suspend fun updateColor(color: PaletteColorEntity) {

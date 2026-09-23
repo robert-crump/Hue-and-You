@@ -16,12 +16,17 @@ interface ThumbnailStore {
 
     /** Deletes the thumbnail file at [path], if it still exists. */
     suspend fun delete(path: String)
+
+    /** Reads the raw bytes of the thumbnail file at [path]. Used to build a backup. */
+    suspend fun readBytes(path: String): ByteArray
+
+    /** Saves [bytes] as a new thumbnail file and returns its path. Used to restore a backup. */
+    suspend fun writeBytes(bytes: ByteArray): String
 }
 
 class FileThumbnailStore(private val context: Context) : ThumbnailStore {
     override suspend fun save(bitmap: Bitmap): String = withContext(Dispatchers.IO) {
-        val dir = File(context.filesDir, "history_thumbnails").apply { mkdirs() }
-        val file = File(dir, "${UUID.randomUUID()}.jpg")
+        val file = newThumbnailFile()
         val scaled = scaleToLongEdge(bitmap, THUMBNAIL_MAX_DIMENSION_PX)
         file.outputStream().use { out -> scaled.compress(Bitmap.CompressFormat.JPEG, 90, out) }
         if (scaled !== bitmap) scaled.recycle()
@@ -31,6 +36,21 @@ class FileThumbnailStore(private val context: Context) : ThumbnailStore {
     override suspend fun delete(path: String) = withContext(Dispatchers.IO) {
         File(path).delete()
         Unit
+    }
+
+    override suspend fun readBytes(path: String): ByteArray = withContext(Dispatchers.IO) {
+        File(path).readBytes()
+    }
+
+    override suspend fun writeBytes(bytes: ByteArray): String = withContext(Dispatchers.IO) {
+        val file = newThumbnailFile()
+        file.writeBytes(bytes)
+        file.absolutePath
+    }
+
+    private fun newThumbnailFile(): File {
+        val dir = File(context.filesDir, "history_thumbnails").apply { mkdirs() }
+        return File(dir, "${UUID.randomUUID()}.jpg")
     }
 }
 

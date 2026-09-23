@@ -30,6 +30,19 @@ class FakeHistoryDao : HistoryDao {
         return id
     }
 
+    override suspend fun insertAll(entries: List<HistoryEntryEntity>) {
+        entries.forEach { entry ->
+            val id = nextId++
+            this.entries[id] = entry.copy(id = id)
+        }
+        emit()
+    }
+
+    override suspend fun deleteAllEntries() {
+        entries.clear()
+        emit()
+    }
+
     override suspend fun updateName(entryId: Long, name: String) {
         entries[entryId]?.let { entries[entryId] = it.copy(name = name) }
         emit()

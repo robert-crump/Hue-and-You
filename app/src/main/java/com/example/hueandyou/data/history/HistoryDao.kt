@@ -21,6 +21,14 @@ interface HistoryDao {
     @Insert
     suspend fun insert(entry: HistoryEntryEntity): Long
 
+    /** Bulk insert used when restoring a backup. */
+    @Insert
+    suspend fun insertAll(entries: List<HistoryEntryEntity>)
+
+    /** Deletes every entry. Used to restore a backup. */
+    @Query("DELETE FROM history_entries")
+    suspend fun deleteAllEntries()
+
     @Query("UPDATE history_entries SET name = :name WHERE id = :entryId")
     suspend fun updateName(entryId: Long, name: String)
 

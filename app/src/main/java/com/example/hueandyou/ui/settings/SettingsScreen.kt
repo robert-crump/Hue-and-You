@@ -3,6 +3,8 @@ package com.example.hueandyou.ui.settings
 import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +26,9 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +51,7 @@ import com.example.hueandyou.R
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.ui.common.HarmonyOptionsControls
 import com.example.hueandyou.ui.profiles.ProfilesViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -58,7 +65,47 @@ fun SettingsScreen(
     val listState = rememberLazyListState()
     val defaultProfileName = stringResource(R.string.profile_default_name)
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var shareCardUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingImportJson by remember { mutableStateOf<String?>(null) }
+
+    val exportSuccessMessage = stringResource(R.string.settings_backup_export_success)
+    val exportFailedMessage = stringResource(R.string.settings_backup_export_failed)
+    val importReadFailedMessage = stringResource(R.string.settings_backup_import_read_failed)
+    val importSuccessMessage = stringResource(R.string.settings_backup_import_success)
+
+    fun showMessage(message: String) {
+        scope.launch { snackbarHostState.showSnackbar(message) }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        settingsViewModel.exportBackup { result ->
+            val written = result.getOrNull()?.let { json ->
+                runCatching {
+                    context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                }.isSuccess
+            } == true
+            showMessage(if (written) exportSuccessMessage else exportFailedMessage)
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        }.getOrNull()
+        if (text == null) {
+            showMessage(importReadFailedMessage)
+        } else {
+            pendingImportJson = text
+        }
+    }
 
     LaunchedEffect(scrollToProfiles) {
         if (scrollToProfiles) {
@@ -66,64 +113,116 @@ fun SettingsScreen(
         }
     }
 
-    LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-        item(key = "defaults_header") {
-            Text(
-                text = stringResource(R.string.settings_defaults_section_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-        }
-        item(key = "defaults_controls") {
-            HarmonyOptionsControls(
-                wheel = defaults.wheel,
-                balance = defaults.balance,
-                onWheelChange = settingsViewModel::setDefaultWheel,
-                onBalanceChange = settingsViewModel::setDefaultBalance,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-        item(key = "profiles_header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
+    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
+        LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().padding(innerPadding)) {
+            item(key = "defaults_header") {
                 Text(
-                    text = stringResource(R.string.profiles_section_title),
+                    text = stringResource(R.string.settings_defaults_section_title),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = {
-                    profilesViewModel.createProfile(defaultProfileName) { id -> onOpenProfile(id) }
-                }) {
-                    Icon(
-                        Icons.Filled.Add,
-                        contentDescription = stringResource(R.string.profile_add_content_description)
-                    )
-                }
-            }
-        }
-        if (profiles.isEmpty()) {
-            item(key = "profiles_empty") {
-                Text(
-                    text = stringResource(R.string.profiles_empty_state),
-                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
-        } else {
-            items(profiles, key = { it.id }) { profile ->
-                ProfileCard(
-                    profile = profile,
-                    onClick = { onOpenProfile(profile.id) },
-                    onShare = {
-                        profilesViewModel.shareCard(profile) { uri -> shareCardUri = uri }
-                    }
+            item(key = "defaults_controls") {
+                HarmonyOptionsControls(
+                    wheel = defaults.wheel,
+                    balance = defaults.balance,
+                    onWheelChange = settingsViewModel::setDefaultWheel,
+                    onBalanceChange = settingsViewModel::setDefaultBalance,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
+            item(key = "profiles_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.profiles_section_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = {
+                        profilesViewModel.createProfile(defaultProfileName) { id -> onOpenProfile(id) }
+                    }) {
+                        Icon(
+                            Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.profile_add_content_description)
+                        )
+                    }
+                }
+            }
+            if (profiles.isEmpty()) {
+                item(key = "profiles_empty") {
+                    Text(
+                        text = stringResource(R.string.profiles_empty_state),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
+            } else {
+                items(profiles, key = { it.id }) { profile ->
+                    ProfileCard(
+                        profile = profile,
+                        onClick = { onOpenProfile(profile.id) },
+                        onShare = {
+                            profilesViewModel.shareCard(profile) { uri -> shareCardUri = uri }
+                        }
+                    )
+                }
+            }
+            item(key = "backup_header") {
+                Text(
+                    text = stringResource(R.string.settings_backup_section_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            item(key = "backup_controls") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(onClick = { exportLauncher.launch("hue_and_you_backup.json") }) {
+                        Text(stringResource(R.string.settings_backup_export))
+                    }
+                    TextButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
+                        Text(stringResource(R.string.settings_backup_import))
+                    }
+                }
+            }
         }
+    }
+
+    pendingImportJson?.let { json ->
+        AlertDialog(
+            onDismissRequest = { pendingImportJson = null },
+            title = { Text(stringResource(R.string.settings_backup_import_confirm_title)) },
+            text = { Text(stringResource(R.string.settings_backup_import_confirm_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportJson = null
+                    settingsViewModel.importBackup(json) { result ->
+                        showMessage(
+                            result.fold(
+                                onSuccess = { importSuccessMessage },
+                                onFailure = { e -> e.message ?: importReadFailedMessage }
+                            )
+                        )
+                    }
+                }) {
+                    Text(stringResource(R.string.settings_backup_import_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImportJson = null }) {
+                    Text(stringResource(R.string.dialog_cancel))
+                }
+            }
+        )
     }
 
     shareCardUri?.let { uri ->
