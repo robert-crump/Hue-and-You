@@ -52,7 +52,7 @@ class PaletteImportViewModel(
 
     fun confirmArea() {
         val state = _uiState.value as? PaletteImportUiState.MarkingArea ?: return
-        advanceAfterArea(state, state.rect?.let { extractSwatches(state.bitmap, it) } ?: emptyList())
+        advanceAfterArea(state, extractSwatches(state.bitmap, state.rect))
     }
 
     fun skipArea() {

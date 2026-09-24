@@ -8,8 +8,8 @@
     <string name="history_empty_state_body">Tap the + button to rate a piece of clothing or match colors for an object. Your results will show up here.</string>
 
     <string name="history_fab_content_description">Start a new analysis</string>
-    <string name="history_fab_action_rate_clothing">Rate clothing</string>
-    <string name="history_fab_action_match_colors">Match colors for an object</string>
+    <string name="history_fab_action_rate_clothing">Clothes</string>
+    <string name="history_fab_action_match_colors">Object</string>
     <string name="history_entry_type_clothing">Clothing</string>
     <string name="history_entry_type_object">Object</string>
     <string name="history_entry_name_label">Name</string>
@@ -73,7 +73,7 @@
     <string name="delete_profile_dialog_body">This removes \"%1$s\" and its colors. This can\'t be undone.</string>
     <string name="delete_profile_dialog_confirm">Delete</string>
 
-    <string name="rate_clothing_title">Rate clothing</string>
+    <string name="rate_clothing_title">Clothes</string>
     <string name="rate_clothing_white_sheet_reminder">Choose a photo that includes a plain white sheet of paper — it\'s used to calibrate colors.</string>
     <string name="rate_clothing_take_photo">Take photo</string>
     <string name="rate_clothing_pick_photo">Pick from gallery</string>
@@ -100,7 +100,7 @@
     <string name="color_match_band_related">Related</string>
     <string name="color_match_band_far">Far</string>
 
-    <string name="match_object_title">Match colors for an object</string>
+    <string name="match_object_title">Object</string>
     <string name="match_object_select_colors_title">Select one or more colors from the object</string>
     <string name="match_object_continue">Continue</string>
     <string name="match_object_input_color_label">Selected color</string>

@@ -1,12 +1,24 @@
 package com.example.hueandyou.ui.navigation
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material.icons.filled.Checkroom
+import androidx.compose.material.icons.filled.Chair
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -76,30 +88,33 @@ fun HueAndYouNavHost() {
         },
         floatingActionButton = {
             if (onHistory) {
-                Box {
-                    FloatingActionButton(onClick = { showFabMenu = true }) {
-                        Icon(
-                            Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.history_fab_content_description)
-                        )
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AnimatedVisibility(visible = showFabMenu, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            ExtendedFloatingActionButton(
+                                onClick = {
+                                    showFabMenu = false
+                                    navController.navigate(Destination.MatchObject.route)
+                                },
+                                modifier = Modifier.height(40.dp),
+                                icon = { Icon(Icons.Filled.Chair, contentDescription = null) },
+                                text = { Text(stringResource(R.string.history_fab_action_match_colors)) }
+                            )
+                            ExtendedFloatingActionButton(
+                                onClick = {
+                                    showFabMenu = false
+                                    navController.navigate(Destination.RateClothing.route)
+                                },
+                                modifier = Modifier.height(40.dp),
+                                icon = { Icon(Icons.Filled.Checkroom, contentDescription = null) },
+                                text = { Text(stringResource(R.string.history_fab_action_rate_clothing)) }
+                            )
+                        }
                     }
-                    DropdownMenu(
-                        expanded = showFabMenu,
-                        onDismissRequest = { showFabMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.history_fab_action_rate_clothing)) },
-                            onClick = {
-                                showFabMenu = false
-                                navController.navigate(Destination.RateClothing.route)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.history_fab_action_match_colors)) },
-                            onClick = {
-                                showFabMenu = false
-                                navController.navigate(Destination.MatchObject.route)
-                            }
+                    FloatingActionButton(onClick = { showFabMenu = !showFabMenu }) {
+                        Icon(
+                            if (showFabMenu) Icons.Filled.Close else Icons.Filled.Add,
+                            contentDescription = stringResource(R.string.history_fab_content_description)
                         )
                     }
                 }
@@ -109,7 +124,7 @@ fun HueAndYouNavHost() {
         NavHost(
             navController = navController,
             startDestination = Destination.History.route,
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
         ) {
             composable(Destination.History.route) {
                 HistoryScreen(

@@ -12,6 +12,14 @@ data class ImportSwatch(
     val selected: Boolean = true,
 )
 
+/** The centered rectangle (60% of each dimension) the marking step starts with. */
+fun defaultMarkingRect(width: Int, height: Int): RectRegion = RectRegion(
+    left = (width * 0.2f).toInt(),
+    top = (height * 0.2f).toInt(),
+    right = (width * 0.8f).toInt(),
+    bottom = (height * 0.8f).toInt(),
+)
+
 sealed interface PaletteImportUiState {
     data object PickingPhoto : PaletteImportUiState
     data object LoadingPhoto : PaletteImportUiState
@@ -19,7 +27,7 @@ sealed interface PaletteImportUiState {
     data class MarkingArea(
         val bitmap: Bitmap,
         val kind: ColorKind,
-        val rect: RectRegion? = null,
+        val rect: RectRegion = defaultMarkingRect(bitmap.width, bitmap.height),
     ) : PaletteImportUiState
 
     data class Reviewing(
