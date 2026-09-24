@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -95,7 +95,11 @@ fun ProfileEditorScreen(
         if (currentProfile == null) {
             return@Scaffold
         }
-        Column(modifier = Modifier.padding(innerPadding)) {
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+        ) {
             OutlinedTextField(
                 value = name,
                 onValueChange = {
@@ -201,8 +205,8 @@ private fun ColorSection(
                 style = MaterialTheme.typography.bodySmall
             )
         } else {
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                itemsIndexed(colors, key = { _, color -> color.id }) { index, color ->
+            Column(modifier = Modifier.fillMaxWidth()) {
+                colors.forEachIndexed { index, color ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

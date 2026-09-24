@@ -68,40 +68,6 @@ class ColorExtractorTest {
     }
 
     @Test
-    fun syntheticSwatchGridReturnsOneColorPerSwatch() {
-        // A grid of well-separated, saturated solid colors, like a screenshot of a palette's swatches.
-        val swatchColors = listOf(
-            0xFFFF0000.toInt(), 0xFF00FF00.toInt(), 0xFF0000FF.toInt(),
-            0xFFFFFF00.toInt(), 0xFF00FFFF.toInt(), 0xFFFFFFFF.toInt(),
-        )
-        val columns = 3
-        val swatchSize = 20
-        val width = swatchSize * columns
-        val height = swatchSize * (swatchColors.size / columns)
-        val pixels = IntArrayPixelSource(
-            width,
-            height,
-            IntArray(width * height) { index ->
-                val x = index % width
-                val y = index / width
-                val swatchIndex = (y / swatchSize) * columns + (x / swatchSize)
-                swatchColors[swatchIndex]
-            },
-        )
-
-        val result = ColorExtractor.extract(
-            pixels,
-            correction = null,
-            clusterCount = CalibrationConfig.PALETTE_IMPORT_QUANTIZER_CLUSTER_COUNT,
-            minShare = CalibrationConfig.PALETTE_IMPORT_MIN_COLOR_SHARE,
-            maxColors = CalibrationConfig.PALETTE_IMPORT_MAX_COLORS,
-        )
-
-        assertEquals(swatchColors.size, result.colors.size)
-        assertEquals(swatchColors.toSet(), result.colors.map { it.argb }.toSet())
-    }
-
-    @Test
     fun notClearlyDominantWhenTopShareBelowThreshold() {
         val width = 100
         val height = 100

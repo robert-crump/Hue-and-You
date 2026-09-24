@@ -11,9 +11,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
-import com.example.hueandyou.colorspace.CalibrationConfig
-import com.example.hueandyou.colorspace.ColorExtractor
 import com.example.hueandyou.colorspace.RectRegion
+import com.example.hueandyou.colorspace.SwatchExtractor
 import com.example.hueandyou.colorspace.parseHexColor
 import com.example.hueandyou.data.profile.ColorKind
 import com.example.hueandyou.data.profile.ProfileRepository
@@ -70,15 +69,8 @@ class PaletteImportViewModel(
     }
 
     private fun extractSwatches(bitmap: Bitmap, rect: RectRegion): List<ImportSwatch> {
-        val extraction = ColorExtractor.extract(
-            pixels = bitmap.toPixelSource(),
-            correction = null,
-            region = rect,
-            clusterCount = CalibrationConfig.PALETTE_IMPORT_QUANTIZER_CLUSTER_COUNT,
-            minShare = CalibrationConfig.PALETTE_IMPORT_MIN_COLOR_SHARE,
-            maxColors = CalibrationConfig.PALETTE_IMPORT_MAX_COLORS,
-        )
-        return extraction.colors.map { ImportSwatch(id = nextSwatchId++, argb = it.argb, share = it.share) }
+        val colors = SwatchExtractor.extract(pixels = bitmap.toPixelSource(), region = rect)
+        return colors.map { ImportSwatch(id = nextSwatchId++, argb = it.argb, share = it.share) }
     }
 
     fun toggleSwatch(kind: ColorKind, swatchId: Int) {
