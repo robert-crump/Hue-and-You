@@ -1,5 +1,24 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-24 - Issue #20: Fix ANR - run color extraction off the main thread
+
+`confirmCalibration` (Match Object and Rate Clothing) and `onTap` (white-balance sampling) now run
+their pixel work inside `withContext(backgroundDispatcher)` (`Dispatchers.Default` by default,
+injectable via the ViewModel constructor). `confirmCalibration` first sets a new `ExtractingColors`
+UI state, which both screens render with the existing `LoadingStep()` spinner, then swaps to
+SelectingColors/SelectingColor/result when extraction finishes. `onTap` updates state via
+`_uiState.update` only if the same bitmap is still being calibrated. `ColorExtractor` now fills a
+primitive `IntArray` (sized to the region, trimmed with `copyOf` if the exclusion circle skipped
+pixels) instead of a boxed `ArrayList<Int>`. StrictMode thread policy (disk/network, log penalty) is
+enabled in `HueAndYouApplication` only when `FLAG_DEBUGGABLE` is set.
+
+Test: `MatchObjectViewModelTest` injects a `StandardTestDispatcher` as the background dispatcher
+and checks that after `confirmCalibration()` the state is `ExtractingColors` and no pixel work has
+run until the background dispatcher is pumped. `Bitmap` can't be built in plain JVM tests, so it's
+allocated via Unsafe and the ViewModel gets a `pixelSourceOf` seam. Rate Clothing shares the same
+pattern but has no dedicated test. PaletteImportViewModel has the same synchronous pattern and was
+not touched (out of scope for #20). The on-device "no ANR with full-size photo" check is still manual.
+
 ## 2026-09-23 - Issue #17: Settings - About section with disclaimers and closeness bands
 
 Added an "About these results" section to the bottom of `SettingsScreen` (`AboutSection`
@@ -170,42 +189,3 @@ drag-to-mark-rectangle interaction or the review screen (same Robolectric/JDK-26
 #3) - verified by reading through the state machine and by `MatchObjectScreen`'s existing
 `Checkbox`-multi-select and `CalibratingStep`'s tap-to-region conversion math already having passing
 render paths to model this screen's `ReviewingStep`/`MarkingAreaStep` on.
-
-## 2026-09-23 - Issue #13: Settings - default color wheel and balance mode
-
-New `data/settings/SettingsRepository` (`DataStoreSettingsRepository`), a thin wrapper over the
-`AppContainer.settingsDataStore` that #9 already created but never used - `observeDefaults(): Flow
-<HarmonyDefaults>` plus `setDefaultWheel`/`setDefaultBalance`, storing each enum by its `.name` as
-a `stringPreferencesKey` (same "store enums as strings, parse defensively" spirit as `HistoryConverters`,
-except here a missing/unrecognized value falls back to `PERCEPTUAL`/`FAITHFUL` rather than failing,
-since unlike Room there's no migration path for a stale DataStore key). `AppContainer` gained
-`settingsRepository`, built from the existing `settingsDataStore` property.
-
-`ui/settings/`: new `SettingsViewModel` (same `StateFlow` + `viewModelScope.launch` factory pattern
-as `ProfilesViewModel`/`HistoryDetailViewModel`) exposing `defaults` and the two setters.
-`SettingsScreen` gained a "Defaults for new object results" section above Profiles, reusing #12's
-`HarmonyOptionsControls` composable directly (it was already `internal`, so no visibility change
-needed) - same dropdown/segmented-row UI as the live result screen and History detail, just wired
-to the stored default instead of one entry's last-used value. `SettingsScreen`'s single `viewModel`
-parameter split into `profilesViewModel`/`settingsViewModel` to host both.
-
-`MatchObjectViewModel.confirmColorSelection()` now reads `settingsRepository.observeDefaults().first()`
-right before saving, instead of the hardcoded `PERCEPTUAL`/`FAITHFUL` constants #11/#12 left as a
-placeholder for this issue - satisfies "new object results use the defaults" by construction, since
-that's the only place a wheel/balance gets chosen for a brand-new entry. Reopened entries are
-unaffected: `HistoryDetailViewModel`/`HistoryDetailScreen` already read `entry.wheel`/`entry.balance`
-straight off the stored row (#12), never touching Settings.
-
-New `DataStoreSettingsRepositoryTest`: builds a real `PreferenceDataStoreFactory` over a temp file
-(pure JVM, no Robolectric needed - `datastore-preferences` doesn't touch `android.*`) - empty-store
-fallback, each setter persists without disturbing the other, and both together round-trip through
-the same repository instance. (A cross-instance "close and reopen" case was tried and dropped:
-DataStore refuses a second concurrent instance over the same file path even after the first's last
-write completes, so that shape isn't testable without an explicit close API this artifact doesn't
-expose - the same-instance round-trip already covers the encode/decode logic.)
-
-`./gradlew assembleDebug test` passes (4 new `DataStoreSettingsRepositoryTest` cases). No UI test
-for the new Settings controls or for `MatchObjectViewModel`'s default read (same Robolectric/JDK-26
-gap noted since #3; `MatchObjectViewModel` still has no dedicated test file, same as before this
-issue) - verified by reading through the wiring and by `HarmonyOptionsControls` already having a
-passing render path from #12.

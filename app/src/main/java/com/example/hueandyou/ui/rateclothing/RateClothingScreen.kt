@@ -137,6 +137,7 @@ fun RateClothingScreen(
                     }
                 )
                 is RateClothingUiState.LoadingPhoto -> LoadingStep()
+                is RateClothingUiState.ExtractingColors -> LoadingStep()
                 is RateClothingUiState.Calibrating -> CalibratingStep(
                     bitmap = state.bitmap,
                     calibration = state.calibration,

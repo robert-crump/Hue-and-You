@@ -26,18 +26,19 @@ object ColorExtractor {
         val bounds = (region ?: RectRegion.fullImage(pixels.width, pixels.height))
             .clampTo(pixels.width, pixels.height)
 
-        val sampled = ArrayList<Int>()
+        val buffer = IntArray(maxOf(0, bounds.right - bounds.left) * maxOf(0, bounds.bottom - bounds.top))
+        var count = 0
         for (y in bounds.top until bounds.bottom) {
             for (x in bounds.left until bounds.right) {
                 if (exclusion != null && exclusion.contains(x, y)) continue
                 val argb = pixels.pixelAt(x, y)
-                sampled.add(correction?.apply(argb) ?: argb)
+                buffer[count++] = correction?.apply(argb) ?: argb
             }
         }
 
-        if (sampled.isEmpty()) return ColorExtractionResult(emptyList(), false)
+        if (count == 0) return ColorExtractionResult(emptyList(), false)
 
-        val quantized = QuantizerCelebi.quantize(sampled.toIntArray(), clusterCount)
+        val quantized = QuantizerCelebi.quantize(if (count == buffer.size) buffer else buffer.copyOf(count), clusterCount)
         val total = quantized.values.sumOf { it }.toDouble()
 
         val allColors = quantized.entries

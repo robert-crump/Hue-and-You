@@ -9,6 +9,7 @@ import com.example.hueandyou.colorspace.WhiteBalanceResult
 sealed interface MatchObjectUiState {
     data object PickingPhoto : MatchObjectUiState
     data object LoadingPhoto : MatchObjectUiState
+    data object ExtractingColors : MatchObjectUiState
 
     data class Calibrating(
         val bitmap: Bitmap,

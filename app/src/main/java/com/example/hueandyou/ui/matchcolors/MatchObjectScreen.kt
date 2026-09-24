@@ -127,6 +127,7 @@ fun MatchObjectScreen(
                     }
                 )
                 is MatchObjectUiState.LoadingPhoto -> LoadingStep()
+                is MatchObjectUiState.ExtractingColors -> LoadingStep()
                 is MatchObjectUiState.Calibrating -> CalibratingStep(
                     bitmap = state.bitmap,
                     calibration = state.calibration,

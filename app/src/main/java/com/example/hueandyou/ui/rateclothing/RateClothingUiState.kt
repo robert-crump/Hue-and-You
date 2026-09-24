@@ -13,6 +13,7 @@ sealed interface RateClothingUiState {
 
     data object PickingPhoto : RateClothingUiState
     data object LoadingPhoto : RateClothingUiState
+    data object ExtractingColors : RateClothingUiState
 
     data class Calibrating(
         val bitmap: Bitmap,

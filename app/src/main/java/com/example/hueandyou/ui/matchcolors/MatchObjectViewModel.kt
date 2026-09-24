@@ -14,26 +14,46 @@ import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.colorspace.ColorExtractor
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
+import com.example.hueandyou.colorspace.PixelSource
 import com.example.hueandyou.colorspace.WhiteBalanceCalibrator
 import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.settings.SettingsRepository
 import com.example.hueandyou.ui.common.toPixelSource
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
 
+private fun decodeBitmap(contentResolver: ContentResolver, uri: Uri): Bitmap {
+    val source = ImageDecoder.createSource(contentResolver, uri)
+    return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        val longestSide = maxOf(info.size.width, info.size.height)
+        if (longestSide > MAX_PHOTO_DIMENSION_PX) {
+            val scale = MAX_PHOTO_DIMENSION_PX.toFloat() / longestSide
+            decoder.setTargetSize(
+                (info.size.width * scale).toInt().coerceAtLeast(1),
+                (info.size.height * scale).toInt().coerceAtLeast(1),
+            )
+        }
+    }
+}
+
 class MatchObjectViewModel(
     private val historyRepository: HistoryRepository,
     private val thumbnailStore: ThumbnailStore,
     private val settingsRepository: SettingsRepository,
+    private val backgroundDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val pixelSourceOf: (Bitmap) -> PixelSource = Bitmap::toPixelSource,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<MatchObjectUiState>(MatchObjectUiState.PickingPhoto)
     val uiState: StateFlow<MatchObjectUiState> = _uiState.asStateFlow()
@@ -43,7 +63,7 @@ class MatchObjectViewModel(
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
         _uiState.value = MatchObjectUiState.LoadingPhoto
         viewModelScope.launch {
-            val bitmap = withContext(Dispatchers.Default) { decodeBitmap(contentResolver, uri) }
+            val bitmap = withContext(backgroundDispatcher) { decodeBitmap(contentResolver, uri) }
             currentBitmap = bitmap
             _uiState.value = MatchObjectUiState.Calibrating(bitmap)
         }
@@ -51,8 +71,18 @@ class MatchObjectViewModel(
 
     fun onTap(x: Int, y: Int) {
         val state = _uiState.value as? MatchObjectUiState.Calibrating ?: return
-        val result = WhiteBalanceCalibrator.calibrate(state.bitmap.toPixelSource(), x, y)
-        _uiState.value = state.copy(calibration = result)
+        viewModelScope.launch {
+            val result = withContext(backgroundDispatcher) {
+                WhiteBalanceCalibrator.calibrate(pixelSourceOf(state.bitmap), x, y)
+            }
+            _uiState.update { current ->
+                if (current is MatchObjectUiState.Calibrating && current.bitmap === state.bitmap) {
+                    current.copy(calibration = result)
+                } else {
+                    current
+                }
+            }
+        }
     }
 
     fun chooseNewPhoto() {
@@ -62,12 +92,17 @@ class MatchObjectViewModel(
     fun confirmCalibration() {
         val state = _uiState.value as? MatchObjectUiState.Calibrating ?: return
         val success = state.calibration as? WhiteBalanceResult.Success ?: return
-        val extraction = ColorExtractor.extract(
-            pixels = state.bitmap.toPixelSource(),
-            correction = success.correction,
-            exclusion = success.sampledRegion,
-        )
-        _uiState.value = MatchObjectUiState.SelectingColors(extraction.colors)
+        _uiState.value = MatchObjectUiState.ExtractingColors
+        viewModelScope.launch {
+            val extraction = withContext(backgroundDispatcher) {
+                ColorExtractor.extract(
+                    pixels = pixelSourceOf(state.bitmap),
+                    correction = success.correction,
+                    exclusion = success.sampledRegion,
+                )
+            }
+            _uiState.value = MatchObjectUiState.SelectingColors(extraction.colors)
+        }
     }
 
     fun toggleColorSelection(argb: Int) {
@@ -119,21 +154,6 @@ class MatchObjectViewModel(
         val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
         _uiState.value = state.copy(balance = balance)
         viewModelScope.launch { historyRepository.updateHarmonyOptions(state.historyEntryId, state.wheel, balance) }
-    }
-
-    private fun decodeBitmap(contentResolver: ContentResolver, uri: Uri): Bitmap {
-        val source = ImageDecoder.createSource(contentResolver, uri)
-        return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            val longestSide = maxOf(info.size.width, info.size.height)
-            if (longestSide > MAX_PHOTO_DIMENSION_PX) {
-                val scale = MAX_PHOTO_DIMENSION_PX.toFloat() / longestSide
-                decoder.setTargetSize(
-                    (info.size.width * scale).toInt().coerceAtLeast(1),
-                    (info.size.height * scale).toInt().coerceAtLeast(1),
-                )
-            }
-        }
     }
 
     companion object {
