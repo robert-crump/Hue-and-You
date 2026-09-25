@@ -15,13 +15,19 @@
     <string name="history_entry_deleted_message">Deleted \"%1$s\"</string>
     <string name="history_entry_deleted_undo_action">Undo</string>
 
-    <string name="settings_defaults_section_title">Defaults for new object results</string>
+    <string name="settings_object_section_title">Object settings</string>
+    <string name="settings_object_section_hint">Used for new object results.</string>
+    <string name="settings_wheel_title">Color wheel</string>
+    <string name="settings_balance_title">Color balance</string>
 
     <string name="profiles_section_title">Profiles</string>
     <string name="profile_add_content_description">Add profile</string>
     <string name="profile_default_name">New profile</string>
-    <string name="profiles_empty_state">No profiles yet. Tap + to add one.</string>
     <string name="profile_no_best_colors">No best colors yet</string>
+    <plurals name="profile_best_colors_count">
+        <item quantity="one">%d best color</item>
+        <item quantity="other">%d best colors</item>
+    </plurals>
     <string name="profile_share_content_description">Share profile</string>
     <string name="share_preview_title">Share card</string>
     <string name="share_preview_image_content_description">Palette card preview</string>
@@ -105,7 +111,9 @@
 
     <string name="settings_backup_section_title">Backup</string>
     <string name="settings_backup_export">Export backup</string>
+    <string name="settings_backup_export_summary">Save profiles, history and settings</string>
     <string name="settings_backup_import">Import backup</string>
+    <string name="settings_backup_import_summary">Restore from a file</string>
     <string name="settings_backup_export_success">Backup saved</string>
     <string name="settings_backup_export_failed">Couldn\'t save the backup</string>
     <string name="settings_backup_import_read_failed">Couldn\'t read that file</string>
@@ -115,13 +123,11 @@
     <string name="settings_backup_import_success">Backup restored</string>
 
     <string name="settings_about_section_title">About these results</string>
-    <string name="settings_about_how_it_works">Hue and You measures the color of clothing or an object from your photo, then compares it with the Best and Avoid colors in your profile using ΔE00, a perceptual color-difference formula.</string>
-    <string name="settings_about_best_guess">This is our best guess, not a professional assessment. Seasonal color analysis — the idea that everyone has a best palette based on their skin, hair, and eye tone — has little scientific backing, so treat these results as a fun starting point rather than a verdict.</string>
-    <string name="settings_about_delta_e">ΔE00 (\"Delta E 2000\") is a standard way to measure how different two colors look to the human eye: the higher the number, the more noticeable the difference.</string>
-    <string name="settings_about_verdicts_intro">Rate Clothing gives each measured color one of three verdicts:</string>
-    <string name="settings_about_verdict_yes">Great color! — the nearest Best color is close enough to count, and closer than anything you\'re avoiding.</string>
-    <string name="settings_about_verdict_avoid">Avoid — the nearest color to avoid is close enough to count, and closer than your Best colors.</string>
-    <string name="settings_about_verdict_neither">Ambiguous — nothing in your profile is close enough to call it either way.</string>
+    <string name="settings_about_intro">We look at the color in your photo and check how close it is to your Best and Avoid colors.</string>
+    <string name="settings_about_verdict_yes">close to a Best color</string>
+    <string name="settings_about_verdict_avoid">close to a color you avoid</string>
+    <string name="settings_about_verdict_neither">not close to either</string>
+    <string name="settings_about_disclaimer">This is a fun guess, not expert advice. Color-type ideas aren\'t proven by science.</string>
 
     <string name="camera_viewfinder_hint">Put the item in the middle of the frame, in daylight if you can.</string>
     <string name="result_done_content_description">Done</string>

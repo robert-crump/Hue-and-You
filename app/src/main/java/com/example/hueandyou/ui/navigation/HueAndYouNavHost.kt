@@ -1,7 +1,15 @@
 package com.example.hueandyou.ui.navigation
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -17,8 +25,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,6 +57,7 @@ import com.example.hueandyou.ui.settings.SettingsScreen
 
 private const val KEY_SCROLL_HISTORY_TO_TOP = "scrollHistoryToTop"
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HueAndYouNavHost() {
     val navController = rememberNavController()
@@ -66,7 +80,33 @@ fun HueAndYouNavHost() {
 
     val currentRoute = currentDestination?.route
 
+    // Only the three tab roots get this bar; every other screen brings its own top bar.
+    val rootTab = topLevelDestinations.firstOrNull { it.destination.route == currentRoute }
+
     Scaffold(
+        topBar = {
+            if (rootTab != null) {
+                val barColor = MaterialTheme.colorScheme.primaryContainer
+                // Tonal step toward primary: close to the bar color, but visibly its own band.
+                val statusBarColor = lerp(barColor, MaterialTheme.colorScheme.primary, 0.25f)
+                Column {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .windowInsetsTopHeight(WindowInsets.statusBars)
+                            .background(statusBarColor)
+                    )
+                    TopAppBar(
+                        title = { Text(stringResource(rootTab.labelRes), fontWeight = FontWeight.Bold) },
+                        windowInsets = WindowInsets(0, 0, 0, 0),
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = barColor,
+                            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    )
+                }
+            }
+        },
         bottomBar = {
             NavigationBar {
                 topLevelDestinations.forEach { topLevel ->
