@@ -1,5 +1,20 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #29: New photo FAB on result pages, Back goes home
+
+Both result pages (Rate Clothing, Match Object) now show a "New photo" `ExtendedFloatingActionButton`
+(camera icon) via the screen's own `Scaffold.floatingActionButton`, only while `ShowingResult`. It calls
+new `startNewPhoto()` on each ViewModel, which drops the cached candidates and sets state back to
+`PickingPhoto` (the CameraX viewfinder); the saved entry is untouched and the next photo saves a new one.
+`RateClothingViewModel` keeps `selectedProfile` across it, so clothing keeps the same profile. Result
+columns reserve 88dp bottom padding (56dp FAB + margins); the photo is `weight(1f)` so it shrinks rather
+than the verdict/harmony rows being covered. Back needed no nav change: both screens are pushed straight
+from Home (History), so result Back -> `finishResult` and viewfinder Back -> `popBackStack` both land there.
+
+Test: `startNewPhoto` cases in `RateClothingViewModelTest` (state -> PickingPhoto, profile switch kept,
+next result saved as a new entry) and `MatchObjectViewModelTest`. No Compose/navigation UI test for the
+FAB overlap or Back (same Robolectric/JDK-26 gap as before); verified by construction only.
+
 ## 2026-09-25 - Issue #27: Re-pick color with chips in History detail
 
 History detail now goes through a new `HistoryDetailUiState` (`Loading`/`NotFound`/`Loaded`)
@@ -155,45 +170,3 @@ for the new key. `DefaultHistoryRepositoryTest` gained `updateClothingProfile_..
 other `HistoryRepository`/`SettingsRepository` fake in the test suite (`MatchObjectViewModelTest`,
 `HistoryViewModelTest`) got the two new interface methods stubbed to throw, since they don't
 exercise this path. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug` all pass.
-
-## 2026-09-25 - Issue #24: Rate Clothing verdict card - Yes / Avoid / Neither
-
-New pure function `ClothingVerdict.forScore(score: PaletteScore)` (colorspace module) replaces
-`ColorMatchBand` entirely: Yes/Avoid require the corresponding nearest color to be within a new
-`ClothingVerdict.VERDICT_MAX_DELTA_E = 12.0` ΔE00 *and* strictly closer than the other side (so a
-tie, or the other side missing, falls through to the next check); Neither covers both-too-far,
-either list empty, and ties. Since it derives from the already-stored `PaletteScore` rather than a
-new column, History entries scored before this issue still get a verdict for free.
-
-`PaletteResultBody` (shared by the live Rate Clothing result step and History detail, unchanged
-call sites in both `RateClothingScreen` and `HistoryDetailScreen`) now renders a single `Card`:
-icon (`ThumbUpAlt`/`ThumbDownAlt`/`HorizontalRule`) + verdict text + a 72dp circle of the measured
-color, colored by verdict - Yes gets a new fixed-light/dark-green `LocalSuccessColors` (not part of
-the dynamic Material scheme, so it needed its own light/dark pair, set in `HueAndYouTheme` via
-`CompositionLocalProvider` next to `MaterialTheme`), Avoid uses `errorContainer`, Neither uses
-`surfaceVariant`. All deltas, hex codes, nearest-color rows and the "closer to avoid" warning are
-gone; the best-guess disclaimer moved off the result page into a top-bar ⓘ `InfoDialog` on
-`RateClothingScreen` (new, matching the `MatchObjectScreen`/`HistoryDetailScreen` pattern from
-#23) - `HistoryDetailScreen`'s existing ⓘ action is no longer conditional on `OBJECT` since
-Clothing entries need it too now. The rename field is also gone from the live Rate Clothing result
-page (`RateClothingUiState.ShowingResult.historyEntryName`/`RateClothingViewModel.renameResult`
-deleted) - renaming a clothing entry is still possible from its History detail page, unchanged.
-
-`ColorMatch` dropped its `band: ColorMatchBand` field (now just `argb`/`deltaE`); `PaletteScore`
-unchanged otherwise, so no schema/migration. `BackupColorMatchDto.band` stays in the JSON schema
-(no longer optional/defaulted, so it's always serialized regardless of `encodeDefaults`) written as
-a fixed placeholder and ignored on import - verified by a test asserting the key is still present
-in serialized JSON and that an import with an arbitrary legacy value round-trips unchanged. Settings
-> About's four-band breakdown is replaced by three static strings explaining Yes/Avoid/Neither
-(no dynamic threshold text needed here, unlike the old band section - the number itself isn't shown
-anywhere in the UI anymore).
-
-Test: new `ClothingVerdictTest` (colorspace) covers Yes/Avoid/Neither, a tie between Best and
-Avoid, the exact `VERDICT_MAX_DELTA_E` boundary vs. just over it, and both lists empty individually.
-`PaletteScorerTest` lost its `ColorMatchBand` boundary test (moved/superseded by the above).
-`DefaultHistoryRepositoryTest`/`BackupSerializerTest` updated for the two-arg `ColorMatch`
-constructor; `BackupSerializerTest` gained the band-compatibility tests above. No new Compose UI
-test for the card layout/theme-contrast AC (same Robolectric/JDK-26 gap noted since #3) - verified
-by reading through the color role choices (all four - success/error/surfaceVariant containers -
-already have Material-guaranteed on-container contrast). `./gradlew :colorspace:test
-:app:testDebugUnitTest assembleDebug` all pass.

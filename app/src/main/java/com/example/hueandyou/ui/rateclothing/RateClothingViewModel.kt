@@ -127,6 +127,13 @@ class RateClothingViewModel(
         }
     }
 
+    /** Back to the viewfinder for the next item; the saved entry stays and the profile is kept. */
+    fun startNewPhoto() {
+        if (_uiState.value !is RateClothingUiState.ShowingResult) return
+        candidates = emptyList()
+        _uiState.value = RateClothingUiState.PickingPhoto
+    }
+
     /** Re-picks the color from one of the chip alternatives (or the current color, a no-op). */
     fun pickCandidate(argb: Int) {
         val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return

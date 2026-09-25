@@ -87,6 +87,28 @@ class RateClothingViewModelTest {
     }
 
     @Test
+    fun startNewPhoto_returnsToViewfinderKeepingProfile_andNextResultIsANewEntry() {
+        val profileA = profile(1L, "Autumn", 0xFFFF0000.toInt(), 0xFF00FF00.toInt())
+        val profileB = profile(2L, "Winter", 0xFF0000FF.toInt(), 0xFFFFFF00.toInt())
+        val historyRepository = FakeHistoryRepository()
+        val model = viewModel(listOf(profileA, profileB), lastUsedClothingProfileId = 1L, historyRepository = historyRepository)
+        mainDispatcher.scheduler.runCurrent()
+        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        mainDispatcher.scheduler.runCurrent()
+        model.switchProfile(profileB)
+        mainDispatcher.scheduler.runCurrent()
+
+        model.startNewPhoto()
+        assertEquals(RateClothingUiState.PickingPhoto, model.uiState.value)
+
+        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        mainDispatcher.scheduler.runCurrent()
+        val state = model.uiState.value as RateClothingUiState.ShowingResult
+        assertEquals(profileB, state.selectedProfile)
+        assertEquals(profileB, historyRepository.savedProfile)
+    }
+
+    @Test
     fun init_rememberedProfileWasDeleted_fallsBackToFirstProfile() {
         val profileA = profile(1L, "Autumn", 0xFFFF0000.toInt(), 0xFF00FF00.toInt())
         val profileB = profile(2L, "Winter", 0xFF0000FF.toInt(), 0xFFFFFF00.toInt())

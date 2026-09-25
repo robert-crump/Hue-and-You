@@ -102,6 +102,23 @@ class MatchObjectViewModelTest {
         assertEquals(Triple(initial.historyEntryId, blue, null to null), historyRepository.lastObjectPick)
     }
 
+    @Test
+    fun startNewPhoto_returnsToViewfinder() {
+        val viewModel = MatchObjectViewModel(
+            historyRepository = FakeHistoryRepository(),
+            thumbnailStore = FakeThumbnailStore(),
+            settingsRepository = FakeSettingsRepository(),
+            backgroundDispatcher = backgroundDispatcher,
+            pixelSourceOf = { twoColorPixelSource(0xFFFF0000.toInt(), 0xFF0000FF.toInt()) },
+        )
+        invokeExtractAndSaveResult(viewModel, allocateWithoutConstructor(Bitmap::class.java))
+        mainDispatcher.scheduler.runCurrent()
+
+        viewModel.startNewPhoto()
+
+        assertEquals(MatchObjectUiState.PickingPhoto, viewModel.uiState.value)
+    }
+
     /**
      * A 20x20 image whose center box (x, y in [6, 14)) is mostly [red], with a [blue] strip at
      * x in [6, 9) - big enough to survive quantizing as its own cluster, 

@@ -91,6 +91,13 @@ class MatchObjectViewModel(
         }
     }
 
+    /** Back to the viewfinder for the next item; the saved entry stays. */
+    fun startNewPhoto() {
+        if (_uiState.value !is MatchObjectUiState.ShowingResult) return
+        candidates = emptyList()
+        _uiState.value = MatchObjectUiState.PickingPhoto
+    }
+
     /** Re-picks the color from one of the chip alternatives (or the current color, a no-op). */
     fun pickCandidate(argb: Int) {
         val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return

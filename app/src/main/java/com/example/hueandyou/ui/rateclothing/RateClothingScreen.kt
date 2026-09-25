@@ -13,6 +13,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -93,6 +95,15 @@ fun RateClothingScreen(
                     }
                 }
             )
+        },
+        floatingActionButton = {
+            if (showingResult) {
+                ExtendedFloatingActionButton(
+                    onClick = viewModel::startNewPhoto,
+                    icon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
+                    text = { Text(stringResource(R.string.result_new_photo)) },
+                )
+            }
         }
     ) { innerPadding ->
         Box(
@@ -163,6 +174,9 @@ private fun LoadingStep() {
 /** Aligns content with the app bar's back arrow on the left and info icon on the right. */
 private val RESULT_HORIZONTAL_PADDING = 16.dp
 
+/** Clears the extended "New photo" FAB (56dp tall + 16dp margin) so it never covers the result. */
+private val RESULT_BOTTOM_PADDING = 88.dp
+
 @Composable
 private fun ResultStep(
     photo: Bitmap,
@@ -177,7 +191,7 @@ private fun ResultStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = RESULT_HORIZONTAL_PADDING, vertical = 16.dp),
+            .padding(start = RESULT_HORIZONTAL_PADDING, end = RESULT_HORIZONTAL_PADDING, top = 16.dp, bottom = RESULT_BOTTOM_PADDING),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         PhotoResultSection(
