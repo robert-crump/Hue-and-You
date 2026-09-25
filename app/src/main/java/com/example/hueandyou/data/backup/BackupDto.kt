@@ -61,6 +61,7 @@ internal data class BackupClothingDto(
     val closerToAvoid: Boolean = false,
 )
 
+/** [band] is unused - kept (and always written) only so a backup this app writes has the same shape as older ones. */
 @Serializable
 internal data class BackupColorMatchDto(
     val argb: String,

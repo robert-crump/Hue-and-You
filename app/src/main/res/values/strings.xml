@@ -81,15 +81,10 @@
     <string name="rate_clothing_no_profile_body">Create a profile with Best and Avoid colors before rating clothing.</string>
     <string name="rate_clothing_go_to_settings">Go to Settings</string>
     <string name="rate_clothing_select_profile_title">Rate against which profile?</string>
-    <string name="rate_clothing_measured_color_label">Measured color</string>
-    <string name="rate_clothing_nearest_best_label">Nearest Best Color</string>
-    <string name="rate_clothing_nearest_avoid_label">Nearest Color to Avoid</string>
-    <string name="rate_clothing_closer_to_avoid_warning">This color is closer to one you\'re avoiding than to any Best Color.</string>
     <string name="rate_clothing_best_guess_disclaimer">This is our best guess — lighting and camera color can shift the measured color.</string>
-    <string name="color_match_band_match">Match</string>
-    <string name="color_match_band_close">Close</string>
-    <string name="color_match_band_related">Related</string>
-    <string name="color_match_band_far">Far</string>
+    <string name="rate_clothing_verdict_yes">Yes, take the color</string>
+    <string name="rate_clothing_verdict_avoid">Avoid that color</string>
+    <string name="rate_clothing_verdict_neither">Neither best color nor color to avoid</string>
 
     <string name="match_object_title">Object</string>
     <string name="harmony_relationship_complementary">Complementary</string>
@@ -128,7 +123,8 @@
     <string name="settings_about_how_it_works">Hue and You measures the color of clothing or an object from your photo, then compares it with the Best and Avoid colors in your profile using ΔE00, a perceptual color-difference formula.</string>
     <string name="settings_about_best_guess">This is our best guess, not a professional assessment. Seasonal color analysis — the idea that everyone has a best palette based on their skin, hair, and eye tone — has little scientific backing, so treat these results as a fun starting point rather than a verdict.</string>
     <string name="settings_about_delta_e">ΔE00 (\"Delta E 2000\") is a standard way to measure how different two colors look to the human eye: the higher the number, the more noticeable the difference.</string>
-    <string name="settings_about_bands_intro">Each measured color\'s closeness to a Best or Avoid color is grouped into one of four bands:</string>
-    <string name="settings_about_band_row_upper">%1$s — ΔE00 up to %2$s</string>
-    <string name="settings_about_band_row_over">%1$s — ΔE00 over %2$s</string>
+    <string name="settings_about_verdicts_intro">Rate Clothing gives each measured color one of three verdicts:</string>
+    <string name="settings_about_verdict_yes">Yes, take the color — the nearest Best color is close enough to count, and closer than anything you\'re avoiding.</string>
+    <string name="settings_about_verdict_avoid">Avoid that color — the nearest color to avoid is close enough to count, and closer than your Best colors.</string>
+    <string name="settings_about_verdict_neither">Neither best color nor color to avoid — nothing in your profile is close enough to call it either way.</string>
 </resources>

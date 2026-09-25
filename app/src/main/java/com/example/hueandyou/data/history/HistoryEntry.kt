@@ -1,7 +1,6 @@
 package com.example.hueandyou.data.history
 
 import com.example.hueandyou.colorspace.ColorMatch
-import com.example.hueandyou.colorspace.ColorMatchBand
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
@@ -34,14 +33,8 @@ data class HistoryEntry(
 )
 
 internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
-    val nearestBest = nearestBestArgb?.let { argb ->
-        val deltaE = requireNotNull(nearestBestDeltaE)
-        ColorMatch(argb, deltaE, ColorMatchBand.forDeltaE(deltaE))
-    }
-    val nearestAvoid = nearestAvoidArgb?.let { argb ->
-        val deltaE = requireNotNull(nearestAvoidDeltaE)
-        ColorMatch(argb, deltaE, ColorMatchBand.forDeltaE(deltaE))
-    }
+    val nearestBest = nearestBestArgb?.let { argb -> ColorMatch(argb, requireNotNull(nearestBestDeltaE)) }
+    val nearestAvoid = nearestAvoidArgb?.let { argb -> ColorMatch(argb, requireNotNull(nearestAvoidDeltaE)) }
     return HistoryEntry(
         id = id,
         type = type,

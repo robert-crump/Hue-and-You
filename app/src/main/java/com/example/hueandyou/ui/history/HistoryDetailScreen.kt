@@ -60,7 +60,7 @@ fun HistoryDetailScreen(
                     }
                 },
                 actions = {
-                    if (entry?.type == HistoryEntryType.OBJECT) {
+                    if (entry != null) {
                         IconButton(onClick = { showDisclaimer = true }) {
                             Icon(
                                 Icons.Filled.Info,

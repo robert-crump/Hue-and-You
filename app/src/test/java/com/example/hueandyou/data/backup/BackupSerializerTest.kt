@@ -1,7 +1,6 @@
 package com.example.hueandyou.data.backup
 
 import com.example.hueandyou.colorspace.ColorMatch
-import com.example.hueandyou.colorspace.ColorMatchBand
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
@@ -50,8 +49,8 @@ class BackupSerializerTest {
                 bestColorsArgb = listOf(0xFF112233.toInt()),
                 avoidColorsArgb = listOf(0xFF778899.toInt()),
                 score = PaletteScore(
-                    nearestBest = ColorMatch(0xFF112233.toInt(), 2.0, ColorMatchBand.MATCH),
-                    nearestAvoid = ColorMatch(0xFF778899.toInt(), 20.0, ColorMatchBand.FAR),
+                    nearestBest = ColorMatch(0xFF112233.toInt(), 2.0),
+                    nearestAvoid = ColorMatch(0xFF778899.toInt(), 20.0),
                     closerToAvoid = false,
                 ),
                 inputColorsArgb = emptyList(),
@@ -93,6 +92,36 @@ class BackupSerializerTest {
         val restored = serializer.deserialize(serializer.serialize(original))
 
         assertEquals(original, restored)
+    }
+
+    @Test
+    fun serialize_stillWritesTheLegacyBandFieldOnAColorMatch() {
+        val json = serializer.serialize(sampleData())
+
+        val nearestBest = rawJson.parseToJsonElement(json).jsonObject
+            .getValue("history").jsonArray.first()
+            .jsonObject.getValue("clothing").jsonObject.getValue("nearestBest").jsonObject
+
+        assertTrue(nearestBest.containsKey("band"))
+    }
+
+    @Test
+    fun deserialize_ignoresWhateverBandValueAnOlderBackupWrote() {
+        val json = serializer.serialize(sampleData())
+        val withLegacyBand = mutated(json) { obj ->
+            val history = obj.getValue("history").jsonArray.map { entry ->
+                val clothing = entry.jsonObject["clothing"]?.jsonObject ?: return@map entry
+                val nearestBest = clothing["nearestBest"]?.jsonObject ?: return@map entry
+                val mutatedNearestBest = JsonObject(nearestBest.toMutableMap().apply { put("band", JsonPrimitive("MATCH")) })
+                val mutatedClothing = JsonObject(clothing.toMutableMap().apply { put("nearestBest", mutatedNearestBest) })
+                JsonObject(entry.jsonObject.toMutableMap().apply { put("clothing", mutatedClothing) })
+            }
+            obj["history"] = JsonArray(history)
+        }
+
+        val restored = serializer.deserialize(withLegacyBand)
+
+        assertEquals(sampleData(), restored)
     }
 
     @Test

@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
@@ -31,9 +32,17 @@ fun HueAndYouTheme(
         )
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = HueAndYouTypography,
-        content = content
-    )
+    val successColors = if (darkTheme) {
+        SuccessColors(SuccessContainerDark, SuccessOnContainerDark)
+    } else {
+        SuccessColors(SuccessContainerLight, SuccessOnContainerLight)
+    }
+
+    CompositionLocalProvider(LocalSuccessColors provides successColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = HueAndYouTypography,
+            content = content
+        )
+    }
 }

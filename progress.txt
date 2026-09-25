@@ -1,5 +1,47 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #24: Rate Clothing verdict card - Yes / Avoid / Neither
+
+New pure function `ClothingVerdict.forScore(score: PaletteScore)` (colorspace module) replaces
+`ColorMatchBand` entirely: Yes/Avoid require the corresponding nearest color to be within a new
+`ClothingVerdict.VERDICT_MAX_DELTA_E = 12.0` ΔE00 *and* strictly closer than the other side (so a
+tie, or the other side missing, falls through to the next check); Neither covers both-too-far,
+either list empty, and ties. Since it derives from the already-stored `PaletteScore` rather than a
+new column, History entries scored before this issue still get a verdict for free.
+
+`PaletteResultBody` (shared by the live Rate Clothing result step and History detail, unchanged
+call sites in both `RateClothingScreen` and `HistoryDetailScreen`) now renders a single `Card`:
+icon (`ThumbUpAlt`/`ThumbDownAlt`/`HorizontalRule`) + verdict text + a 72dp circle of the measured
+color, colored by verdict - Yes gets a new fixed-light/dark-green `LocalSuccessColors` (not part of
+the dynamic Material scheme, so it needed its own light/dark pair, set in `HueAndYouTheme` via
+`CompositionLocalProvider` next to `MaterialTheme`), Avoid uses `errorContainer`, Neither uses
+`surfaceVariant`. All deltas, hex codes, nearest-color rows and the "closer to avoid" warning are
+gone; the best-guess disclaimer moved off the result page into a top-bar ⓘ `InfoDialog` on
+`RateClothingScreen` (new, matching the `MatchObjectScreen`/`HistoryDetailScreen` pattern from
+#23) - `HistoryDetailScreen`'s existing ⓘ action is no longer conditional on `OBJECT` since
+Clothing entries need it too now. The rename field is also gone from the live Rate Clothing result
+page (`RateClothingUiState.ShowingResult.historyEntryName`/`RateClothingViewModel.renameResult`
+deleted) - renaming a clothing entry is still possible from its History detail page, unchanged.
+
+`ColorMatch` dropped its `band: ColorMatchBand` field (now just `argb`/`deltaE`); `PaletteScore`
+unchanged otherwise, so no schema/migration. `BackupColorMatchDto.band` stays in the JSON schema
+(no longer optional/defaulted, so it's always serialized regardless of `encodeDefaults`) written as
+a fixed placeholder and ignored on import - verified by a test asserting the key is still present
+in serialized JSON and that an import with an arbitrary legacy value round-trips unchanged. Settings
+> About's four-band breakdown is replaced by three static strings explaining Yes/Avoid/Neither
+(no dynamic threshold text needed here, unlike the old band section - the number itself isn't shown
+anywhere in the UI anymore).
+
+Test: new `ClothingVerdictTest` (colorspace) covers Yes/Avoid/Neither, a tie between Best and
+Avoid, the exact `VERDICT_MAX_DELTA_E` boundary vs. just over it, and both lists empty individually.
+`PaletteScorerTest` lost its `ColorMatchBand` boundary test (moved/superseded by the above).
+`DefaultHistoryRepositoryTest`/`BackupSerializerTest` updated for the two-arg `ColorMatch`
+constructor; `BackupSerializerTest` gained the band-compatibility tests above. No new Compose UI
+test for the card layout/theme-contrast AC (same Robolectric/JDK-26 gap noted since #3) - verified
+by reading through the color role choices (all four - success/error/surfaceVariant containers -
+already have Material-guaranteed on-container contrast). `./gradlew :colorspace:test
+:app:testDebugUnitTest assembleDebug` all pass.
+
 ## 2026-09-25 - Issue #23: Simplified Match Object result - Complementary, Analogous, Tonal with info dialogs and neutral hint
 
 `HarmonyRelationship`/`HarmonyEngine.generate` dropped `SPLIT_COMPLEMENTARY`/`TRIADIC` entirely
@@ -8,8 +50,8 @@ detection is a separate pure function, `HarmonyEngine.isNeutral(chroma)` against
 `HarmonyConfig.NEUTRAL_CHROMA_THRESHOLD = 12.0`, rather than folded into `generate()` - keeping it
 outside `generate()` meant the existing hue/balance tests (which run over arbitrary sample colors)
 didn't need auditing for accidental neutrality, and the threshold itself stays boundary-testable
-as a plain `Double -> Boolean` (same shape as `ColorMatchBand.forDeltaE`) instead of needing a
-gamut-mapped round trip through an actual color.
+as a plain `Double -> Boolean` (same shape as the old `ColorMatchBand.forDeltaE`) instead of needing
+a gamut-mapped round trip through an actual color.
 
 `HarmonyResultBody` (shared by the live Match Object result and History detail) is now just the
 relationship rows: no input-color swatch/hex/label section, no disclaimer text. Each row is a
@@ -19,9 +61,8 @@ height) on the left, ~64dp circles on the right - and tapping the ⓘ opens a ne
 fixed explanation text for that relationship. When `HarmonyEngine.isNeutral(chroma)` is true,
 Complementary/Analogous are swapped for one plain hint row; Tonal always renders. The same
 `InfoDialog` backs a new ⓘ action in `MatchObjectScreen`'s and `HistoryDetailScreen`'s top bars
-(History only when the entry is `OBJECT`) showing the best-guess disclaimer that used to sit
-inline - reusing `rate_clothing_best_guess_disclaimer` rather than a new string, since Rate
-Clothing's own inline disclaimer (`PaletteResultBody`) is untouched and out of scope.
+showing the best-guess disclaimer that used to sit inline - reusing `rate_clothing_best_guess_disclaimer`
+rather than a new string.
 
 Wheel/balance and the rename field are gone from both the live result page and History detail -
 `HarmonyOptionsControls` now has exactly one caller left (Settings' own defaults, unchanged); new
@@ -129,46 +170,3 @@ the save step within the same coroutine. `ColorExtractorTest` rewritten for `ext
 Rate Clothing still has no dedicated ViewModel test (unchanged from #20). `./gradlew :colorspace:test
 :app:testDebugUnitTest assembleDebug` all pass. Center-box overlay UI and in-app camera viewfinder are
 out of scope here (issue #28).
-
-## 2026-09-24 - Issue #20: Fix ANR - run color extraction off the main thread
-
-`confirmCalibration` (Match Object and Rate Clothing) and `onTap` (white-balance sampling) now run
-their pixel work inside `withContext(backgroundDispatcher)` (`Dispatchers.Default` by default,
-injectable via the ViewModel constructor). `confirmCalibration` first sets a new `ExtractingColors`
-UI state, which both screens render with the existing `LoadingStep()` spinner, then swaps to
-SelectingColors/SelectingColor/result when extraction finishes. `onTap` updates state via
-`_uiState.update` only if the same bitmap is still being calibrated. `ColorExtractor` now fills a
-primitive `IntArray` (sized to the region, trimmed with `copyOf` if the exclusion circle skipped
-pixels) instead of a boxed `ArrayList<Int>`. StrictMode thread policy (disk/network, log penalty) is
-enabled in `HueAndYouApplication` only when `FLAG_DEBUGGABLE` is set.
-
-Test: `MatchObjectViewModelTest` injects a `StandardTestDispatcher` as the background dispatcher
-and checks that after `confirmCalibration()` the state is `ExtractingColors` and no pixel work has
-run until the background dispatcher is pumped. `Bitmap` can't be built in plain JVM tests, so it's
-allocated via Unsafe and the ViewModel gets a `pixelSourceOf` seam. Rate Clothing shares the same
-pattern but has no dedicated test. PaletteImportViewModel has the same synchronous pattern and was
-not touched (out of scope for #20). The on-device "no ANR with full-size photo" check is still manual.
-
-## 2026-09-23 - Issue #17: Settings - About section with disclaimers and closeness bands
-
-Added an "About these results" section to the bottom of `SettingsScreen` (`AboutSection`
-composable, after the Backup section) - static explanatory text plus a dynamically-built list of
-the four closeness bands. All disclaimer/explanation copy (how measurement works, the "best guess"
-caveat, seasonal color analysis having little scientific backing, and the white-sheet calibration's
-optical-brightener/lighting limits) lives in `strings.xml` as plain `settings_about_*` strings -
-nothing there needed to be dynamic.
-
-The band list is the one part the issue required to "never drift": each row is built from
-`ColorMatchBand.MATCH_MAX_DELTA_E`/`CLOSE_MAX_DELTA_E`/`RELATED_MAX_DELTA_E` (the same constants
-`PaletteScorer`/`ColorMatchBand.forDeltaE` already score against) rather than restating 3/8/15 as
-literals in `strings.xml`, so a future change to those thresholds automatically updates this text.
-Band labels reuse the existing `colorMatchBandLabel()` (from `PaletteResultView.kt`, already
-`internal` and thus visible across `ui.*` packages in the app module) instead of adding parallel
-`settings_about_band_*_label` strings - same label the Rate Clothing result screen already shows
-for Match/Close/Related/Far. A small `formatDeltaE` helper trims the trailing `.0` off these
-currently-whole-number `Double` constants (`3.0` -> "3") without hardcoding the assumption that
-they'll always be whole numbers into the string resources themselves.
-
-No new tests: this is static UI copy plus a read of existing, already-tested constants - no new
-logic to unit-test, and this app has no Compose UI test harness (same Robolectric/JDK-26 gap noted
-since #3). `./gradlew assembleDebug test` passes with no new failures.

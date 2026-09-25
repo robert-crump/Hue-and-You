@@ -115,7 +115,6 @@ class RateClothingViewModel(
                 sampleY = null,
                 score = score,
                 historyEntryId = entry.id,
-                historyEntryName = entry.name,
             )
         }
     }
@@ -157,11 +156,6 @@ class RateClothingViewModel(
         viewModelScope.launch {
             historyRepository.updateClothingPick(state.historyEntryId, argb, score, sampleX, sampleY)
         }
-    }
-
-    fun renameResult(name: String) {
-        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
-        viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
     }
 
     private fun scoreFor(argb: Int, profile: Profile?): PaletteScore = if (profile != null) {

@@ -3,106 +3,89 @@ package com.example.hueandyou.ui.common
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.HorizontalRule
+import androidx.compose.material.icons.filled.ThumbDownAlt
+import androidx.compose.material.icons.filled.ThumbUpAlt
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.hueandyou.R
-import com.example.hueandyou.colorspace.ColorMatch
-import com.example.hueandyou.colorspace.ColorMatchBand
+import com.example.hueandyou.colorspace.ClothingVerdict
 import com.example.hueandyou.colorspace.PaletteScore
-import com.example.hueandyou.colorspace.formatHexColor
+import com.example.hueandyou.ui.theme.LocalSuccessColors
+
+private val VERDICT_COLOR_CIRCLE_SIZE = 72.dp
 
 /**
- * The measured-color swatch, closer-to-avoid warning, nearest Best/Avoid matches and disclaimer
- * shared by the live Rate Clothing result step and the History detail screen that reopens a
- * saved snapshot of the same result.
+ * The verdict card - Yes/Avoid/Neither, plus the measured color - shared by the live Rate
+ * Clothing result step and the History detail screen that reopens a saved snapshot of the same
+ * result. The verdict is derived from [score] rather than stored, so History entries saved before
+ * the verdict existed still get one.
  */
 @Composable
 internal fun PaletteResultBody(argb: Int, score: PaletteScore) {
-    Text(
-        text = stringResource(R.string.rate_clothing_measured_color_label),
-        style = MaterialTheme.typography.titleMedium
-    )
-    Box(
+    val verdict = remember(score) { ClothingVerdict.forScore(score) }
+    val successColors = LocalSuccessColors.current
+
+    val (containerColor, contentColor) = when (verdict) {
+        ClothingVerdict.YES -> successColors.container to successColors.onContainer
+        ClothingVerdict.AVOID -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        ClothingVerdict.NEITHER -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Card(
         modifier = Modifier
-            .padding(top = 8.dp)
-            .size(120.dp)
-            .clip(CircleShape)
-            .background(Color(argb))
-    )
-    Text(
-        text = formatHexColor(argb),
-        style = MaterialTheme.typography.headlineSmall,
-        modifier = Modifier.padding(top = 8.dp)
-    )
-
-    if (score.closerToAvoid) {
-        Text(
-            text = stringResource(R.string.rate_clothing_closer_to_avoid_warning),
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = 24.dp)
-        )
-    }
-
-    score.nearestBest?.let { match ->
-        ColorMatchRow(labelRes = R.string.rate_clothing_nearest_best_label, match = match)
-    }
-    score.nearestAvoid?.let { match ->
-        ColorMatchRow(labelRes = R.string.rate_clothing_nearest_avoid_label, match = match)
-    }
-
-    Text(
-        text = stringResource(R.string.rate_clothing_best_guess_disclaimer),
-        style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(top = 24.dp)
-    )
-}
-
-@Composable
-internal fun ColorMatchRow(labelRes: Int, match: ColorMatch) {
-    Column(
-        modifier = Modifier
-            .padding(top = 24.dp)
+            .fillMaxWidth()
+            .padding(top = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
-        Text(text = stringResource(labelRes), style = MaterialTheme.typography.titleSmall)
-        Row(
-            modifier = Modifier.padding(top = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Icon(verdictIcon(verdict), contentDescription = null, modifier = Modifier.size(40.dp))
+            Text(
+                text = stringResource(verdictLabel(verdict)),
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(top = 8.dp),
+            )
             Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .padding(top = 16.dp)
+                    .size(VERDICT_COLOR_CIRCLE_SIZE)
                     .clip(CircleShape)
-                    .background(Color(match.argb))
+                    .background(Color(argb))
             )
-            Column(modifier = Modifier.padding(start = 12.dp)) {
-                Text(text = formatHexColor(match.argb))
-                Text(
-                    text = "ΔE %.1f — %s".format(
-                        match.deltaE,
-                        stringResource(colorMatchBandLabel(match.band))
-                    ),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
         }
     }
 }
 
-internal fun colorMatchBandLabel(band: ColorMatchBand): Int = when (band) {
-    ColorMatchBand.MATCH -> R.string.color_match_band_match
-    ColorMatchBand.CLOSE -> R.string.color_match_band_close
-    ColorMatchBand.RELATED -> R.string.color_match_band_related
-    ColorMatchBand.FAR -> R.string.color_match_band_far
+private fun verdictLabel(verdict: ClothingVerdict): Int = when (verdict) {
+    ClothingVerdict.YES -> R.string.rate_clothing_verdict_yes
+    ClothingVerdict.AVOID -> R.string.rate_clothing_verdict_avoid
+    ClothingVerdict.NEITHER -> R.string.rate_clothing_verdict_neither
+}
+
+private fun verdictIcon(verdict: ClothingVerdict): ImageVector = when (verdict) {
+    ClothingVerdict.YES -> Icons.Filled.ThumbUpAlt
+    ClothingVerdict.AVOID -> Icons.Filled.ThumbDownAlt
+    ClothingVerdict.NEITHER -> Icons.Filled.HorizontalRule
 }

@@ -1,7 +1,6 @@
 package com.example.hueandyou.data.history
 
 import com.example.hueandyou.colorspace.ColorMatch
-import com.example.hueandyou.colorspace.ColorMatchBand
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
@@ -39,8 +38,8 @@ class DefaultHistoryRepositoryTest {
     )
 
     private fun sampleScore() = PaletteScore(
-        nearestBest = ColorMatch(0xFF112233.toInt(), 2.0, ColorMatchBand.MATCH),
-        nearestAvoid = ColorMatch(0xFF445566.toInt(), 12.0, ColorMatchBand.RELATED),
+        nearestBest = ColorMatch(0xFF112233.toInt(), 2.0),
+        nearestAvoid = ColorMatch(0xFF445566.toInt(), 12.0),
         closerToAvoid = false,
     )
 
@@ -219,7 +218,7 @@ class DefaultHistoryRepositoryTest {
             score = sampleScore(),
         )
         val newScore = PaletteScore(
-            nearestBest = ColorMatch(0xFF445566.toInt(), 1.0, ColorMatchBand.MATCH),
+            nearestBest = ColorMatch(0xFF445566.toInt(), 1.0),
             nearestAvoid = null,
             closerToAvoid = false,
         )

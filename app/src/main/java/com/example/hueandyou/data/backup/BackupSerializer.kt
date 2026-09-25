@@ -1,7 +1,6 @@
 package com.example.hueandyou.data.backup
 
 import com.example.hueandyou.colorspace.ColorMatch
-import com.example.hueandyou.colorspace.ColorMatchBand
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
@@ -122,8 +121,11 @@ private fun BackupHistoryEntry.toDto(): BackupHistoryDto = BackupHistoryDto(
     },
 )
 
+/** [BackupColorMatchDto.band] no longer means anything to this app; written only for schema compatibility. */
+private const val LEGACY_UNUSED_BAND = "UNUSED"
+
 private fun ColorMatch.toDto(): BackupColorMatchDto =
-    BackupColorMatchDto(argb = formatHexColor(argb), deltaE = deltaE, band = band.name)
+    BackupColorMatchDto(argb = formatHexColor(argb), deltaE = deltaE, band = LEGACY_UNUSED_BAND)
 
 internal fun BackupDocumentDto.toDomain(): BackupData = BackupData(
     defaultWheel = settings.defaultWheel.toEnumOrThrow(),
@@ -205,7 +207,7 @@ private fun BackupHistoryDto.toDomain(): BackupHistoryEntry {
 }
 
 private fun BackupColorMatchDto.toDomain(): ColorMatch =
-    ColorMatch(argb = argb.toArgbOrThrow(), deltaE = deltaE, band = band.toEnumOrThrow())
+    ColorMatch(argb = argb.toArgbOrThrow(), deltaE = deltaE)
 
 private fun String.toArgbOrThrow(): Int =
     parseHexColor(this) ?: throw BackupImportException("This file contains an invalid color: \"$this\".")

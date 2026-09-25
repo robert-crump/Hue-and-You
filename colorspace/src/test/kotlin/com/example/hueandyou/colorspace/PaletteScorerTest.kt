@@ -9,18 +9,6 @@ import org.junit.Test
 class PaletteScorerTest {
 
     @Test
-    fun bandBoundaries() {
-        assertEquals(ColorMatchBand.MATCH, ColorMatchBand.forDeltaE(0.0))
-        assertEquals(ColorMatchBand.MATCH, ColorMatchBand.forDeltaE(3.0))
-        assertEquals(ColorMatchBand.CLOSE, ColorMatchBand.forDeltaE(3.0001))
-        assertEquals(ColorMatchBand.CLOSE, ColorMatchBand.forDeltaE(8.0))
-        assertEquals(ColorMatchBand.RELATED, ColorMatchBand.forDeltaE(8.0001))
-        assertEquals(ColorMatchBand.RELATED, ColorMatchBand.forDeltaE(15.0))
-        assertEquals(ColorMatchBand.FAR, ColorMatchBand.forDeltaE(15.0001))
-        assertEquals(ColorMatchBand.FAR, ColorMatchBand.forDeltaE(100.0))
-    }
-
-    @Test
     fun nearestColorIsSelectedFromSeveralCandidates() {
         val measured = 0xFF3050C0.toInt()
         val near = 0xFF3050C5.toInt()

@@ -22,6 +22,5 @@ sealed interface RateClothingUiState {
         val sampleY: Double?,
         val score: PaletteScore,
         val historyEntryId: Long,
-        val historyEntryName: String,
     ) : RateClothingUiState
 }
