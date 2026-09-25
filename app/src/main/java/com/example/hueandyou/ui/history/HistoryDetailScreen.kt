@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -19,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,8 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.data.history.HistoryEntryType
-import com.example.hueandyou.ui.common.HarmonyOptionsControls
 import com.example.hueandyou.ui.common.HarmonyResultBody
+import com.example.hueandyou.ui.common.InfoDialog
 import com.example.hueandyou.ui.common.PaletteResultBody
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +45,7 @@ fun HistoryDetailScreen(
     ),
 ) {
     val entry by viewModel.entry.collectAsState()
+    var showDisclaimer by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -54,6 +57,16 @@ fun HistoryDetailScreen(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.navigate_back)
                         )
+                    }
+                },
+                actions = {
+                    if (entry?.type == HistoryEntryType.OBJECT) {
+                        IconButton(onClick = { showDisclaimer = true }) {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = stringResource(R.string.harmony_disclaimer_content_description)
+                            )
+                        }
                     }
                 }
             )
@@ -82,22 +95,21 @@ fun HistoryDetailScreen(
             when (current.type) {
                 HistoryEntryType.CLOTHING -> PaletteResultBody(argb = current.calibratedArgb, score = current.score)
                 HistoryEntryType.OBJECT -> {
-                    val wheel = requireNotNull(current.wheel)
-                    val balance = requireNotNull(current.balance)
-                    HarmonyOptionsControls(
-                        wheel = wheel,
-                        balance = balance,
-                        onWheelChange = viewModel::setWheel,
-                        onBalanceChange = viewModel::setBalance,
-                        modifier = Modifier.padding(top = 16.dp),
-                    )
                     HarmonyResultBody(
                         inputColorArgb = current.inputColorsArgb.first(),
-                        wheel = wheel,
-                        balance = balance,
+                        wheel = requireNotNull(current.wheel),
+                        balance = requireNotNull(current.balance),
                     )
                 }
             }
+        }
+
+        if (showDisclaimer) {
+            InfoDialog(
+                title = stringResource(R.string.harmony_disclaimer_title),
+                text = stringResource(R.string.rate_clothing_best_guess_disclaimer),
+                onDismiss = { showDisclaimer = false },
+            )
         }
     }
 }

@@ -1,5 +1,46 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #23: Simplified Match Object result - Complementary, Analogous, Tonal with info dialogs and neutral hint
+
+`HarmonyRelationship`/`HarmonyEngine.generate` dropped `SPLIT_COMPLEMENTARY`/`TRIADIC` entirely
+(enum cases, generation, tests) - only Complementary, Analogous and Tonal remain. Neutral-color
+detection is a separate pure function, `HarmonyEngine.isNeutral(chroma)` against a new
+`HarmonyConfig.NEUTRAL_CHROMA_THRESHOLD = 12.0`, rather than folded into `generate()` - keeping it
+outside `generate()` meant the existing hue/balance tests (which run over arbitrary sample colors)
+didn't need auditing for accidental neutrality, and the threshold itself stays boundary-testable
+as a plain `Double -> Boolean` (same shape as `ColorMatchBand.forDeltaE`) instead of needing a
+gamut-mapped round trip through an actual color.
+
+`HarmonyResultBody` (shared by the live Match Object result and History detail) is now just the
+relationship rows: no input-color swatch/hex/label section, no disclaimer text. Each row is a
+compact `Row` - label + a small ⓘ `IconButton` (32dp touch target, so it doesn't blow out row
+height) on the left, ~64dp circles on the right - and tapping the ⓘ opens a new shared
+`InfoDialog` (title + one/two sentences + a single OK button, `ui/common/InfoDialog.kt`) with the
+fixed explanation text for that relationship. When `HarmonyEngine.isNeutral(chroma)` is true,
+Complementary/Analogous are swapped for one plain hint row; Tonal always renders. The same
+`InfoDialog` backs a new ⓘ action in `MatchObjectScreen`'s and `HistoryDetailScreen`'s top bars
+(History only when the entry is `OBJECT`) showing the best-guess disclaimer that used to sit
+inline - reusing `rate_clothing_best_guess_disclaimer` rather than a new string, since Rate
+Clothing's own inline disclaimer (`PaletteResultBody`) is untouched and out of scope.
+
+Wheel/balance and the rename field are gone from both the live result page and History detail -
+`HarmonyOptionsControls` now has exactly one caller left (Settings' own defaults, unchanged); new
+results still take Settings' defaults, History still reopens with the wheel/balance it was saved
+with, but neither is editable from the result/detail screens anymore. Since nothing could still
+call it, `HistoryRepository.updateHarmonyOptions`/`HistoryDao.updateHarmonyOptions` (and the SQL
+`UPDATE ... SET wheel, balance` query) were deleted outright rather than left as dead code, along
+with `MatchObjectViewModel.renameResult`/`setWheel`/`setBalance` and
+`HistoryDetailViewModel.setWheel`/`setBalance` and the now-unused `historyEntryName` state field -
+the `wheel`/`balance` columns themselves are untouched (still written at creation, still read for
+display), so no migration was needed.
+
+Test: `HarmonyEngineTest` lost its split-complementary/triadic assertions and gained
+`isNeutralExcludesTheThresholdItselfButIncludesJustBelowIt` (boundary test at exactly
+`NEUTRAL_CHROMA_THRESHOLD`). No new Compose UI test for the row/dialog layout or the "fits without
+scrolling" AC (same Robolectric/JDK-26 gap noted since #3) - verified by reading through the
+layout and manually reasoning about removed vertical space (no hex/name/wheel-balance/disclaimer
+lines). `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug` all pass.
+
 ## 2026-09-25 - Issue #22: Result page photo, alternative color chips and tap-to-pick
 
 Both result pages (`MatchObjectScreen`, `RateClothingScreen`) now show the decoded photo at the
@@ -131,60 +172,3 @@ they'll always be whole numbers into the string resources themselves.
 No new tests: this is static UI copy plus a read of existing, already-tested constants - no new
 logic to unit-test, and this app has no Compose UI test harness (same Robolectric/JDK-26 gap noted
 since #3). `./gradlew assembleDebug test` passes with no new failures.
-
-## 2026-09-23 - Issue #16: JSON backup - export and import all data
-
-New `data/backup/` package. `BackupSerializer` (`JsonBackupSerializer`) is a pure function
-`BackupData <-> JSON` using kotlinx.serialization - no I/O, no DB/DataStore access - so every
-validation rule (`ignoreUnknownKeys = true`; a missing required DTO field surfaces as
-`SerializationException`; an unrecognized enum string or hex color throws) runs and can fail before
-anything is written, satisfying "validation happens before any write" by construction rather than by
-convention. `schemaVersion` is peeked from the raw `JsonElement` *before* the full `decodeFromString`,
-so a newer/unrecognized version gets a clear "update the app" message instead of whatever generic
-deserialization error the mismatched shape would otherwise produce. Colors are hex strings
-(`colorspace`'s existing `formatHexColor`/`parseHexColor`, alpha-ignored, matching how the rest of
-the app already treats color ints) rather than the domain's ARGB `Int`s, matching the PRD's
-illustrative shape; a history entry's `clothing`/`object` (renamed `objectResult` + `@SerialName`
-since `object` is reserved) blocks are mutually exclusive by `type`, validated on decode rather than
-relying on the type system to enforce it.
-
-`BackupRepository` (`DefaultBackupRepository`) is the I/O layer: exports by reusing the existing
-`ProfileWithColors.toDomain()`/`HistoryEntryEntity.toDomain()` extensions (rather than re-deriving
-`PaletteScore` from raw entity columns) plus `ThumbnailStore.readBytes` (new method - thumbnails were
-previously only ever written by `Bitmap.compress`, never read back) for each entry's JPEG bytes,
-base64-encoded into the JSON. Import deletes everything and reinserts under one `TransactionRunner`
-(new indirection over `androidx.room.withTransaction` - added so this repository could be unit-tested
-against the existing `FakeProfileDao`/`FakeHistoryDao` doubles, same as every other repository here,
-rather than needing a real/Robolectric Room instance) - profile ids are remapped old-JSON-id ->
-freshly-inserted-id as they're created, then substituted into each history entry's `profileId`, since
-neither fake nor real Room insert can be trusted to reproduce the exact original row ids. New
-thumbnail files are written *before* the transaction (pure, retryable) and the *old* ones are only
-deleted *after* it commits, so a failed import never leaves History pointing at a missing file.
-`ProfileDao`/`HistoryDao` gained bulk `deleteAll*`/`insert*(List<...>)` methods for this, mirrored in
-both fakes.
-
-`ui/settings/`: `SettingsViewModel` gained `exportBackup`/`importBackup` (`Result`-returning callback
-style, since unlike every other action on this screen these two can fail in ways the user needs to
-see). `SettingsScreen` gained a "Backup" section (Export/Import `TextButton`s) using
-`ActivityResultContracts.CreateDocument`/`OpenDocument` for SAF - the first SAF usage in this app
-(existing photo pickers all use `PickVisualMedia`/`TakePicture`, not document trees). Import reads
-the chosen file to a `String`, then shows a confirm `AlertDialog` (same shape as
-`delete_profile_dialog`) before calling into the ViewModel, since replacing all data can't be undone;
-result/failure messages surface through a new `Scaffold`+`SnackbarHost` (same nested-Scaffold-for-
-just-the-snackbar shape `HistoryScreen` already uses) - `BackupImportException.message` is written to
-be shown directly, so the UI doesn't need its own copy of "what went wrong" strings.
-
-New `BackupSerializerTest` (round-trip equality; unknown fields ignored; invalid JSON, a missing
-required field, and a future schema version all throw `BackupImportException`) and
-`DefaultBackupRepositoryTest` (export from one fake-backed repository into a second, fresh one -
-profile/color ids line up because both start empty and are filled in the same order, but history ids
-don't, since export orders by `createdAt DESC` while re-insertion replays that order into an
-originally-empty table - `id`/`thumbnailPath` are normalized away before comparing since they're
-storage details, not dataset content; a separate assertion confirms thumbnail bytes carried over
-correctly via the fakes' own paths). `BackupHistoryEntry` needed hand-written `equals`/`hashCode`
-(the `ByteArray` thumbnail field breaks the data class default, which compares by identity).
-
-`./gradlew assembleDebug test` passes (8 new test cases: 5 `BackupSerializerTest`, 3
-`DefaultBackupRepositoryTest`). No UI test for the Export/Import buttons or the confirm dialog (same
-Robolectric/JDK-26 gap noted since #3) - verified by reading through the SAF launcher wiring and by
-the fact the confirm dialog reuses `delete_profile_dialog`'s already-working `AlertDialog` shape.

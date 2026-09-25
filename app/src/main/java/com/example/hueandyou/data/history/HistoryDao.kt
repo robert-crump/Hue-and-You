@@ -3,8 +3,6 @@ package com.example.hueandyou.data.history
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
-import com.example.hueandyou.colorspace.HarmonyBalance
-import com.example.hueandyou.colorspace.HarmonyWheel
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -31,9 +29,6 @@ interface HistoryDao {
 
     @Query("UPDATE history_entries SET name = :name WHERE id = :entryId")
     suspend fun updateName(entryId: Long, name: String)
-
-    @Query("UPDATE history_entries SET wheel = :wheel, balance = :balance WHERE id = :entryId")
-    suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance)
 
     /** A re-pick on an OBJECT entry: the new color and where it was sampled from (null = center box). */
     @Query(

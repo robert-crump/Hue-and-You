@@ -92,12 +92,17 @@
     <string name="color_match_band_far">Far</string>
 
     <string name="match_object_title">Object</string>
-    <string name="match_object_input_color_label">Selected color</string>
     <string name="harmony_relationship_complementary">Complementary</string>
-    <string name="harmony_relationship_split_complementary">Split-complementary</string>
     <string name="harmony_relationship_analogous">Analogous</string>
-    <string name="harmony_relationship_triadic">Triadic</string>
     <string name="harmony_relationship_tonal">Tonal</string>
+    <string name="harmony_relationship_complementary_explanation">The color opposite yours on the color wheel. It gives the strongest contrast, which is great for a bold accent.</string>
+    <string name="harmony_relationship_analogous_explanation">The colors right next to yours on the color wheel. They blend in calmly and are a safe choice that always works.</string>
+    <string name="harmony_relationship_tonal_explanation">Your color in lighter and darker versions. It gives an elegant, head-to-toe look that works even with neutrals.</string>
+    <string name="harmony_relationship_info_content_description">More about this relationship</string>
+    <string name="harmony_neutral_hint">Neutral colors go with almost anything. Pick any accent you like.</string>
+    <string name="harmony_disclaimer_title">About this result</string>
+    <string name="harmony_disclaimer_content_description">About this result</string>
+    <string name="dialog_ok">OK</string>
     <string name="harmony_wheel_label">Color wheel</string>
     <string name="harmony_wheel_traditional">Traditional</string>
     <string name="harmony_wheel_screen">Screen</string>

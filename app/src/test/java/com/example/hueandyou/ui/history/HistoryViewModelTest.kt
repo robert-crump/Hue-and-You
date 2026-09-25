@@ -137,10 +137,6 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         throw UnsupportedOperationException("not used by this test")
     }
 
-    override suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance) {
-        throw UnsupportedOperationException("not used by this test")
-    }
-
     override suspend fun updateObjectPick(entryId: Long, argb: Int, sampleX: Double?, sampleY: Double?) {
         throw UnsupportedOperationException("not used by this test")
     }

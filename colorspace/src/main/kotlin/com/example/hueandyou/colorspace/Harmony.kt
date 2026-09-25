@@ -4,7 +4,7 @@ import kotlin.math.abs
 
 /** The relationships [HarmonyEngine] generates suggestions for, relative to a reference color. */
 enum class HarmonyRelationship {
-    COMPLEMENTARY, SPLIT_COMPLEMENTARY, ANALOGOUS, TRIADIC, TONAL
+    COMPLEMENTARY, ANALOGOUS, TONAL
 }
 
 /** One relationship's suggested color(s) for a reference color. */
@@ -132,6 +132,9 @@ object HarmonyConfig {
 
     /** ...by this fraction of the distance between the reference's own tone and the target. */
     const val SOFTENED_TONE_PULL_FRACTION = 0.3
+
+    /** Below this HCT chroma, a color is treated as neutral: see [HarmonyEngine.isNeutral]. */
+    const val NEUTRAL_CHROMA_THRESHOLD = 12.0
 }
 
 /** Mutes the reference color: lower chroma, tone pulled toward a mid-light target. */
@@ -176,12 +179,16 @@ object HarmonyEngine {
 
         return listOf(
             HarmonySuggestion(HarmonyRelationship.COMPLEMENTARY, listOf(colorAt(180.0))),
-            HarmonySuggestion(HarmonyRelationship.SPLIT_COMPLEMENTARY, listOf(colorAt(150.0), colorAt(210.0))),
             HarmonySuggestion(HarmonyRelationship.ANALOGOUS, listOf(colorAt(-30.0), colorAt(30.0))),
-            HarmonySuggestion(HarmonyRelationship.TRIADIC, listOf(colorAt(120.0), colorAt(240.0))),
             HarmonySuggestion(HarmonyRelationship.TONAL, tonalColors(reference)),
         )
     }
+
+    /**
+     * Whether a reference color of this HCT [chroma] is neutral enough that Complementary/
+     * Analogous suggestions stop being meaningful (they'd just be near-identical grays).
+     */
+    fun isNeutral(chroma: Double): Boolean = chroma < HarmonyConfig.NEUTRAL_CHROMA_THRESHOLD
 
     private fun tonalColors(reference: Hct): List<Int> {
         val closest = TONAL_TONES.minBy { abs(it - reference.tone) }

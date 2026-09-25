@@ -19,6 +19,5 @@ sealed interface MatchObjectUiState {
         val wheel: HarmonyWheel,
         val balance: HarmonyBalance,
         val historyEntryId: Long,
-        val historyEntryName: String,
     ) : MatchObjectUiState
 }

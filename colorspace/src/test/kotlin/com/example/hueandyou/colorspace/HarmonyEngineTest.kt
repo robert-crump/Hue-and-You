@@ -31,17 +31,9 @@ class HarmonyEngineTest {
 
                 assertHue(expectedHue(180.0), suggestions.hueOf(HarmonyRelationship.COMPLEMENTARY)[0])
 
-                val splitComplementary = suggestions.hueOf(HarmonyRelationship.SPLIT_COMPLEMENTARY)
-                assertHue(expectedHue(150.0), splitComplementary[0])
-                assertHue(expectedHue(210.0), splitComplementary[1])
-
                 val analogous = suggestions.hueOf(HarmonyRelationship.ANALOGOUS)
                 assertHue(expectedHue(-30.0), analogous[0])
                 assertHue(expectedHue(30.0), analogous[1])
-
-                val triadic = suggestions.hueOf(HarmonyRelationship.TRIADIC)
-                assertHue(expectedHue(120.0), triadic[0])
-                assertHue(expectedHue(240.0), triadic[1])
             }
         }
     }
@@ -136,6 +128,13 @@ class HarmonyEngineTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun isNeutralExcludesTheThresholdItselfButIncludesJustBelowIt() {
+        assertTrue(HarmonyEngine.isNeutral(HarmonyConfig.NEUTRAL_CHROMA_THRESHOLD - 0.01))
+        assertTrue(!HarmonyEngine.isNeutral(HarmonyConfig.NEUTRAL_CHROMA_THRESHOLD))
+        assertTrue(!HarmonyEngine.isNeutral(HarmonyConfig.NEUTRAL_CHROMA_THRESHOLD + 0.01))
     }
 
     private fun List<HarmonySuggestion>.hueOf(relationship: HarmonyRelationship): List<Double> =

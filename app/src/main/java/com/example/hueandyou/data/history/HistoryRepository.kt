@@ -29,9 +29,6 @@ interface HistoryRepository {
 
     suspend fun renameEntry(entryId: Long, name: String)
 
-    /** Updates the wheel/balance an OBJECT entry was last viewed with, so reopening restores it. */
-    suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance)
-
     /** Updates an OBJECT entry in place after a re-pick: the new color and its sample location. */
     suspend fun updateObjectPick(entryId: Long, argb: Int, sampleX: Double?, sampleY: Double?)
 
@@ -108,10 +105,6 @@ class DefaultHistoryRepository(
 
     override suspend fun renameEntry(entryId: Long, name: String) {
         dao.updateName(entryId, name)
-    }
-
-    override suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance) {
-        dao.updateHarmonyOptions(entryId, wheel, balance)
     }
 
     override suspend fun updateObjectPick(entryId: Long, argb: Int, sampleX: Double?, sampleY: Double?) {

@@ -7,8 +7,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
-import com.example.hueandyou.colorspace.HarmonyBalance
-import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryRepository
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,16 +24,6 @@ class HistoryDetailViewModel(
 
     fun rename(name: String) {
         viewModelScope.launch { repository.renameEntry(entryId, name) }
-    }
-
-    fun setWheel(wheel: HarmonyWheel) {
-        val balance = entry.value?.balance ?: return
-        viewModelScope.launch { repository.updateHarmonyOptions(entryId, wheel, balance) }
-    }
-
-    fun setBalance(balance: HarmonyBalance) {
-        val wheel = entry.value?.wheel ?: return
-        viewModelScope.launch { repository.updateHarmonyOptions(entryId, wheel, balance) }
     }
 
     companion object {

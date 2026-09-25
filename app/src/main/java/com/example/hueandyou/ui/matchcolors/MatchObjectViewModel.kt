@@ -12,8 +12,6 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.colorspace.ColorExtractor
-import com.example.hueandyou.colorspace.HarmonyBalance
-import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PixelSource
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
@@ -93,7 +91,6 @@ class MatchObjectViewModel(
                 wheel = entry.wheel ?: defaults.wheel,
                 balance = entry.balance ?: defaults.balance,
                 historyEntryId = entry.id,
-                historyEntryName = entry.name,
             )
         }
     }
@@ -131,23 +128,6 @@ class MatchObjectViewModel(
             sampleY = sampleY,
         )
         viewModelScope.launch { historyRepository.updateObjectPick(state.historyEntryId, argb, sampleX, sampleY) }
-    }
-
-    fun renameResult(name: String) {
-        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
-        viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
-    }
-
-    fun setWheel(wheel: HarmonyWheel) {
-        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
-        _uiState.value = state.copy(wheel = wheel)
-        viewModelScope.launch { historyRepository.updateHarmonyOptions(state.historyEntryId, wheel, state.balance) }
-    }
-
-    fun setBalance(balance: HarmonyBalance) {
-        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
-        _uiState.value = state.copy(balance = balance)
-        viewModelScope.launch { historyRepository.updateHarmonyOptions(state.historyEntryId, state.wheel, balance) }
     }
 
     companion object {
