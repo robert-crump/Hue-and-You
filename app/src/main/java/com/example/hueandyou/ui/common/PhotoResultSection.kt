@@ -100,7 +100,7 @@ private fun DrawScope.drawMarkerRing(center: Offset, radius: Float) {
     drawCircle(color = Color.White, radius = radius, center = center, style = Stroke(width = 3f))
 }
 
-private fun DrawScope.drawMarkerRect(topLeft: Offset, boxSize: Size) {
+internal fun DrawScope.drawMarkerRect(topLeft: Offset, boxSize: Size) {
     drawRect(color = Color.Black.copy(alpha = 0.6f), topLeft = topLeft, size = boxSize, style = Stroke(width = 6f))
     drawRect(color = Color.White, topLeft = topLeft, size = boxSize, style = Stroke(width = 3f))
 }

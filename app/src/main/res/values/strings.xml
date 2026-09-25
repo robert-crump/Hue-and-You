@@ -74,8 +74,6 @@
     <string name="delete_profile_dialog_confirm">Delete</string>
 
     <string name="rate_clothing_title">Clothes</string>
-    <string name="pick_photo_reminder">Choose or take a photo with the color you want centered in the frame.</string>
-    <string name="rate_clothing_take_photo">Take photo</string>
     <string name="rate_clothing_pick_photo">Pick from gallery</string>
     <string name="rate_clothing_no_profile_title">No profile yet</string>
     <string name="rate_clothing_no_profile_body">Create a profile with Best and Avoid colors before rating clothing.</string>
@@ -128,4 +126,9 @@
     <string name="settings_about_verdict_yes">Yes, take the color — the nearest Best color is close enough to count, and closer than anything you\'re avoiding.</string>
     <string name="settings_about_verdict_avoid">Avoid that color — the nearest color to avoid is close enough to count, and closer than your Best colors.</string>
     <string name="settings_about_verdict_neither">Neither best color nor color to avoid — nothing in your profile is close enough to call it either way.</string>
+
+    <string name="camera_viewfinder_hint">Put the item in the middle of the frame, in daylight if you can.</string>
+    <string name="camera_shutter_content_description">Take photo</string>
+    <string name="camera_permission_denied_message">Camera access was denied. You can still pick a photo from your gallery, or turn on Camera access in Settings to use the viewfinder.</string>
+    <string name="camera_open_settings">Open Settings</string>
 </resources>

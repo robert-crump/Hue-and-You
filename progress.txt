@@ -1,5 +1,55 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #28: In-app CameraX viewfinder with center-box overlay and gallery button
+
+Both photo flows' `PickingPhoto` step now renders a new shared `CameraCaptureStep`
+(`ui/common/CameraCaptureStep.kt`) instead of the old two-button "Take photo / Pick photo" screen -
+`MatchObjectScreen` and `RateClothingScreen` each just wire its `onPhotoUri` callback straight to
+their existing `viewModel.onPhotoPicked(context.contentResolver, uri)`, unchanged from here on (same
+decode-and-downscale-off-main-thread pipeline as every other photo entry point). `CameraCaptureStep`
+requests the `CAMERA` runtime permission once on first composition; granted shows `CameraViewfinder`
+(new CameraX `Preview` + `ImageCapture` bound to `ProcessCameraProvider` via an `AndroidView`-wrapped
+`PreviewView`, the back camera, a shutter `FloatingActionButton`, and a corner gallery `IconButton`),
+denied falls back to `CameraPermissionFallback` (a "Pick from gallery" button plus, only after an
+actual denial rather than merely not-yet-granted, a denial message and an "Open Settings" button so
+permission can still be granted later) and auto-launches the gallery picker once so the user isn't
+stuck. The shutter captures to a temp file in the same `cacheDir/camera_captures` FileProvider path
+the old system-camera intent used (`ImageCapture.OutputFileOptions` + `FileProvider.getUriForFile`),
+guarded by an `isCapturing` flag against double-taps; the gallery button and the fallback's button
+both reuse one `ActivityResultContracts.PickVisualMedia()` launcher owned by `CameraCaptureStep`.
+
+The overlay box reuses `CalibrationConfig.CENTER_BOX_FRACTION` and the same `drawMarkerRect`
+`DrawScope` extension `PhotoResultSection` already draws its center-box marker with (widened from
+`private` to `internal` so both files in `ui.common` share it) - the two are guaranteed to match
+since they're the same constant and the same drawing code, not just visually similar. The old
+`ActivityResultContracts.TakePicture()` system-camera launch (and its per-screen
+`createCameraPhotoUri`/`pendingCameraUri`) is deleted from both screens; the `FileProvider`
+declaration and its `camera_captures`/`share_cards` cache-paths are untouched since CameraX's own
+file output and `ShareCardRenderer` still need them. Added the CameraX (`camera-core`/`camera2`/
+`lifecycle`/`view`, 1.4.2) and `lifecycle-runtime-compose` dependencies, plus a manifest
+`CAMERA` permission and an optional `android.hardware.camera` `<uses-feature>` (optional since the
+gallery fallback means the app still works on a camera-less device). Removed the now-orphaned
+`pick_photo_reminder`/`rate_clothing_take_photo` strings (the old screen's copy) and added
+`camera_viewfinder_hint`/`camera_shutter_content_description`/`camera_permission_denied_message`/
+`camera_open_settings`.
+
+Rotation and the live-preview/capture pipeline itself are standard CameraX behavior (`PreviewView`
+and `ImageCapture` both handle sensor/device rotation internally) rather than anything this issue's
+code manages by hand, so there's nothing bespoke to unit-test there. Back from the viewfinder was
+already correct with no change needed - `PickingPhoto` is a state within the existing screen, not a
+separate nav destination, so the screen's existing top-bar back arrow (`onNavigateBack` ->
+`navController.popBackStack()`, both routes are one hop from home) already lands on the home screen.
+
+Test: no new automated test - this issue is almost entirely `PreviewView`/`ProcessCameraProvider`/
+`ImageCapture` wiring plus runtime-permission branching, none of which is unit-testable without
+Robolectric or an instrumented device (same JDK-26/no-`adb` gap noted since #3, and CameraX's own
+Compose/`AndroidView` integration has no meaningful pure-function surface to extract here) - verified
+by reading through the permission branches (granted/first-request/denied-with-fallback) and the
+shutter's file-write-then-`FileProvider`-wrap-then-existing-`onPhotoPicked` call chain. No manual
+on-device check was possible in this environment (no attached device/emulator) - flagged per the
+issue's own "manual check on device" AC as unverified rather than claimed done.
+`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass.
+
 ## 2026-09-25 - Issue #26: Long-press any color circle to copy its hex code
 
 New shared `ColorCircle` composable (`ui/common/ColorCircle.kt`) replaces every ad hoc
@@ -145,50 +195,3 @@ Test: `HarmonyEngineTest` lost its split-complementary/triadic assertions and ga
 scrolling" AC (same Robolectric/JDK-26 gap noted since #3) - verified by reading through the
 layout and manually reasoning about removed vertical space (no hex/name/wheel-balance/disclaimer
 lines). `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug` all pass.
-
-## 2026-09-25 - Issue #22: Result page photo, alternative color chips and tap-to-pick
-
-Both result pages (`MatchObjectScreen`, `RateClothingScreen`) now show the decoded photo at the
-top (capped at 35%/40% of screen height via a new shared `PhotoResultSection` composable that
-measures the actual `BoxWithConstraints` width so the image never letterboxes), a marker (the
-center 40% box for the auto-pick/a chip-pick, or a ring at the tap point sized to the real sample
-circle), and a `ColorChipRow` of the current color plus up to 4 alternatives. The decoded `Bitmap`
-now lives in `ShowingResult` state itself (both ViewModels) instead of going out of scope after
-extraction, since it's needed for display and for re-sampling on a tap.
-
-`ColorExtractor` gained `extractCandidates` (every quantized cluster in a region, no min-share
-filter - `extractMainColor` now just takes `.first()`), `extractColorAtPoint` (dominant color in a
-circle of radius ~3% of the image's short edge, for tap-to-pick), and `selectAlternatives` (greedy
-ΔE00 ≥ 5 dedup against the current pick and against each other, capped at 4 -
-`CalibrationConfig.ALTERNATIVE_MAX_COUNT`/`ALTERNATIVE_MIN_DELTA_E`/`TAP_SAMPLE_RADIUS_FRACTION`).
-Both ViewModels cache the ranked candidate list from the initial center-box extraction per photo;
-a chip re-pick just re-filters that cached list (synchronous, no pixel work), while a tap re-pick
-re-samples via `extractColorAtPoint` off `backgroundDispatcher` before filtering the same cached
-list for new alternatives - both funnel through a shared private `applyPick` that updates state
-immediately and persists via a new `updateObjectPick`/`updateClothingPick` repository call, which
-`UPDATE`s the existing History row in place (color, sample point, and recomputed score for
-Clothing) rather than inserting a new entry. (`pickAtPoint` reads width/height from the injected
-`PixelSource`, not from the real `Bitmap`, so it stays unit-testable without Robolectric.)
-
-`HistoryEntry`/`HistoryEntryEntity` gained nullable `sampleX`/`sampleY` (normalized 0-1; null =
-center box). Room bumped to version 4 with a real `MIGRATION_3_4` (`ALTER TABLE ... ADD COLUMN ...
-REAL`, additive/nullable) registered via `addMigrations` ahead of the existing
-`fallbackToDestructiveMigration` safety net - the first real migration in this codebase (prior
-version bumps just relied on destructive fallback). Since Room migration testing normally needs
-Robolectric/instrumentation (the gap this codebase already avoids elsewhere, see
-`DefaultBackupRepository`'s `TransactionRunner`), `Migration3To4Test` instead asserts on the exact
-SQL via a recording `java.lang.reflect.Proxy` over `SupportSQLiteDatabase` - same "no real DB"
-philosophy as the DAO fakes, one level lower. Backup gained matching optional `sampleX`/`sampleY`
-(entry, DTO, export, import); no schema version bump needed since `ignoreUnknownKeys` plus
-nullable-with-null-default fields make old backups without the fields import unchanged (tested).
-
-Test: `ColorExtractorTest`/new `ColorExtractorSelectAlternativesTest` cover the three new
-colorspace functions (candidate ranking with no share filter, circle sampling and its bounds
-clamping, dedup/cap/order for alternatives). `MatchObjectViewModelTest` gained
-`pickCandidate_updatesStateInstantlyAndPersistsToTheSameEntry` and
-`pickAtPoint_samplesOffMainThreadThenUpdatesTheSameEntry` (same off-main-thread assertion shape as
-#20/#21); Rate Clothing still has no dedicated ViewModel test (unchanged since #20) but its
-`updateClothingPick` path is covered at the repository layer. `DefaultHistoryRepositoryTest` and
-`BackupSerializerTest` gained cases for the new update/roundtrip/missing-field paths. History
-detail screen re-pick (chips there) is explicitly out of scope - that's #27.
-`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug` all pass.

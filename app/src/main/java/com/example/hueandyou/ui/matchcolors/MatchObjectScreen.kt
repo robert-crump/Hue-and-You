@@ -1,12 +1,6 @@
 package com.example.hueandyou.ui.matchcolors
 
-import android.content.Context
 import android.graphics.Bitmap
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,12 +10,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -36,16 +28,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
+import com.example.hueandyou.ui.common.CameraCaptureStep
 import com.example.hueandyou.ui.common.ColorChipRow
 import com.example.hueandyou.ui.common.HarmonyResultBody
 import com.example.hueandyou.ui.common.InfoDialog
 import com.example.hueandyou.ui.common.PhotoResultSection
-import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,18 +46,6 @@ fun MatchObjectScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val pickPhotoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) viewModel.onPhotoPicked(context.contentResolver, uri)
-    }
-    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
-    val takePhotoLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        val uri = pendingCameraUri
-        if (success && uri != null) viewModel.onPhotoPicked(context.contentResolver, uri)
-    }
     var showDisclaimer by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -98,17 +77,8 @@ fun MatchObjectScreen(
                 .padding(innerPadding)
         ) {
             when (val state = uiState) {
-                is MatchObjectUiState.PickingPhoto -> PickPhotoStep(
-                    onTakePhoto = {
-                        val uri = createCameraPhotoUri(context)
-                        pendingCameraUri = uri
-                        takePhotoLauncher.launch(uri)
-                    },
-                    onPickPhoto = {
-                        pickPhotoLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
-                    }
+                is MatchObjectUiState.PickingPhoto -> CameraCaptureStep(
+                    onPhotoUri = { uri -> viewModel.onPhotoPicked(context.contentResolver, uri) },
                 )
                 is MatchObjectUiState.LoadingPhoto -> LoadingStep()
                 is MatchObjectUiState.ExtractingColors -> LoadingStep()
@@ -134,34 +104,6 @@ fun MatchObjectScreen(
             onDismiss = { showDisclaimer = false },
         )
     }
-}
-
-@Composable
-private fun PickPhotoStep(onTakePhoto: () -> Unit, onPickPhoto: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = stringResource(R.string.pick_photo_reminder),
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Button(onClick = onTakePhoto, modifier = Modifier.padding(top = 24.dp)) {
-            Text(stringResource(R.string.rate_clothing_take_photo))
-        }
-        Button(onClick = onPickPhoto, modifier = Modifier.padding(top = 8.dp)) {
-            Text(stringResource(R.string.rate_clothing_pick_photo))
-        }
-    }
-}
-
-private fun createCameraPhotoUri(context: Context): Uri {
-    val capturesDir = File(context.cacheDir, "camera_captures").apply { mkdirs() }
-    val photoFile = File.createTempFile("capture_", ".jpg", capturesDir)
-    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", photoFile)
 }
 
 @Composable
