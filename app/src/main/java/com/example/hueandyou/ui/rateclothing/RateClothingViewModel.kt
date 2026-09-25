@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
 
@@ -120,8 +119,6 @@ class RateClothingViewModel(
                 photo = bitmap,
                 argb = argb,
                 chipColorsArgb = ColorExtractor.selectTopColors(candidates),
-                sampleX = null,
-                sampleY = null,
                 score = score,
                 historyEntryId = entry.id,
                 profiles = profiles,
@@ -134,36 +131,17 @@ class RateClothingViewModel(
     fun pickCandidate(argb: Int) {
         val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
         if (argb == state.argb) return
-        applyPick(state, argb, sampleX = null, sampleY = null)
+        applyPick(state, argb)
     }
 
-    /** Re-picks the color by sampling around a tap on the photo, at normalized [x]/[y] in [0, 1]. */
-    fun pickAtPoint(x: Double, y: Double) {
-        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
-        viewModelScope.launch {
-            val argb = withContext(backgroundDispatcher) {
-                val pixels = pixelSourceOf(state.photo)
-                ColorExtractor.extractColorAtPoint(
-                    pixels,
-                    x = (x * pixels.width).roundToInt(),
-                    y = (y * pixels.height).roundToInt(),
-                )
-            }
-            val latest = _uiState.value as? RateClothingUiState.ShowingResult ?: return@launch
-            applyPick(latest, argb, sampleX = x, sampleY = y)
-        }
-    }
-
-    private fun applyPick(state: RateClothingUiState.ShowingResult, argb: Int, sampleX: Double?, sampleY: Double?) {
+    private fun applyPick(state: RateClothingUiState.ShowingResult, argb: Int) {
         val score = scoreFor(argb, selectedProfile)
         _uiState.value = state.copy(
             argb = argb,
-            sampleX = sampleX,
-            sampleY = sampleY,
             score = score,
         )
         viewModelScope.launch {
-            historyRepository.updateClothingPick(state.historyEntryId, argb, score, sampleX, sampleY)
+            historyRepository.updateClothingPick(state.historyEntryId, argb, score, sampleX = null, sampleY = null)
         }
     }
 

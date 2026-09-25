@@ -17,9 +17,6 @@ sealed interface RateClothingUiState {
         val argb: Int,
         /** The fixed top-3 chip row; only the highlight moves when a pick changes. */
         val chipColorsArgb: List<Int>,
-        /** Where [argb] was sampled from, normalized to [photo]'s size; null = center box. */
-        val sampleX: Double?,
-        val sampleY: Double?,
         val score: PaletteScore,
         val historyEntryId: Long,
         /** Every profile, for the "For: <name>" switcher; the "For:" line is hidden below 2. */

@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -14,10 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -26,33 +22,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.CalibrationConfig
 
 /**
  * The photo at the top of a result page, with a marker showing where the current color was
- * sampled from - the center box for the auto-pick or a chip-pick (null [sampleX]/[sampleY]), or
- * a ring at the tap point for a tap-pick. When [onTap] is non-null, tapping the photo reports a
- * normalized point in [0, 1] to it (the caller is responsible for running the off-main-thread
- * sampling); when null, the photo is display-only.
+ * sampled from - the center box (null [sampleX]/[sampleY]), or a ring for History entries saved
+ * back when tap-to-pick existed. Display-only: colors are re-picked through the chips.
  */
 @Composable
 internal fun PhotoResultSection(
     photo: Bitmap,
-    sampleX: Double?,
-    sampleY: Double?,
     maxHeightFraction: Float,
-    onTap: ((x: Double, y: Double) -> Unit)?,
     modifier: Modifier = Modifier,
+    sampleX: Double? = null,
+    sampleY: Double? = null,
 ) {
     val imageBitmap = remember(photo) { photo.asImageBitmap() }
     val bitmapAspectRatio = photo.width.toFloat() / photo.height.toFloat()
-    var displaySizePx by remember { mutableStateOf(IntSize.Zero) }
 
     BoxWithConstraints(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
         val maxAllowedHeight = maxHeight * maxHeightFraction
@@ -66,19 +55,6 @@ internal fun PhotoResultSection(
                 contentDescription = stringResource(R.string.result_photo_content_description),
                 modifier = Modifier
                     .fillMaxSize()
-                    .onSizeChanged { displaySizePx = it }
-                    .let { imageModifier ->
-                        if (onTap == null) return@let imageModifier
-                        imageModifier.pointerInput(photo) {
-                            detectTapGestures { offset ->
-                                val size = displaySizePx
-                                if (size.width == 0 || size.height == 0) return@detectTapGestures
-                                val x = (offset.x / size.width).toDouble().coerceIn(0.0, 1.0)
-                                val y = (offset.y / size.height).toDouble().coerceIn(0.0, 1.0)
-                                onTap(x, y)
-                            }
-                        }
-                    }
             )
             Canvas(modifier = Modifier.fillMaxSize()) {
                 if (sampleX != null && sampleY != null) {

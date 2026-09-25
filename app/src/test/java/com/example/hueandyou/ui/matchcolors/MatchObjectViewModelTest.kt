@@ -96,55 +96,15 @@ class MatchObjectViewModelTest {
         assertEquals(blue, afterPick.inputColorArgb)
         // The chip row stays put; only the highlight (the current color) moves.
         assertEquals(listOf(red, blue), afterPick.chipColorsArgb)
-        assertEquals(null, afterPick.sampleX)
-        assertEquals(null, afterPick.sampleY)
         assertEquals(initial.historyEntryId, afterPick.historyEntryId)
 
         mainDispatcher.scheduler.runCurrent()
         assertEquals(Triple(initial.historyEntryId, blue, null to null), historyRepository.lastObjectPick)
     }
 
-    @Test
-    fun pickAtPoint_samplesOffMainThreadThenUpdatesTheSameEntry() {
-        val extractionThreadNames = mutableListOf<String>()
-        val red = 0xFFFF0000.toInt()
-        val blue = 0xFF0000FF.toInt()
-        val historyRepository = FakeHistoryRepository()
-        val viewModel = MatchObjectViewModel(
-            historyRepository = historyRepository,
-            thumbnailStore = FakeThumbnailStore(),
-            settingsRepository = FakeSettingsRepository(),
-            backgroundDispatcher = backgroundDispatcher,
-            pixelSourceOf = {
-                extractionThreadNames += Thread.currentThread().name
-                twoColorPixelSource(red, blue)
-            },
-        )
-        invokeExtractAndSaveResult(viewModel, allocateWithoutConstructor(Bitmap::class.java))
-        mainDispatcher.scheduler.runCurrent()
-        val initial = viewModel.uiState.value as MatchObjectUiState.ShowingResult
-        extractionThreadNames.clear()
-
-        viewModel.pickAtPoint(0.35, 0.5)
-
-        // Nothing has changed yet: the sampling work is only queued on the background dispatcher.
-        assertEquals(initial, viewModel.uiState.value)
-        assertTrue(extractionThreadNames.isEmpty())
-
-        mainDispatcher.scheduler.runCurrent()
-
-        assertEquals(1, extractionThreadNames.size)
-        val afterTap = viewModel.uiState.value as MatchObjectUiState.ShowingResult
-        assertEquals(blue, afterTap.inputColorArgb)
-        assertEquals(0.35, afterTap.sampleX)
-        assertEquals(0.5, afterTap.sampleY)
-        assertEquals(initial.historyEntryId, afterTap.historyEntryId)
-        assertEquals(Triple(initial.historyEntryId, blue, 0.35 to 0.5), historyRepository.lastObjectPick)
-    }
-
     /**
      * A 20x20 image whose center box (x, y in [6, 14)) is mostly [red], with a [blue] strip at
-     * x in [6, 9) - big enough to survive quantizing as its own cluster, and to tap into cleanly.
+     * x in [6, 9) - big enough to survive quantizing as its own cluster, 
      */
     private fun twoColorPixelSource(red: Int, blue: Int): IntArrayPixelSource {
         val size = 20

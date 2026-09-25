@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -54,10 +55,13 @@ import java.util.Locale
 
 @Composable
 fun HistoryScreen(
+    scrollToTopRequested: Boolean,
+    onScrolledToTop: () -> Unit,
     onOpenEntry: (Long) -> Unit,
     viewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.factory(LocalContext.current)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
     val undoActionLabel = stringResource(R.string.history_entry_deleted_undo_action)
     val deletedMessage = uiState.pendingDeletion?.let {
@@ -77,12 +81,18 @@ fun HistoryScreen(
         }
     }
 
+    LaunchedEffect(scrollToTopRequested) {
+        if (!scrollToTopRequested) return@LaunchedEffect
+        listState.scrollToItem(0)
+        onScrolledToTop()
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             if (uiState.isEmpty) {
                 HistoryEmptyState()
             } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     items(uiState.entries, key = { it.id }) { entry ->
                         HistoryEntryRow(
                             entry = entry,

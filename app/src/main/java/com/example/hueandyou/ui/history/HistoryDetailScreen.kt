@@ -87,7 +87,6 @@ fun HistoryDetailScreen(
                 innerPadding = innerPadding,
                 onRename = viewModel::rename,
                 onPickCandidate = viewModel::pickCandidate,
-                onPickAtPoint = viewModel::pickAtPoint,
             )
         }
 
@@ -119,7 +118,6 @@ private fun LoadedContent(
     innerPadding: PaddingValues,
     onRename: (String) -> Unit,
     onPickCandidate: (Int) -> Unit,
-    onPickAtPoint: (x: Double, y: Double) -> Unit,
 ) {
     val entry = state.entry
     var name by rememberSaveable(entry.id) { mutableStateOf(entry.name) }
@@ -129,7 +127,7 @@ private fun LoadedContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(innerPadding)
-            .padding(32.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         OutlinedTextField(
@@ -146,7 +144,6 @@ private fun LoadedContent(
             sampleX = entry.sampleX,
             sampleY = entry.sampleY,
             maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
-            onTap = onPickAtPoint,
             modifier = Modifier.padding(top = 16.dp),
         )
         ColorChipRow(

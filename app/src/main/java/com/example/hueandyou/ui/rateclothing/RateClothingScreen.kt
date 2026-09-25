@@ -2,6 +2,7 @@ package com.example.hueandyou.ui.rateclothing
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,23 +50,30 @@ import com.example.hueandyou.ui.common.PhotoResultSection
 @Composable
 fun RateClothingScreen(
     onNavigateBack: () -> Unit,
+    onFinished: () -> Unit,
     onNavigateToProfileSettings: () -> Unit,
     viewModel: RateClothingViewModel = viewModel(factory = RateClothingViewModel.factory(LocalContext.current)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showDisclaimer by remember { mutableStateOf(false) }
+    val showingResult = uiState is RateClothingUiState.ShowingResult
+
+    // On the finished result the checkmark replaces the back arrow; system back behaves the same.
+    BackHandler(enabled = showingResult, onBack = onFinished)
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.rate_clothing_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.navigate_back)
-                        )
+                    if (!showingResult) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back)
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -73,6 +82,14 @@ fun RateClothingScreen(
                             Icons.Filled.Info,
                             contentDescription = stringResource(R.string.harmony_disclaimer_content_description)
                         )
+                    }
+                    if (showingResult) {
+                        IconButton(onClick = onFinished) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = stringResource(R.string.result_done_content_description)
+                            )
+                        }
                     }
                 }
             )
@@ -98,13 +115,10 @@ fun RateClothingScreen(
                     photo = state.photo,
                     argb = state.argb,
                     chipColorsArgb = state.chipColorsArgb,
-                    sampleX = state.sampleX,
-                    sampleY = state.sampleY,
                     score = state.score,
                     profiles = state.profiles,
                     selectedProfile = state.selectedProfile,
                     onPickCandidate = viewModel::pickCandidate,
-                    onPickAtPoint = viewModel::pickAtPoint,
                     onSwitchProfile = viewModel::switchProfile,
                 )
             }
@@ -154,13 +168,10 @@ private fun ResultStep(
     photo: Bitmap,
     argb: Int,
     chipColorsArgb: List<Int>,
-    sampleX: Double?,
-    sampleY: Double?,
     score: PaletteScore,
     profiles: List<Profile>,
     selectedProfile: Profile?,
     onPickCandidate: (Int) -> Unit,
-    onPickAtPoint: (x: Double, y: Double) -> Unit,
     onSwitchProfile: (Profile) -> Unit,
 ) {
     Column(
@@ -171,10 +182,7 @@ private fun ResultStep(
     ) {
         PhotoResultSection(
             photo = photo,
-            sampleX = sampleX,
-            sampleY = sampleY,
             maxHeightFraction = 1f,
-            onTap = onPickAtPoint,
             modifier = Modifier.weight(1f),
         )
         if (profiles.size >= 2 && selectedProfile != null) {

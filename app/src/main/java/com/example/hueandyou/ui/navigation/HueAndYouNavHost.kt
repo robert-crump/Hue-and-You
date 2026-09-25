@@ -26,6 +26,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,12 +49,20 @@ import com.example.hueandyou.ui.profiles.ProfileEditorScreen
 import com.example.hueandyou.ui.rateclothing.RateClothingScreen
 import com.example.hueandyou.ui.settings.SettingsScreen
 
+private const val KEY_SCROLL_HISTORY_TO_TOP = "scrollHistoryToTop"
+
 @Composable
 fun HueAndYouNavHost() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
     var showFabMenu by remember { mutableStateOf(false) }
+
+    // Leaving a freshly created rating: its entry is the newest, so History should show it at the top.
+    val finishResult: () -> Unit = {
+        navController.previousBackStackEntry?.savedStateHandle?.set(KEY_SCROLL_HISTORY_TO_TOP, true)
+        navController.popBackStack()
+    }
 
     val onHistory = currentDestination?.hierarchy?.any { it.route == Destination.History.route } == true
 
@@ -126,8 +135,13 @@ fun HueAndYouNavHost() {
             startDestination = Destination.History.route,
             modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
         ) {
-            composable(Destination.History.route) {
+            composable(Destination.History.route) { historyEntry ->
+                val scrollToTop by historyEntry.savedStateHandle
+                    .getStateFlow(KEY_SCROLL_HISTORY_TO_TOP, false)
+                    .collectAsState()
                 HistoryScreen(
+                    scrollToTopRequested = scrollToTop,
+                    onScrolledToTop = { historyEntry.savedStateHandle[KEY_SCROLL_HISTORY_TO_TOP] = false },
                     onOpenEntry = { entryId ->
                         navController.navigate(Destination.HistoryDetail.route(entryId))
                     }
@@ -193,13 +207,14 @@ fun HueAndYouNavHost() {
             composable(Destination.RateClothing.route) {
                 RateClothingScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    onFinished = finishResult,
                     onNavigateToProfileSettings = {
                         navController.navigate(Destination.Settings.route(scrollToProfiles = true))
                     }
                 )
             }
             composable(Destination.MatchObject.route) {
-                MatchObjectScreen(onNavigateBack = { navController.popBackStack() })
+                MatchObjectScreen(onNavigateBack = { navController.popBackStack() }, onFinished = finishResult)
             }
         }
     }

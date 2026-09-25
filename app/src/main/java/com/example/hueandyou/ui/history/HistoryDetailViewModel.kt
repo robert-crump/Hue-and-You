@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 sealed interface HistoryDetailUiState {
     data object Loading : HistoryDetailUiState
@@ -86,23 +85,6 @@ class HistoryDetailViewModel(
         val state = _uiState.value as? HistoryDetailUiState.Loaded ?: return
         if (argb == state.entry.calibratedArgb) return
         viewModelScope.launch { persistPick(state.entry, argb, sampleX = null, sampleY = null) }
-    }
-
-    /** Re-picks the entry's color by sampling around a tap on the photo, at normalized [x]/[y] in [0, 1]. */
-    fun pickAtPoint(x: Double, y: Double) {
-        val state = _uiState.value as? HistoryDetailUiState.Loaded ?: return
-        viewModelScope.launch {
-            val argb = withContext(backgroundDispatcher) {
-                val pixels = pixelSourceOf(state.photo)
-                ColorExtractor.extractColorAtPoint(
-                    pixels,
-                    x = (x * pixels.width).roundToInt(),
-                    y = (y * pixels.height).roundToInt(),
-                )
-            }
-            val latest = (_uiState.value as? HistoryDetailUiState.Loaded)?.entry ?: return@launch
-            persistPick(latest, argb, sampleX = x, sampleY = y)
-        }
     }
 
     private suspend fun persistPick(entry: HistoryEntry, argb: Int, sampleX: Double?, sampleY: Double?) {

@@ -1,12 +1,14 @@
 package com.example.hueandyou.ui.matchcolors
 
 import android.graphics.Bitmap
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,22 +42,29 @@ import com.example.hueandyou.ui.common.PhotoResultSection
 @Composable
 fun MatchObjectScreen(
     onNavigateBack: () -> Unit,
+    onFinished: () -> Unit,
     viewModel: MatchObjectViewModel = viewModel(factory = MatchObjectViewModel.factory(LocalContext.current)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showDisclaimer by remember { mutableStateOf(false) }
+    val showingResult = uiState is MatchObjectUiState.ShowingResult
+
+    // On the finished result the checkmark replaces the back arrow; system back behaves the same.
+    BackHandler(enabled = showingResult, onBack = onFinished)
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.match_object_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.navigate_back)
-                        )
+                    if (!showingResult) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back)
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -64,6 +73,14 @@ fun MatchObjectScreen(
                             Icons.Filled.Info,
                             contentDescription = stringResource(R.string.harmony_disclaimer_content_description)
                         )
+                    }
+                    if (showingResult) {
+                        IconButton(onClick = onFinished) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = stringResource(R.string.result_done_content_description)
+                            )
+                        }
                     }
                 }
             )
@@ -84,12 +101,9 @@ fun MatchObjectScreen(
                     photo = state.photo,
                     inputColorArgb = state.inputColorArgb,
                     chipColorsArgb = state.chipColorsArgb,
-                    sampleX = state.sampleX,
-                    sampleY = state.sampleY,
                     wheel = state.wheel,
                     balance = state.balance,
                     onPickCandidate = viewModel::pickCandidate,
-                    onPickAtPoint = viewModel::pickAtPoint,
                 )
             }
         }
@@ -119,12 +133,9 @@ private fun ResultStep(
     photo: Bitmap,
     inputColorArgb: Int,
     chipColorsArgb: List<Int>,
-    sampleX: Double?,
-    sampleY: Double?,
     wheel: HarmonyWheel,
     balance: HarmonyBalance,
     onPickCandidate: (Int) -> Unit,
-    onPickAtPoint: (x: Double, y: Double) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -134,10 +145,7 @@ private fun ResultStep(
     ) {
         PhotoResultSection(
             photo = photo,
-            sampleX = sampleX,
-            sampleY = sampleY,
             maxHeightFraction = 1f,
-            onTap = onPickAtPoint,
             modifier = Modifier.weight(1f),
         )
         ColorChipRow(

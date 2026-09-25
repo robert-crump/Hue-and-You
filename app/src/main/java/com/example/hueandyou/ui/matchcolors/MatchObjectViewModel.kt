@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
 
@@ -85,8 +84,6 @@ class MatchObjectViewModel(
                 photo = bitmap,
                 inputColorArgb = entry.inputColorsArgb.first(),
                 chipColorsArgb = ColorExtractor.selectTopColors(candidates),
-                sampleX = null,
-                sampleY = null,
                 wheel = entry.wheel ?: defaults.wheel,
                 balance = entry.balance ?: defaults.balance,
                 historyEntryId = entry.id,
@@ -98,33 +95,14 @@ class MatchObjectViewModel(
     fun pickCandidate(argb: Int) {
         val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
         if (argb == state.inputColorArgb) return
-        applyPick(state, argb, sampleX = null, sampleY = null)
+        applyPick(state, argb)
     }
 
-    /** Re-picks the color by sampling around a tap on the photo, at normalized [x]/[y] in [0, 1]. */
-    fun pickAtPoint(x: Double, y: Double) {
-        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
-        viewModelScope.launch {
-            val argb = withContext(backgroundDispatcher) {
-                val pixels = pixelSourceOf(state.photo)
-                ColorExtractor.extractColorAtPoint(
-                    pixels,
-                    x = (x * pixels.width).roundToInt(),
-                    y = (y * pixels.height).roundToInt(),
-                )
-            }
-            val latest = _uiState.value as? MatchObjectUiState.ShowingResult ?: return@launch
-            applyPick(latest, argb, sampleX = x, sampleY = y)
-        }
-    }
-
-    private fun applyPick(state: MatchObjectUiState.ShowingResult, argb: Int, sampleX: Double?, sampleY: Double?) {
+    private fun applyPick(state: MatchObjectUiState.ShowingResult, argb: Int) {
         _uiState.value = state.copy(
             inputColorArgb = argb,
-            sampleX = sampleX,
-            sampleY = sampleY,
         )
-        viewModelScope.launch { historyRepository.updateObjectPick(state.historyEntryId, argb, sampleX, sampleY) }
+        viewModelScope.launch { historyRepository.updateObjectPick(state.historyEntryId, argb, sampleX = null, sampleY = null) }
     }
 
     companion object {

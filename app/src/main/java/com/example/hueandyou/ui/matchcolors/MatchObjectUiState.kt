@@ -14,9 +14,6 @@ sealed interface MatchObjectUiState {
         val inputColorArgb: Int,
         /** The fixed top-3 chip row; only the highlight moves when a pick changes. */
         val chipColorsArgb: List<Int>,
-        /** Where [inputColorArgb] was sampled from, normalized to [photo]'s size; null = center box. */
-        val sampleX: Double?,
-        val sampleY: Double?,
         val wheel: HarmonyWheel,
         val balance: HarmonyBalance,
         val historyEntryId: Long,

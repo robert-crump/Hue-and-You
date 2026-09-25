@@ -226,43 +226,6 @@ class HistoryDetailViewModelTest {
     }
 
     @Test
-    fun pickAtPoint_objectEntry_samplesOffMainThreadAndPersistsWithSamplePoint() {
-        val repository = FakeHistoryRepository(objectEntry(calibratedArgb = red))
-        val extractThreads = mutableListOf<String>()
-        val model = viewModel(repository, extractThreadNames = extractThreads)
-        mainDispatcher.scheduler.runCurrent()
-        extractThreads.clear()
-
-        model.pickAtPoint(0.35, 0.5)
-        assertTrue(extractThreads.isEmpty())
-        mainDispatcher.scheduler.runCurrent()
-
-        assertEquals(1, extractThreads.size)
-        assertEquals(Triple(1L, blue, 0.35 to 0.5), repository.lastObjectPick)
-        val state = model.uiState.value as HistoryDetailUiState.Loaded
-        assertEquals(blue, state.entry.calibratedArgb)
-        assertEquals(listOf(red, blue), state.chipColorsArgb)
-    }
-
-    @Test
-    fun pickAtPoint_clothingEntry_rescoresAgainstStoredSnapshot() {
-        val bestColorsArgb = listOf(0xFF00FF00.toInt())
-        val avoidColorsArgb = listOf(0xFF000000.toInt())
-        val repository = FakeHistoryRepository(
-            clothingEntry(calibratedArgb = red, bestColorsArgb = bestColorsArgb, avoidColorsArgb = avoidColorsArgb)
-        )
-        val model = viewModel(repository)
-        mainDispatcher.scheduler.runCurrent()
-
-        model.pickAtPoint(0.35, 0.5)
-        mainDispatcher.scheduler.runCurrent()
-
-        assertEquals(PaletteScorer.score(blue, bestColorsArgb, avoidColorsArgb), repository.lastClothingPick?.score)
-        assertEquals(0.35, repository.lastClothingPick?.sampleX)
-        assertEquals(0.5, repository.lastClothingPick?.sampleY)
-    }
-
-    @Test
     fun rename_updatesTheEntryName() {
         val repository = FakeHistoryRepository(clothingEntry())
         val model = viewModel(repository)
