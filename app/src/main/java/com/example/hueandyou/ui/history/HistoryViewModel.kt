@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.data.history.HistoryEntry
+import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,7 +32,10 @@ data class HistoryUiState(
     val isEmpty: Boolean get() = entries.isEmpty()
 }
 
-class HistoryViewModel(private val repository: HistoryRepository) : ViewModel() {
+class HistoryViewModel(
+    private val repository: HistoryRepository,
+    private val type: HistoryEntryType? = null,
+) : ViewModel() {
 
     /** Entries currently within their undo window: hidden from the list, not yet deleted for real. */
     private val pendingDeletions = MutableStateFlow<Map<Long, HistoryEntry>>(emptyMap())
@@ -44,7 +48,7 @@ class HistoryViewModel(private val repository: HistoryRepository) : ViewModel() 
         repository.observeEntries(), pendingDeletions, deletedIds
     ) { entries, pending, deleted ->
         HistoryUiState(
-            entries = entries.filterNot { it.id in pending || it.id in deleted },
+            entries = entries.filter { (type == null || it.type == type) && it.id !in pending && it.id !in deleted },
             pendingDeletion = pending.values.lastOrNull()?.let { PendingDeletion(it.id, it.name) }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
@@ -70,11 +74,11 @@ class HistoryViewModel(private val repository: HistoryRepository) : ViewModel() 
     }
 
     companion object {
-        fun factory(context: Context): ViewModelProvider.Factory = viewModelFactory {
+        fun factory(context: Context, type: HistoryEntryType? = null): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val repository = (context.applicationContext as HueAndYouApplication)
                     .container.historyRepository
-                HistoryViewModel(repository)
+                HistoryViewModel(repository, type)
             }
         }
     }

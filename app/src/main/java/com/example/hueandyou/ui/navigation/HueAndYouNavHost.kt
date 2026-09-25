@@ -1,29 +1,19 @@
 package com.example.hueandyou.ui.navigation
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.LargeFloatingActionButton
+import com.example.hueandyou.data.history.HistoryEntryType
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Checkroom
-import androidx.compose.material.icons.filled.Chair
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -32,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
@@ -60,7 +49,6 @@ fun HueAndYouNavHost() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = backStackEntry?.destination
-    var showFabMenu by remember { mutableStateOf(false) }
 
     // Leaving a freshly created rating: its entry is the newest, so History should show it at the top.
     val finishResult: () -> Unit = {
@@ -76,7 +64,7 @@ fun HueAndYouNavHost() {
         label = "fabOffset"
     )
 
-    val onHistory =currentDestination?.hierarchy?.any { it.route == Destination.History.route } == true
+    val currentRoute = currentDestination?.route
 
     Scaffold(
         bottomBar = {
@@ -84,7 +72,10 @@ fun HueAndYouNavHost() {
                 topLevelDestinations.forEach { topLevel ->
                     val selected = currentDestination?.hierarchy?.any { destination ->
                         topLevel.screens.any { it.route == destination.route }
-                    } == true
+                    } == true || (
+                        currentRoute == Destination.HistoryDetail.route &&
+                            navController.previousBackStackEntry?.destination?.route == topLevel.destination.route
+                        )
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
@@ -113,60 +104,48 @@ fun HueAndYouNavHost() {
             }
         },
         floatingActionButton = {
-            if (onHistory) {
-                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    AnimatedVisibility(visible = showFabMenu, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-                        Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            ExtendedFloatingActionButton(
-                                onClick = {
-                                    showFabMenu = false
-                                    navController.navigate(Destination.MatchObject.route)
-                                },
-                                modifier = Modifier.height(40.dp),
-                                icon = { Icon(Icons.Filled.Chair, contentDescription = null) },
-                                text = { Text(stringResource(R.string.history_fab_action_match_colors)) }
-                            )
-                            ExtendedFloatingActionButton(
-                                onClick = {
-                                    showFabMenu = false
-                                    navController.navigate(Destination.RateClothing.route)
-                                },
-                                modifier = Modifier.height(40.dp),
-                                icon = { Icon(Icons.Filled.Checkroom, contentDescription = null) },
-                                text = { Text(stringResource(R.string.history_fab_action_rate_clothing)) }
-                            )
-                        }
-                    }
-                    FloatingActionButton(
-                        onClick = { showFabMenu = !showFabMenu },
-                        modifier = Modifier.offset(y = fabOffset)
-                    ) {
-                        Icon(
-                            if (showFabMenu) Icons.Filled.Close else Icons.Filled.Add,
-                            contentDescription = stringResource(R.string.history_fab_content_description)
-                        )
-                    }
+            val fabTarget = when (currentRoute) {
+                Destination.Clothes.route -> Destination.RateClothing
+                Destination.Objects.route -> Destination.MatchObject
+                else -> null
+            }
+            if (fabTarget != null) {
+                LargeFloatingActionButton(
+                    onClick = { navController.navigate(fabTarget.route) },
+                    modifier = Modifier.offset(y = fabOffset)
+                ) {
+                    Icon(
+                        Icons.Filled.PhotoCamera,
+                        contentDescription = stringResource(R.string.history_fab_content_description),
+                        modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize)
+                    )
                 }
             }
         }
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Destination.History.route,
+            startDestination = Destination.Clothes.route,
             modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
         ) {
-            composable(Destination.History.route) { historyEntry ->
-                val scrollToTop by historyEntry.savedStateHandle
-                    .getStateFlow(KEY_SCROLL_HISTORY_TO_TOP, false)
-                    .collectAsState()
-                HistoryScreen(
-                    scrollToTopRequested = scrollToTop,
-                    onScrolledToTop = { historyEntry.savedStateHandle[KEY_SCROLL_HISTORY_TO_TOP] = false },
-                    onSnackbarHeightChange = { snackbarHeightPx = it },
-                    onOpenEntry = { entryId ->
-                        navController.navigate(Destination.HistoryDetail.route(entryId))
-                    }
-                )
+            listOf(
+                Destination.Clothes to HistoryEntryType.CLOTHING,
+                Destination.Objects to HistoryEntryType.OBJECT,
+            ).forEach { (destination, type) ->
+                composable(destination.route) { historyEntry ->
+                    val scrollToTop by historyEntry.savedStateHandle
+                        .getStateFlow(KEY_SCROLL_HISTORY_TO_TOP, false)
+                        .collectAsState()
+                    HistoryScreen(
+                        type = type,
+                        scrollToTopRequested = scrollToTop,
+                        onScrolledToTop = { historyEntry.savedStateHandle[KEY_SCROLL_HISTORY_TO_TOP] = false },
+                        onSnackbarHeightChange = { snackbarHeightPx = it },
+                        onOpenEntry = { entryId ->
+                            navController.navigate(Destination.HistoryDetail.route(entryId))
+                        }
+                    )
+                }
             }
             composable(
                 Destination.HistoryDetail.route,

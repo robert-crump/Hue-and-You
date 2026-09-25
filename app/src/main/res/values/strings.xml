@@ -1,17 +1,14 @@
 <resources>
     <string name="app_name">Hue and You</string>
 
-    <string name="nav_history">History</string>
+    <string name="nav_clothes">Clothes</string>
+    <string name="nav_objects">Objects</string>
     <string name="nav_settings">Settings</string>
 
     <string name="history_empty_state_title">No analyses yet</string>
-    <string name="history_empty_state_body">Tap the + button to rate a piece of clothing or match colors for an object. Your results will show up here.</string>
+    <string name="history_empty_state_body">Tap the camera button to take a photo. Your results will show up here.</string>
 
-    <string name="history_fab_content_description">Start a new analysis</string>
-    <string name="history_fab_action_rate_clothing">Clothes</string>
-    <string name="history_fab_action_match_colors">Object</string>
-    <string name="history_entry_type_clothing">Clothing</string>
-    <string name="history_entry_type_object">Object</string>
+    <string name="history_fab_content_description">Take a photo</string>
     <string name="history_entry_name_label">Name</string>
     <string name="history_detail_title">Result</string>
     <string name="history_entry_delete_content_description">Delete entry</string>

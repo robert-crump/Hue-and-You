@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -60,11 +61,12 @@ import java.util.Locale
 
 @Composable
 fun HistoryScreen(
+    type: HistoryEntryType,
     scrollToTopRequested: Boolean,
     onScrolledToTop: () -> Unit,
     onOpenEntry: (Long) -> Unit,
     onSnackbarHeightChange: (Int) -> Unit,
-    viewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.factory(LocalContext.current)),
+    viewModel: HistoryViewModel = viewModel(key = type.name, factory = HistoryViewModel.factory(LocalContext.current, type)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -139,10 +141,7 @@ private fun HistoryEntryRow(entry: HistoryEntry, onClick: () -> Unit, onDeleteCl
                 .weight(1f)
                 .padding(start = 16.dp, top = 16.dp, bottom = 16.dp)
         ) {
-            Text(text = entry.name, style = MaterialTheme.typography.titleMedium)
-            val subtitle = listOfNotNull(historyEntryTypeLabel(entry.type), entry.profileName)
-                .joinToString(" · ")
-            Text(text = subtitle, style = MaterialTheme.typography.bodySmall)
+            Text(text = entry.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(text = formatHistoryTimestamp(entry.createdAt), style = MaterialTheme.typography.bodySmall)
         }
         IconButton(onClick = onDeleteClick) {
@@ -169,14 +168,6 @@ private fun HistoryThumbnail(path: String) {
         )
     }
 }
-
-@Composable
-private fun historyEntryTypeLabel(type: HistoryEntryType): String = stringResource(
-    when (type) {
-        HistoryEntryType.CLOTHING -> R.string.history_entry_type_clothing
-        HistoryEntryType.OBJECT -> R.string.history_entry_type_object
-    }
-)
 
 private val historyTimestampFormatter: DateTimeFormatter =
     DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", Locale.getDefault())

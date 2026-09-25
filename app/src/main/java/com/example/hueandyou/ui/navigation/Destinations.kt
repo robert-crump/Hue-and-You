@@ -1,13 +1,15 @@
 package com.example.hueandyou.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Chair
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.hueandyou.R
 
 sealed class Destination(val route: String) {
-    data object History : Destination("history")
+    data object Clothes : Destination("clothes")
+    data object Objects : Destination("objects")
     data object HistoryDetail : Destination("history_detail/{entryId}") {
         const val ARG_ENTRY_ID = "entryId"
         fun route(entryId: Long) = "history_detail/$entryId"
@@ -39,16 +41,18 @@ data class TopLevelDestination(
 
 val topLevelDestinations = listOf(
     TopLevelDestination(
-        Destination.History,
-        Destination.History.route,
-        Icons.Filled.History,
-        R.string.nav_history,
-        screens = listOf(
-            Destination.History,
-            Destination.HistoryDetail,
-            Destination.RateClothing,
-            Destination.MatchObject,
-        ),
+        Destination.Clothes,
+        Destination.Clothes.route,
+        Icons.Filled.Checkroom,
+        R.string.nav_clothes,
+        screens = listOf(Destination.Clothes, Destination.RateClothing),
+    ),
+    TopLevelDestination(
+        Destination.Objects,
+        Destination.Objects.route,
+        Icons.Filled.Chair,
+        R.string.nav_objects,
+        screens = listOf(Destination.Objects, Destination.MatchObject),
     ),
     TopLevelDestination(
         Destination.Settings,
