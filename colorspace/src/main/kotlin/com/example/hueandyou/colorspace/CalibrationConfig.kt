@@ -14,8 +14,11 @@ object CalibrationConfig {
     /** A tap-to-pick sample circle's radius, as a fraction of the image's short edge. */
     const val TAP_SAMPLE_RADIUS_FRACTION = 0.03
 
-    /** Maximum number of alternative color chips shown alongside the current pick. */
-    const val ALTERNATIVE_MAX_COUNT = 4
+    /** Number of color chips shown under the photo: the most likely colors, in a fixed order. */
+    const val CHIP_COUNT = 3
+
+    /** Chips beyond the top-ranked color. */
+    const val ALTERNATIVE_MAX_COUNT = CHIP_COUNT - 1
 
     /** Candidate colors closer than this ΔE00 to the current pick or to each other are folded together. */
     const val ALTERNATIVE_MIN_DELTA_E = 5.0

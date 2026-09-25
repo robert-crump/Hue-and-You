@@ -12,7 +12,8 @@ sealed interface MatchObjectUiState {
     data class ShowingResult(
         val photo: Bitmap,
         val inputColorArgb: Int,
-        val alternativesArgb: List<Int>,
+        /** The fixed top-3 chip row; only the highlight moves when a pick changes. */
+        val chipColorsArgb: List<Int>,
         /** Where [inputColorArgb] was sampled from, normalized to [photo]'s size; null = center box. */
         val sampleX: Double?,
         val sampleY: Double?,

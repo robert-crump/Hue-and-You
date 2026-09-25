@@ -78,12 +78,11 @@
     <string name="rate_clothing_no_profile_title">No profile yet</string>
     <string name="rate_clothing_no_profile_body">Create a profile with Best and Avoid colors before rating clothing.</string>
     <string name="rate_clothing_go_to_settings">Go to Settings</string>
-    <string name="rate_clothing_select_profile_title">Rate against which profile?</string>
     <string name="rate_clothing_for_profile">For: %1$s</string>
     <string name="rate_clothing_best_guess_disclaimer">This is our best guess — lighting and camera color can shift the measured color.</string>
-    <string name="rate_clothing_verdict_yes">Yes, take the color</string>
-    <string name="rate_clothing_verdict_avoid">Avoid that color</string>
-    <string name="rate_clothing_verdict_neither">Neither best color nor color to avoid</string>
+    <string name="rate_clothing_verdict_yes">Great color!</string>
+    <string name="rate_clothing_verdict_avoid">Avoid</string>
+    <string name="rate_clothing_verdict_neither">Ambiguous</string>
 
     <string name="match_object_title">Object</string>
     <string name="harmony_relationship_complementary">Complementary</string>
@@ -123,11 +122,21 @@
     <string name="settings_about_best_guess">This is our best guess, not a professional assessment. Seasonal color analysis — the idea that everyone has a best palette based on their skin, hair, and eye tone — has little scientific backing, so treat these results as a fun starting point rather than a verdict.</string>
     <string name="settings_about_delta_e">ΔE00 (\"Delta E 2000\") is a standard way to measure how different two colors look to the human eye: the higher the number, the more noticeable the difference.</string>
     <string name="settings_about_verdicts_intro">Rate Clothing gives each measured color one of three verdicts:</string>
-    <string name="settings_about_verdict_yes">Yes, take the color — the nearest Best color is close enough to count, and closer than anything you\'re avoiding.</string>
-    <string name="settings_about_verdict_avoid">Avoid that color — the nearest color to avoid is close enough to count, and closer than your Best colors.</string>
-    <string name="settings_about_verdict_neither">Neither best color nor color to avoid — nothing in your profile is close enough to call it either way.</string>
+    <string name="settings_about_verdict_yes">Great color! — the nearest Best color is close enough to count, and closer than anything you\'re avoiding.</string>
+    <string name="settings_about_verdict_avoid">Avoid — the nearest color to avoid is close enough to count, and closer than your Best colors.</string>
+    <string name="settings_about_verdict_neither">Ambiguous — nothing in your profile is close enough to call it either way.</string>
 
     <string name="camera_viewfinder_hint">Put the item in the middle of the frame, in daylight if you can.</string>
+    <string name="camera_white_balance_content_description">White balance</string>
+    <string name="camera_exposure_content_description">Exposure</string>
+    <string name="camera_white_balance_auto">Auto</string>
+    <string name="camera_white_balance_incandescent">Incandescent</string>
+    <string name="camera_white_balance_warm_fluorescent">Warm fluor.</string>
+    <string name="camera_white_balance_fluorescent">Fluorescent</string>
+    <string name="camera_white_balance_daylight">Daylight</string>
+    <string name="camera_white_balance_cloudy">Cloudy</string>
+    <string name="camera_white_balance_twilight">Twilight</string>
+    <string name="camera_white_balance_shade">Shade</string>
     <string name="camera_shutter_content_description">Take photo</string>
     <string name="camera_permission_denied_message">Camera access was denied. You can still pick a photo from your gallery, or turn on Camera access in Settings to use the viewfinder.</string>
     <string name="camera_open_settings">Open Settings</string>

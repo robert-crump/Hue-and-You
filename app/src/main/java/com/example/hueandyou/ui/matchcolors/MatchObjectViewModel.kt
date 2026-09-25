@@ -73,7 +73,6 @@ class MatchObjectViewModel(
             }
             candidates = extractedCandidates.map { it.argb }
             val mainColorArgb = candidates.first()
-            val alternatives = ColorExtractor.selectAlternatives(candidates, mainColorArgb)
             val defaults = settingsRepository.observeDefaults().first()
             val thumbnailPath = thumbnailStore.save(bitmap)
             val entry = historyRepository.saveObjectResult(
@@ -85,7 +84,7 @@ class MatchObjectViewModel(
             _uiState.value = MatchObjectUiState.ShowingResult(
                 photo = bitmap,
                 inputColorArgb = entry.inputColorsArgb.first(),
-                alternativesArgb = alternatives,
+                chipColorsArgb = ColorExtractor.selectTopColors(candidates),
                 sampleX = null,
                 sampleY = null,
                 wheel = entry.wheel ?: defaults.wheel,
@@ -120,10 +119,8 @@ class MatchObjectViewModel(
     }
 
     private fun applyPick(state: MatchObjectUiState.ShowingResult, argb: Int, sampleX: Double?, sampleY: Double?) {
-        val alternatives = ColorExtractor.selectAlternatives(candidates, argb)
         _uiState.value = state.copy(
             inputColorArgb = argb,
-            alternativesArgb = alternatives,
             sampleX = sampleX,
             sampleY = sampleY,
         )

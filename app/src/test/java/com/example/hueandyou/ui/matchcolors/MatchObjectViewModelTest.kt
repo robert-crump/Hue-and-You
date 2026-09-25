@@ -87,14 +87,15 @@ class MatchObjectViewModelTest {
         mainDispatcher.scheduler.runCurrent()
         val initial = viewModel.uiState.value as MatchObjectUiState.ShowingResult
         assertEquals(red, initial.inputColorArgb)
-        assertEquals(listOf(blue), initial.alternativesArgb)
+        assertEquals(listOf(red, blue), initial.chipColorsArgb)
 
         viewModel.pickCandidate(blue)
 
         // The state updates synchronously; only persistence needs the coroutine to run.
         val afterPick = viewModel.uiState.value as MatchObjectUiState.ShowingResult
         assertEquals(blue, afterPick.inputColorArgb)
-        assertEquals(listOf(red), afterPick.alternativesArgb)
+        // The chip row stays put; only the highlight (the current color) moves.
+        assertEquals(listOf(red, blue), afterPick.chipColorsArgb)
         assertEquals(null, afterPick.sampleX)
         assertEquals(null, afterPick.sampleY)
         assertEquals(initial.historyEntryId, afterPick.historyEntryId)

@@ -54,6 +54,7 @@ class ColorExtractorSelectAlternativesTest {
         val alternatives = ColorExtractor.selectAlternatives(
             candidates = listOf(purple, blue, green),
             currentArgb = red,
+            maxAlternatives = 3,
         )
 
         assertEquals(listOf(purple, blue, green), alternatives)
@@ -64,5 +65,19 @@ class ColorExtractorSelectAlternativesTest {
         val alternatives = ColorExtractor.selectAlternatives(candidates = emptyList(), currentArgb = red)
 
         assertTrue(alternatives.isEmpty())
+    }
+
+    @Test
+    fun selectTopColors_returnsTopCandidateFollowedByTwoDistinctOnes() {
+        val nearlyRed = 0xFFFF0002.toInt()
+
+        val top = ColorExtractor.selectTopColors(listOf(red, nearlyRed, green, blue, yellow))
+
+        assertEquals(listOf(red, green, blue), top)
+    }
+
+    @Test
+    fun selectTopColors_emptyCandidatesYieldsNothing() {
+        assertTrue(ColorExtractor.selectTopColors(emptyList()).isEmpty())
     }
 }

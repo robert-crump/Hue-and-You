@@ -107,7 +107,6 @@ class RateClothingViewModel(
             }
             candidates = extractedCandidates.map { it.argb }
             val argb = candidates.first()
-            val alternatives = ColorExtractor.selectAlternatives(candidates, argb)
             val profile = selectedProfile
             val score = scoreFor(argb, profile)
             val thumbnailPath = thumbnailStore.save(bitmap)
@@ -120,7 +119,7 @@ class RateClothingViewModel(
             _uiState.value = RateClothingUiState.ShowingResult(
                 photo = bitmap,
                 argb = argb,
-                alternativesArgb = alternatives,
+                chipColorsArgb = ColorExtractor.selectTopColors(candidates),
                 sampleX = null,
                 sampleY = null,
                 score = score,
@@ -156,11 +155,9 @@ class RateClothingViewModel(
     }
 
     private fun applyPick(state: RateClothingUiState.ShowingResult, argb: Int, sampleX: Double?, sampleY: Double?) {
-        val alternatives = ColorExtractor.selectAlternatives(candidates, argb)
         val score = scoreFor(argb, selectedProfile)
         _uiState.value = state.copy(
             argb = argb,
-            alternativesArgb = alternatives,
             sampleX = sampleX,
             sampleY = sampleY,
             score = score,

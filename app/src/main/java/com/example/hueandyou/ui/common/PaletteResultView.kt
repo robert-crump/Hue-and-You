@@ -1,6 +1,7 @@
 package com.example.hueandyou.ui.common
 
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,16 +26,14 @@ import com.example.hueandyou.colorspace.ClothingVerdict
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.ui.theme.LocalSuccessColors
 
-private val VERDICT_COLOR_CIRCLE_SIZE = 72.dp
-
 /**
- * The verdict card - Yes/Avoid/Neither, plus the measured color - shared by the live Rate
- * Clothing result step and the History detail screen that reopens a saved snapshot of the same
- * result. The verdict is derived from [score] rather than stored, so History entries saved before
- * the verdict existed still get one.
+ * The verdict card - one row with an icon and "Great color!" / "Avoid" / "Ambiguous" - shared by
+ * the live Rate Clothing result step and the History detail screen that reopens a saved snapshot
+ * of the same result. The verdict is derived from [score] rather than stored, so History entries
+ * saved before the verdict existed still get one.
  */
 @Composable
-internal fun PaletteResultBody(argb: Int, score: PaletteScore) {
+internal fun PaletteResultBody(score: PaletteScore, modifier: Modifier = Modifier) {
     val verdict = remember(score) { ClothingVerdict.forScore(score) }
     val successColors = LocalSuccessColors.current
 
@@ -45,28 +44,18 @@ internal fun PaletteResultBody(argb: Int, score: PaletteScore) {
     }
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp),
+        modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Icon(verdictIcon(verdict), contentDescription = null, modifier = Modifier.size(40.dp))
-            Text(
-                text = stringResource(verdictLabel(verdict)),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            ColorCircle(
-                argb = argb,
-                size = VERDICT_COLOR_CIRCLE_SIZE,
-                modifier = Modifier.padding(top = 16.dp),
-            )
+            Icon(verdictIcon(verdict), contentDescription = null, modifier = Modifier.size(28.dp))
+            Text(text = stringResource(verdictLabel(verdict)), style = MaterialTheme.typography.titleMedium)
         }
     }
 }

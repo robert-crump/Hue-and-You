@@ -9,6 +9,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -107,6 +108,7 @@ private fun CameraViewfinder(onPhotoUri: (Uri) -> Unit, onGalleryClick: () -> Un
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageCapture = remember { ImageCapture.Builder().build() }
     var isCapturing by remember { mutableStateOf(false) }
+    var camera by remember { mutableStateOf<Camera?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
@@ -121,7 +123,7 @@ private fun CameraViewfinder(onPhotoUri: (Uri) -> Unit, onGalleryClick: () -> Un
                             it.surfaceProvider = previewView.surfaceProvider
                         }
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
+                        camera = cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             CameraSelector.DEFAULT_BACK_CAMERA,
                             preview,
@@ -152,6 +154,14 @@ private fun CameraViewfinder(onPhotoUri: (Uri) -> Unit, onGalleryClick: () -> Un
                 .padding(top = 32.dp)
                 .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                 .padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+
+        // Below the center box and above the shutter row, so it never covers the sampled area.
+        CameraAdjustmentSliders(
+            camera = camera,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 16.dp, end = 16.dp, bottom = 128.dp),
         )
 
         IconButton(

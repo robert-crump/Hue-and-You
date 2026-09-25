@@ -91,6 +91,16 @@ object ColorExtractor {
         return alternatives
     }
 
+    /**
+     * The fixed chip row for a photo: the top-ranked candidate followed by the next most likely
+     * ones a user can tell apart, [CalibrationConfig.CHIP_COUNT] in total at most. Computed once
+     * per photo so the row never reorders when a different color is picked.
+     */
+    fun selectTopColors(candidates: List<Int>): List<Int> {
+        val top = candidates.firstOrNull() ?: return emptyList()
+        return listOf(top) + selectAlternatives(candidates, top)
+    }
+
     private fun collectPixels(pixels: PixelSource, bounds: RectRegion): IntArray {
         val buffer = IntArray(maxOf(0, bounds.right - bounds.left) * maxOf(0, bounds.bottom - bounds.top))
         var count = 0

@@ -109,18 +109,20 @@ internal fun DrawScope.drawMarkerRect(topLeft: Offset, boxSize: Size) {
     drawRect(color = Color.White, topLeft = topLeft, size = boxSize, style = Stroke(width = 3f))
 }
 
-/** The current color (highlighted) plus its alternatives, any of which can be tapped to re-pick. */
+/**
+ * The photo's top colors in a fixed order; the chip matching [currentArgb] (if any - a tap-pick
+ * may match none) gets the highlight, so a re-pick only moves the border.
+ */
 @Composable
 internal fun ColorChipRow(
+    chipColorsArgb: List<Int>,
     currentArgb: Int,
-    alternativesArgb: List<Int>,
     onPick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        ColorChip(argb = currentArgb, selected = true, onClick = { onPick(currentArgb) })
-        alternativesArgb.forEach { argb ->
-            ColorChip(argb = argb, selected = false, onClick = { onPick(argb) })
+        chipColorsArgb.forEach { argb ->
+            ColorChip(argb = argb, selected = argb == currentArgb, onClick = { onPick(argb) })
         }
     }
 }
@@ -129,7 +131,7 @@ internal fun ColorChipRow(
 private fun ColorChip(argb: Int, selected: Boolean, onClick: () -> Unit) {
     ColorCircle(
         argb = argb,
-        size = if (selected) 48.dp else 40.dp,
+        size = 48.dp,
         border = if (selected) BorderStroke(3.dp, MaterialTheme.colorScheme.primary) else null,
         onClick = onClick,
     )

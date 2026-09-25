@@ -87,6 +87,7 @@ fun HistoryDetailScreen(
                 innerPadding = innerPadding,
                 onRename = viewModel::rename,
                 onPickCandidate = viewModel::pickCandidate,
+                onPickAtPoint = viewModel::pickAtPoint,
             )
         }
 
@@ -118,6 +119,7 @@ private fun LoadedContent(
     innerPadding: PaddingValues,
     onRename: (String) -> Unit,
     onPickCandidate: (Int) -> Unit,
+    onPickAtPoint: (x: Double, y: Double) -> Unit,
 ) {
     val entry = state.entry
     var name by rememberSaveable(entry.id) { mutableStateOf(entry.name) }
@@ -144,17 +146,17 @@ private fun LoadedContent(
             sampleX = entry.sampleX,
             sampleY = entry.sampleY,
             maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
-            onTap = null,
+            onTap = onPickAtPoint,
             modifier = Modifier.padding(top = 16.dp),
         )
         ColorChipRow(
+            chipColorsArgb = state.chipColorsArgb,
             currentArgb = entry.calibratedArgb,
-            alternativesArgb = state.alternativesArgb,
             onPick = onPickCandidate,
             modifier = Modifier.padding(top = 16.dp),
         )
         when (entry.type) {
-            HistoryEntryType.CLOTHING -> PaletteResultBody(argb = entry.calibratedArgb, score = entry.score)
+            HistoryEntryType.CLOTHING -> PaletteResultBody(score = entry.score, modifier = Modifier.padding(top = 16.dp))
             HistoryEntryType.OBJECT -> HarmonyResultBody(
                 inputColorArgb = entry.calibratedArgb,
                 wheel = requireNotNull(entry.wheel),

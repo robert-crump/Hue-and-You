@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
@@ -85,7 +83,7 @@ fun MatchObjectScreen(
                 is MatchObjectUiState.ShowingResult -> ResultStep(
                     photo = state.photo,
                     inputColorArgb = state.inputColorArgb,
-                    alternativesArgb = state.alternativesArgb,
+                    chipColorsArgb = state.chipColorsArgb,
                     sampleX = state.sampleX,
                     sampleY = state.sampleY,
                     wheel = state.wheel,
@@ -113,13 +111,14 @@ private fun LoadingStep() {
     }
 }
 
-private const val PHOTO_MAX_HEIGHT_FRACTION = 0.35f
+/** Aligns content with the app bar's back arrow on the left and info icon on the right. */
+private val RESULT_HORIZONTAL_PADDING = 16.dp
 
 @Composable
 private fun ResultStep(
     photo: Bitmap,
     inputColorArgb: Int,
-    alternativesArgb: List<Int>,
+    chipColorsArgb: List<Int>,
     sampleX: Double?,
     sampleY: Double?,
     wheel: HarmonyWheel,
@@ -130,20 +129,20 @@ private fun ResultStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+            .padding(horizontal = RESULT_HORIZONTAL_PADDING, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         PhotoResultSection(
             photo = photo,
             sampleX = sampleX,
             sampleY = sampleY,
-            maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
+            maxHeightFraction = 1f,
             onTap = onPickAtPoint,
+            modifier = Modifier.weight(1f),
         )
         ColorChipRow(
+            chipColorsArgb = chipColorsArgb,
             currentArgb = inputColorArgb,
-            alternativesArgb = alternativesArgb,
             onPick = onPickCandidate,
             modifier = Modifier.padding(top = 16.dp),
         )

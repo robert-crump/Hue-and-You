@@ -6,17 +6,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -99,7 +97,7 @@ fun RateClothingScreen(
                 is RateClothingUiState.ShowingResult -> ResultStep(
                     photo = state.photo,
                     argb = state.argb,
-                    alternativesArgb = state.alternativesArgb,
+                    chipColorsArgb = state.chipColorsArgb,
                     sampleX = state.sampleX,
                     sampleY = state.sampleY,
                     score = state.score,
@@ -142,50 +140,20 @@ private fun NoProfileDialog(onCancel: () -> Unit, onGoToSettings: () -> Unit) {
 }
 
 @Composable
-private fun ProfilePickerDialog(profiles: List<Profile>, onSelect: (Profile) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.rate_clothing_select_profile_title)) },
-        text = {
-            LazyColumn {
-                items(profiles, key = { it.id }) { profile ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onSelect(profile)
-                                onDismiss()
-                            }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = profile.name, style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.dialog_cancel))
-            }
-        }
-    )
-}
-
-@Composable
 private fun LoadingStep() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         CircularProgressIndicator()
     }
 }
 
-private const val PHOTO_MAX_HEIGHT_FRACTION = 0.40f
+/** Aligns content with the app bar's back arrow on the left and info icon on the right. */
+private val RESULT_HORIZONTAL_PADDING = 16.dp
 
 @Composable
 private fun ResultStep(
     photo: Bitmap,
     argb: Int,
-    alternativesArgb: List<Int>,
+    chipColorsArgb: List<Int>,
     sampleX: Double?,
     sampleY: Double?,
     score: PaletteScore,
@@ -195,45 +163,69 @@ private fun ResultStep(
     onPickAtPoint: (x: Double, y: Double) -> Unit,
     onSwitchProfile: (Profile) -> Unit,
 ) {
-    var showProfilePicker by remember { mutableStateOf(false) }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(32.dp),
+            .padding(horizontal = RESULT_HORIZONTAL_PADDING, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         PhotoResultSection(
             photo = photo,
             sampleX = sampleX,
             sampleY = sampleY,
-            maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
+            maxHeightFraction = 1f,
             onTap = onPickAtPoint,
+            modifier = Modifier.weight(1f),
         )
         if (profiles.size >= 2 && selectedProfile != null) {
-            Text(
-                text = stringResource(R.string.rate_clothing_for_profile, selectedProfile.name),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .padding(top = 8.dp)
-                    .clickable { showProfilePicker = true }
+            ProfileDropdown(
+                profiles = profiles,
+                selectedProfile = selectedProfile,
+                onSelect = onSwitchProfile,
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
         ColorChipRow(
+            chipColorsArgb = chipColorsArgb,
             currentArgb = argb,
-            alternativesArgb = alternativesArgb,
             onPick = onPickCandidate,
             modifier = Modifier.padding(top = 16.dp),
         )
-        PaletteResultBody(argb = argb, score = score)
+        PaletteResultBody(score = score, modifier = Modifier.padding(top = 16.dp))
     }
+}
 
-    if (showProfilePicker) {
-        ProfilePickerDialog(
-            profiles = profiles,
-            onSelect = onSwitchProfile,
-            onDismiss = { showProfilePicker = false },
-        )
+/** "For: <name> ▾" - tapping it opens a dropdown menu of every profile to score against. */
+@Composable
+private fun ProfileDropdown(
+    profiles: List<Profile>,
+    selectedProfile: Profile,
+    onSelect: (Profile) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier.clickable { expanded = true },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.rate_clothing_for_profile, selectedProfile.name),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            profiles.forEach { profile ->
+                DropdownMenuItem(
+                    text = { Text(profile.name) },
+                    onClick = {
+                        expanded = false
+                        onSelect(profile)
+                    },
+                )
+            }
+        }
     }
 }
