@@ -3,8 +3,8 @@ Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest en
 ## 2026-09-25 - Issue #19: Material 3 theme and palette app icon
 
 `Color.kt` now holds the Material Theme Builder (default settings) light/dark palette, replacing the old
-hand-picked seed colors; `Theme.kt` uses full `LightColorScheme`/`DarkColorScheme` as the fallback behind
-dynamic color (still primary). Medium/high-contrast variants were exported but not wired in, since nothing
+hand-picked seed colors; `Theme.kt` uses full `LightColorScheme`/`DarkColorScheme`. Dynamic (wallpaper)
+color was later removed on request, so the generated scheme is always used. Medium/high-contrast variants were exported but not wired in, since nothing
 switches on the contrast setting. Typography stayed the default (the export has none). The `SuccessColors`
 for the Yes verdict are unchanged. Launcher icon uses the Material Symbols "palette" glyph (chosen over the
 issue's "Compare") as a white foreground scaled to 48dp inside the 66dp safe zone, on the theme's primary

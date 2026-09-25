@@ -3,7 +3,7 @@ package com.example.hueandyou.ui.theme
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-// Generated with Material Theme Builder (default settings). Used only when dynamic color is unavailable.
+// Generated with Material Theme Builder (default settings).
 val primaryLight = Color(0xFF904B3F)
 val onPrimaryLight = Color(0xFFFFFFFF)
 val primaryContainerLight = Color(0xFFFFDAD4)
