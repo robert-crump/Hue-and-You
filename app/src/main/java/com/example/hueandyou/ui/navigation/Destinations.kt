@@ -28,19 +28,37 @@ sealed class Destination(val route: String) {
     data object MatchObject : Destination("match_object")
 }
 
+/** [screens] are all destinations that keep this tab highlighted, so exactly one tab is always active. */
 data class TopLevelDestination(
     val destination: Destination,
     val navRoute: String,
     val icon: ImageVector,
-    val labelRes: Int
+    val labelRes: Int,
+    val screens: List<Destination>,
 )
 
 val topLevelDestinations = listOf(
-    TopLevelDestination(Destination.History, Destination.History.route, Icons.Filled.History, R.string.nav_history),
+    TopLevelDestination(
+        Destination.History,
+        Destination.History.route,
+        Icons.Filled.History,
+        R.string.nav_history,
+        screens = listOf(
+            Destination.History,
+            Destination.HistoryDetail,
+            Destination.RateClothing,
+            Destination.MatchObject,
+        ),
+    ),
     TopLevelDestination(
         Destination.Settings,
         Destination.Settings.route(scrollToProfiles = false),
         Icons.Filled.Settings,
-        R.string.nav_settings
+        R.string.nav_settings,
+        screens = listOf(
+            Destination.Settings,
+            Destination.ProfileEditor,
+            Destination.PaletteImport,
+        ),
     )
 )

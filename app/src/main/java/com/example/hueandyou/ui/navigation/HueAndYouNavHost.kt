@@ -70,8 +70,8 @@ fun HueAndYouNavHost() {
         bottomBar = {
             NavigationBar {
                 topLevelDestinations.forEach { topLevel ->
-                    val selected = currentDestination?.hierarchy?.any {
-                        it.route == topLevel.destination.route
+                    val selected = currentDestination?.hierarchy?.any { destination ->
+                        topLevel.screens.any { it.route == destination.route }
                     } == true
                     NavigationBarItem(
                         selected = selected,

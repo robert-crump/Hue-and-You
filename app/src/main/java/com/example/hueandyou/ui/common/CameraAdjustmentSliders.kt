@@ -8,16 +8,15 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Exposure
-import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -31,10 +30,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.hueandyou.R
+import com.example.hueandyou.colorspace.CalibrationConfig
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /** Auto first, then the presets from warm to cool light - the order the white-balance slider steps through. */
@@ -50,28 +57,32 @@ private val AWB_PRESET_ORDER = listOf(
 )
 
 /**
- * White-balance and exposure sliders for the viewfinder, always visible below the center box.
- * Both apply to the preview and to the captured photo; they stay disabled until a [camera] is
- * bound or if the device doesn't support the adjustment.
+ * White-balance slider in the strip left of the center box and exposure slider in the strip right
+ * of it, each vertically centered. Both apply to the preview and to the captured photo; they stay
+ * disabled until a [camera] is bound or if the device doesn't support the adjustment.
  */
 @Composable
 internal fun CameraAdjustmentSliders(camera: Camera?, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-    ) {
-        WhiteBalanceSlider(camera)
-        ExposureSlider(camera)
+    val stripWidth = (1f - CalibrationConfig.CENTER_BOX_FRACTION.toFloat()) / 2f
+    Box(modifier = modifier) {
+        WhiteBalanceSlider(
+            camera,
+            Modifier.align(Alignment.CenterStart).fillMaxWidth(stripWidth).padding(horizontal = 4.dp),
+        )
+        ExposureSlider(
+            camera,
+            Modifier.align(Alignment.CenterEnd).fillMaxWidth(stripWidth).padding(horizontal = 4.dp),
+        )
     }
 }
 
 @OptIn(ExperimentalCamera2Interop::class)
 @Composable
-private fun WhiteBalanceSlider(camera: Camera?) {
+private fun WhiteBalanceSlider(camera: Camera?, modifier: Modifier) {
     val modes = remember(camera) { camera?.let(::availableAwbModes) ?: listOf(CameraMetadata.CONTROL_AWB_MODE_AUTO) }
     var position by remember(camera) { mutableFloatStateOf(0f) }
     val selected = position.roundToInt().coerceIn(0, modes.lastIndex)
+    val whiteBalanceDescription = stringResource(R.string.camera_white_balance_content_description)
 
     LaunchedEffect(camera, selected) {
         val boundCamera = camera ?: return@LaunchedEffect
@@ -82,9 +93,18 @@ private fun WhiteBalanceSlider(camera: Camera?) {
         )
     }
 
-    SliderRow(
-        icon = Icons.Filled.WbSunny,
-        contentDescription = stringResource(R.string.camera_white_balance_content_description),
+    SliderColumn(
+        modifier = modifier,
+        icon = {
+            Text(
+                text = stringResource(R.string.camera_white_balance_abbreviation),
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.semantics {
+                    contentDescription = whiteBalanceDescription
+                },
+            )
+        },
         label = stringResource(awbLabel(modes[selected])),
         value = position,
         onValueChange = { position = it },
@@ -94,34 +114,45 @@ private fun WhiteBalanceSlider(camera: Camera?) {
     )
 }
 
+/** Exposure is offered in 1/3 EV notches from -3 to +3 EV, as far as the device's range allows. */
+private const val EXPOSURE_NOTCH_EV = 1f / 3f
+private const val MAX_EXPOSURE_NOTCHES = 9
+
 @Composable
-private fun ExposureSlider(camera: Camera?) {
+private fun ExposureSlider(camera: Camera?, modifier: Modifier) {
     val exposureState = camera?.cameraInfo?.exposureState
     val range = exposureState?.exposureCompensationRange
-    val supported = exposureState?.isExposureCompensationSupported == true && range != null && range.upper > range.lower
+    val evPerIndex = exposureState?.exposureCompensationStep?.toFloat() ?: 1f
+    val indicesPerNotch = maxOf(1, (EXPOSURE_NOTCH_EV / evPerIndex).roundToInt())
+    val lowerNotch = range?.let { maxOf(ceil(it.lower.toFloat() / indicesPerNotch).toInt(), -MAX_EXPOSURE_NOTCHES) } ?: 0
+    val upperNotch = range?.let { minOf(floor(it.upper.toFloat() / indicesPerNotch).toInt(), MAX_EXPOSURE_NOTCHES) } ?: 0
+    val supported = exposureState?.isExposureCompensationSupported == true && upperNotch > lowerNotch
     var position by remember(camera) { mutableFloatStateOf(0f) }
-    val index = position.roundToInt()
+    val notch = position.roundToInt()
+    val index = notch * indicesPerNotch
 
     LaunchedEffect(camera, index) {
         if (supported) camera?.cameraControl?.setExposureCompensationIndex(index)
     }
 
-    SliderRow(
-        icon = Icons.Filled.Exposure,
-        contentDescription = stringResource(R.string.camera_exposure_content_description),
-        label = if (supported) "%+d EV".format(index) else "0 EV",
+    val exposureDescription = stringResource(R.string.camera_exposure_content_description)
+    SliderColumn(
+        modifier = modifier,
+        icon = { Icon(Icons.Filled.Exposure, contentDescription = exposureDescription, tint = Color.White, modifier = Modifier.size(20.dp)) },
+        label = if (supported) "%.1f EV".format(index * evPerIndex) else "0 EV",
         value = position,
         onValueChange = { position = it },
-        valueRange = if (supported && range != null) range.lower.toFloat()..range.upper.toFloat() else -1f..1f,
-        steps = if (supported && range != null) range.upper - range.lower - 1 else 0,
+        valueRange = if (supported) lowerNotch.toFloat()..upperNotch.toFloat() else -1f..1f,
+        steps = if (supported) upperNotch - lowerNotch - 1 else 0,
         enabled = supported,
     )
 }
 
+/** Vertical slider (max at the top) with its icon above and current value below. */
 @Composable
-private fun SliderRow(
-    icon: ImageVector,
-    contentDescription: String,
+private fun SliderColumn(
+    modifier: Modifier,
+    icon: @Composable () -> Unit,
     label: String,
     value: Float,
     onValueChange: (Float) -> Unit,
@@ -129,8 +160,8 @@ private fun SliderRow(
     steps: Int,
     enabled: Boolean,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = contentDescription, tint = Color.White, modifier = Modifier.size(20.dp))
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+        icon()
         Slider(
             value = value,
             onValueChange = onValueChange,
@@ -138,17 +169,46 @@ private fun SliderRow(
             steps = steps,
             enabled = enabled,
             modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 8.dp),
+                .height(SLIDER_LENGTH)
+                .verticalSliderLayout(),
         )
         Text(
             text = label,
             color = Color.White,
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.width(88.dp),
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            softWrap = false,
+            // Long labels may extend past the column rather than wrap mid-word.
+            modifier = Modifier.wrapContentWidth(unbounded = true),
         )
     }
 }
+
+private val SLIDER_LENGTH = 240.dp
+
+/**
+ * Turns a horizontal slider by 270 degrees so it runs bottom (min) to top (max). The layout swaps
+ * width and height first, so the rotated slider takes up a tall, narrow slot.
+ */
+private fun Modifier.verticalSliderLayout(): Modifier = this
+    .layout { measurable, constraints ->
+        val placeable = measurable.measure(
+            Constraints(
+                minWidth = constraints.minHeight,
+                maxWidth = constraints.maxHeight,
+                minHeight = constraints.minWidth,
+                maxHeight = constraints.maxWidth,
+            )
+        )
+        layout(placeable.height, placeable.width) {
+            placeable.place(
+                x = -(placeable.width / 2 - placeable.height / 2),
+                y = -(placeable.height / 2 - placeable.width / 2),
+            )
+        }
+    }
+    .graphicsLayer(rotationZ = 270f)
 
 @OptIn(ExperimentalCamera2Interop::class)
 private fun availableAwbModes(camera: Camera): List<Int> {

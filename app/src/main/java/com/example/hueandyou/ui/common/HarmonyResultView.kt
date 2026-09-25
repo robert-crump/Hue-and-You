@@ -1,9 +1,14 @@
 package com.example.hueandyou.ui.common
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -31,6 +36,9 @@ import com.example.hueandyou.colorspace.argbToHct
 
 private val RELATIONSHIP_SWATCH_SIZE = 64.dp
 
+/** Swatch height plus the 12dp top padding of [HarmonySuggestionRow]. */
+private val SUGGESTION_ROW_HEIGHT = RELATIONSHIP_SWATCH_SIZE + 12.dp
+
 /**
  * Renders the harmony suggestions for [inputColorArgb], recomputed from it, [wheel] and [balance]
  * rather than from any stored/precomputed colors - shared by the live Match Colors for an Object
@@ -45,14 +53,26 @@ internal fun HarmonyResultBody(inputColorArgb: Int, wheel: HarmonyWheel, balance
     }
     val isNeutral = remember(inputColorArgb) { HarmonyEngine.isNeutral(argbToHct(inputColorArgb).chroma) }
 
+    // The body always occupies the space of all three rows, so switching between a neutral color
+    // (Tonal only) and a chromatic one only fades rows in/out and never resizes the photo above.
     Column {
-        if (isNeutral) {
-            NeutralHintRow()
-        } else {
-            HarmonySuggestionRow(suggestions.single { it.relationship == HarmonyRelationship.COMPLEMENTARY })
-            HarmonySuggestionRow(suggestions.single { it.relationship == HarmonyRelationship.ANALOGOUS })
-        }
+        ChromaticRows(isNeutral = isNeutral, suggestions = suggestions)
         HarmonySuggestionRow(suggestions.single { it.relationship == HarmonyRelationship.TONAL })
+    }
+}
+
+@Composable
+private fun ChromaticRows(isNeutral: Boolean, suggestions: List<HarmonySuggestion>) {
+    Box(modifier = Modifier.fillMaxWidth().height(SUGGESTION_ROW_HEIGHT * 2)) {
+        AnimatedVisibility(visible = isNeutral, enter = fadeIn(), exit = fadeOut()) {
+            NeutralHintRow()
+        }
+        AnimatedVisibility(visible = !isNeutral, enter = fadeIn(), exit = fadeOut()) {
+            Column {
+                HarmonySuggestionRow(suggestions.single { it.relationship == HarmonyRelationship.COMPLEMENTARY })
+                HarmonySuggestionRow(suggestions.single { it.relationship == HarmonyRelationship.ANALOGOUS })
+            }
+        }
     }
 }
 

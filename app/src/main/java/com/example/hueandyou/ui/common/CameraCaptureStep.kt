@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,6 +47,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -149,20 +151,15 @@ private fun CameraViewfinder(onPhotoUri: (Uri) -> Unit, onGalleryClick: () -> Un
         Text(
             text = stringResource(R.string.camera_viewfinder_hint),
             color = Color.White,
+            textAlign = TextAlign.Center,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 32.dp)
+                .padding(top = 32.dp, start = 32.dp, end = 32.dp)
                 .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         )
 
-        // Below the center box and above the shutter row, so it never covers the sampled area.
-        CameraAdjustmentSliders(
-            camera = camera,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = 16.dp, end = 16.dp, bottom = 128.dp),
-        )
+        CameraAdjustmentSliders(camera = camera, modifier = Modifier.fillMaxSize())
 
         IconButton(
             onClick = onGalleryClick,

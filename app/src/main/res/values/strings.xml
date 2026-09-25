@@ -129,6 +129,7 @@
     <string name="camera_viewfinder_hint">Put the item in the middle of the frame, in daylight if you can.</string>
     <string name="result_done_content_description">Done</string>
     <string name="result_new_photo">New photo</string>
+    <string name="camera_white_balance_abbreviation">WB</string>
     <string name="camera_white_balance_content_description">White balance</string>
     <string name="camera_exposure_content_description">Exposure</string>
     <string name="camera_white_balance_auto">Auto</string>
