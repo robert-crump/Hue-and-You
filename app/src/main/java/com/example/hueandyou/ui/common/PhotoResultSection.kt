@@ -37,8 +37,9 @@ import com.example.hueandyou.colorspace.CalibrationConfig
 /**
  * The photo at the top of a result page, with a marker showing where the current color was
  * sampled from - the center box for the auto-pick or a chip-pick (null [sampleX]/[sampleY]), or
- * a ring at the tap point for a tap-pick. Tapping the photo reports a normalized point in [0, 1]
- * via [onTap]; the caller is responsible for running the (off-main-thread) sampling.
+ * a ring at the tap point for a tap-pick. When [onTap] is non-null, tapping the photo reports a
+ * normalized point in [0, 1] to it (the caller is responsible for running the off-main-thread
+ * sampling); when null, the photo is display-only.
  */
 @Composable
 internal fun PhotoResultSection(
@@ -46,7 +47,7 @@ internal fun PhotoResultSection(
     sampleX: Double?,
     sampleY: Double?,
     maxHeightFraction: Float,
-    onTap: (x: Double, y: Double) -> Unit,
+    onTap: ((x: Double, y: Double) -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val imageBitmap = remember(photo) { photo.asImageBitmap() }
@@ -66,13 +67,16 @@ internal fun PhotoResultSection(
                 modifier = Modifier
                     .fillMaxSize()
                     .onSizeChanged { displaySizePx = it }
-                    .pointerInput(photo) {
-                        detectTapGestures { offset ->
-                            val size = displaySizePx
-                            if (size.width == 0 || size.height == 0) return@detectTapGestures
-                            val x = (offset.x / size.width).toDouble().coerceIn(0.0, 1.0)
-                            val y = (offset.y / size.height).toDouble().coerceIn(0.0, 1.0)
-                            onTap(x, y)
+                    .let { imageModifier ->
+                        if (onTap == null) return@let imageModifier
+                        imageModifier.pointerInput(photo) {
+                            detectTapGestures { offset ->
+                                val size = displaySizePx
+                                if (size.width == 0 || size.height == 0) return@detectTapGestures
+                                val x = (offset.x / size.width).toDouble().coerceIn(0.0, 1.0)
+                                val y = (offset.y / size.height).toDouble().coerceIn(0.0, 1.0)
+                                onTap(x, y)
+                            }
                         }
                     }
             )

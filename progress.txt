@@ -1,5 +1,47 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #27: Re-pick color with chips in History detail
+
+History detail now goes through a new `HistoryDetailUiState` (`Loading`/`NotFound`/`Loaded`)
+instead of rendering straight off `repository.observeEntry`'s nullable value - `Loaded` carries
+the decoded thumbnail `Bitmap` and a freshly-recomputed `alternativesArgb` chip list alongside the
+domain `HistoryEntry`, so the screen has everything it needs without a second query. On each
+`observeEntry` emission, `HistoryDetailViewModel` decodes the thumbnail file (`BitmapFactory.decodeFile`,
+injectable as `bitmapDecoder` for tests) and runs `ColorExtractor.extractCandidates` over it -
+both off `backgroundDispatcher` - but only once per entry open (`photo`/`candidates` are cached
+`var`s checked before redoing either), matching the AC that extraction is a one-time cost, not a
+per-pick one. Since the thumbnail is the 512px JPEG `ThumbnailStore` already saves (not the
+original photo), re-picks can land a few ΔE from the original live pick, which the issue accepts.
+
+`HistoryDetailScreen` renders the shared `PhotoResultSection` (photo + marker at the entry's stored
+`sampleX`/`sampleY`, center box when `null`) and `ColorChipRow` from `ui/common` - the same
+composables the live Rate Clothing/Match Object result pages use from #22 - for both entry types.
+`PhotoResultSection.onTap` became nullable (`((x, y) -> Unit)?`) rather than adding a parallel
+read-only composable, since the only behavioral difference for History detail is skipping the
+`pointerInput`/`detectTapGestures` chain entirely; live-result call sites are unchanged (`onTap` is
+always a lambda there). Picking a chip calls `HistoryDetailViewModel.pickCandidate(argb)`, a no-op
+if it's already the current color, which persists via the existing `HistoryRepository.updateObjectPick`
+(OBJECT) or `updateClothingPick` (CLOTHING, re-scored with `PaletteScorer.score` against the
+entry's own stored `bestColorsArgb`/`avoidColorsArgb` snapshot rather than a live profile lookup -
+this is what makes pre-migration clothing entries with an empty snapshot still score correctly,
+same null-safe shape `PaletteScorer` already handles) with `sampleX`/`sampleY` reset to `null` -
+both already reset the sample point in their SQL, so no DAO change was needed. The updated row
+flows back through the same `observeEntry` Flow, so the screen picks up the new color/score without
+any locally-held pick state. Object entries keep rendering with the wheel/balance they were saved
+with since `HarmonyResultBody` never grew editing controls back after #23 - nothing to change there.
+
+Test: new `HistoryDetailViewModelTest` (the screen had no dedicated ViewModel test before this
+issue) covers off-main-thread decode+extraction on open, extraction-not-repeated-on-repick,
+same-color-repick-is-a-no-op, OBJECT and CLOTHING re-pick persisting with the sample point reset,
+a pre-migration CLOTHING entry (empty best/avoid snapshot) still scoring and updating, rename, and
+the entry-deleted-elsewhere -> `NotFound` case - using the same reflection-free background-dispatcher
+pattern as `MatchObjectViewModelTest`/`RateClothingViewModelTest` (no private method to invoke here,
+since extraction runs from `init` via the repository `Flow` rather than a public entry point).
+No new Compose UI test for the non-tappable photo/chip-row layout (same Robolectric/JDK-26 gap
+noted since #3) - verified by reading through `PhotoResultSection`'s nullable-`onTap` branch and
+`HistoryDetailScreen`'s composition. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug
+lintDebug` all pass.
+
 ## 2026-09-25 - Issue #28: In-app CameraX viewfinder with center-box overlay and gallery button
 
 Both photo flows' `PickingPhoto` step now renders a new shared `CameraCaptureStep`
@@ -155,43 +197,3 @@ test for the card layout/theme-contrast AC (same Robolectric/JDK-26 gap noted si
 by reading through the color role choices (all four - success/error/surfaceVariant containers -
 already have Material-guaranteed on-container contrast). `./gradlew :colorspace:test
 :app:testDebugUnitTest assembleDebug` all pass.
-
-## 2026-09-25 - Issue #23: Simplified Match Object result - Complementary, Analogous, Tonal with info dialogs and neutral hint
-
-`HarmonyRelationship`/`HarmonyEngine.generate` dropped `SPLIT_COMPLEMENTARY`/`TRIADIC` entirely
-(enum cases, generation, tests) - only Complementary, Analogous and Tonal remain. Neutral-color
-detection is a separate pure function, `HarmonyEngine.isNeutral(chroma)` against a new
-`HarmonyConfig.NEUTRAL_CHROMA_THRESHOLD = 12.0`, rather than folded into `generate()` - keeping it
-outside `generate()` meant the existing hue/balance tests (which run over arbitrary sample colors)
-didn't need auditing for accidental neutrality, and the threshold itself stays boundary-testable
-as a plain `Double -> Boolean` (same shape as the old `ColorMatchBand.forDeltaE`) instead of needing
-a gamut-mapped round trip through an actual color.
-
-`HarmonyResultBody` (shared by the live Match Object result and History detail) is now just the
-relationship rows: no input-color swatch/hex/label section, no disclaimer text. Each row is a
-compact `Row` - label + a small ⓘ `IconButton` (32dp touch target, so it doesn't blow out row
-height) on the left, ~64dp circles on the right - and tapping the ⓘ opens a new shared
-`InfoDialog` (title + one/two sentences + a single OK button, `ui/common/InfoDialog.kt`) with the
-fixed explanation text for that relationship. When `HarmonyEngine.isNeutral(chroma)` is true,
-Complementary/Analogous are swapped for one plain hint row; Tonal always renders. The same
-`InfoDialog` backs a new ⓘ action in `MatchObjectScreen`'s and `HistoryDetailScreen`'s top bars
-showing the best-guess disclaimer that used to sit inline - reusing `rate_clothing_best_guess_disclaimer`
-rather than a new string.
-
-Wheel/balance and the rename field are gone from both the live result page and History detail -
-`HarmonyOptionsControls` now has exactly one caller left (Settings' own defaults, unchanged); new
-results still take Settings' defaults, History still reopens with the wheel/balance it was saved
-with, but neither is editable from the result/detail screens anymore. Since nothing could still
-call it, `HistoryRepository.updateHarmonyOptions`/`HistoryDao.updateHarmonyOptions` (and the SQL
-`UPDATE ... SET wheel, balance` query) were deleted outright rather than left as dead code, along
-with `MatchObjectViewModel.renameResult`/`setWheel`/`setBalance` and
-`HistoryDetailViewModel.setWheel`/`setBalance` and the now-unused `historyEntryName` state field -
-the `wheel`/`balance` columns themselves are untouched (still written at creation, still read for
-display), so no migration was needed.
-
-Test: `HarmonyEngineTest` lost its split-complementary/triadic assertions and gained
-`isNeutralExcludesTheThresholdItselfButIncludesJustBelowIt` (boundary test at exactly
-`NEUTRAL_CHROMA_THRESHOLD`). No new Compose UI test for the row/dialog layout or the "fits without
-scrolling" AC (same Robolectric/JDK-26 gap noted since #3) - verified by reading through the
-layout and manually reasoning about removed vertical space (no hex/name/wheel-balance/disclaimer
-lines). `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug` all pass.
