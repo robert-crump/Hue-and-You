@@ -1,5 +1,38 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #25: Remember last-used profile and switch profile on the clothing result
+
+`RateClothingUiState.SelectingProfile` is gone - the profile-selection step never runs anymore.
+`RateClothingViewModel.init` reads `SettingsRepository.observeLastUsedClothingProfileId()` (new
+`Flow<Long?>` backed by a `longPreferencesKey`, alongside the existing harmony-defaults keys in the
+same `hue_and_you_settings` DataStore) and picks `profiles.firstOrNull { it.id == lastUsedId } ?:
+profiles.first()` - so a deleted remembered profile silently falls back to the oldest profile
+(`ProfileDao` already orders by `createdAt ASC`) with no error state. `ShowingResult` carries the
+full `profiles` list plus `selectedProfile` so `RateClothingScreen` can render the new clickable
+"For: <name>" line (only when `profiles.size >= 2`) without a second query; tapping it opens a
+`ProfilePickerDialog` (an `AlertDialog` wrapping the same clickable-row list the old selection step
+used) and picking a profile calls the new `RateClothingViewModel.switchProfile(profile)`.
+
+`switchProfile` re-scores the *current* `argb` against the new profile synchronously (same
+"state updates instantly, persistence follows" pattern as `pickCandidate`/`pickAtPoint` from #22),
+then in a coroutine calls both `SettingsRepository.setLastUsedClothingProfileId` and a new
+`HistoryRepository.updateClothingProfile(entryId, profile, score)` - a straight `UPDATE` of
+`profileId`/`profileName`/`bestColorsArgb`/`avoidColorsArgb`/the four score columns on the existing
+row (mirrors `updateClothingPick`'s shape, just swapping color+sample for profile+score). Switching
+to the already-selected profile is a no-op (checked by id) so it doesn't spuriously overwrite the
+remembered id or touch History. No Room schema change - `updateClothingProfile` is a new `HistoryDao`
+query over existing columns, and the DataStore key is additive like the harmony-default ones.
+
+Test: new `RateClothingViewModelTest` (the flow had no dedicated ViewModel test before this issue,
+noted as a gap since #20/#22) covers remember-when-present, fallback-when-deleted, first-run-with-
+nothing-stored, switch (rescore + persisted history update + remembered id) and switch-to-same-
+profile-is-a-no-op, using the same reflection-invoked `extractAndSaveResult` + `Unsafe`-allocated
+`Bitmap` pattern as `MatchObjectViewModelTest`. `DataStoreSettingsRepositoryTest` gained two cases
+for the new key. `DefaultHistoryRepositoryTest` gained `updateClothingProfile_...InPlace`. Every
+other `HistoryRepository`/`SettingsRepository` fake in the test suite (`MatchObjectViewModelTest`,
+`HistoryViewModelTest`) got the two new interface methods stubbed to throw, since they don't
+exercise this path. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug` all pass.
+
 ## 2026-09-25 - Issue #24: Rate Clothing verdict card - Yes / Avoid / Neither
 
 New pure function `ClothingVerdict.forScore(score: PaletteScore)` (colorspace module) replaces

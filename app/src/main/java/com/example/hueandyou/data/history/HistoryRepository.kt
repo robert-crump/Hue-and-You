@@ -35,6 +35,9 @@ interface HistoryRepository {
     /** Updates a CLOTHING entry in place after a re-pick: the new color, its recomputed score, and sample location. */
     suspend fun updateClothingPick(entryId: Long, argb: Int, score: PaletteScore, sampleX: Double?, sampleY: Double?)
 
+    /** Updates a CLOTHING entry in place after switching profiles: the new profile snapshot and recomputed score. */
+    suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore)
+
     /** Deletes an entry and its thumbnail file. */
     suspend fun deleteEntry(entryId: Long)
 }
@@ -122,6 +125,21 @@ class DefaultHistoryRepository(
             closerToAvoid = score.closerToAvoid,
             sampleX = sampleX,
             sampleY = sampleY,
+        )
+    }
+
+    override suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore) {
+        dao.updateClothingProfile(
+            entryId = entryId,
+            profileId = profile.id,
+            profileName = profile.name,
+            bestColorsArgb = profile.bestColors.map { it.argb },
+            avoidColorsArgb = profile.avoidColors.map { it.argb },
+            nearestBestArgb = score.nearestBest?.argb,
+            nearestBestDeltaE = score.nearestBest?.deltaE,
+            nearestAvoidArgb = score.nearestAvoid?.argb,
+            nearestAvoidDeltaE = score.nearestAvoid?.deltaE,
+            closerToAvoid = score.closerToAvoid,
         )
     }
 

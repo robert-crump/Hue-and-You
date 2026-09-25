@@ -7,7 +7,6 @@ import com.example.hueandyou.data.profile.Profile
 sealed interface RateClothingUiState {
     data object LoadingProfiles : RateClothingUiState
     data object NoProfile : RateClothingUiState
-    data class SelectingProfile(val profiles: List<Profile>) : RateClothingUiState
 
     data object PickingPhoto : RateClothingUiState
     data object LoadingPhoto : RateClothingUiState
@@ -22,5 +21,8 @@ sealed interface RateClothingUiState {
         val sampleY: Double?,
         val score: PaletteScore,
         val historyEntryId: Long,
+        /** Every profile, for the "For: <name>" switcher; the "For:" line is hidden below 2. */
+        val profiles: List<Profile>,
+        val selectedProfile: Profile?,
     ) : RateClothingUiState
 }

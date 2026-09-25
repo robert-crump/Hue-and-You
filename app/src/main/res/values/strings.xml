@@ -81,6 +81,7 @@
     <string name="rate_clothing_no_profile_body">Create a profile with Best and Avoid colors before rating clothing.</string>
     <string name="rate_clothing_go_to_settings">Go to Settings</string>
     <string name="rate_clothing_select_profile_title">Rate against which profile?</string>
+    <string name="rate_clothing_for_profile">For: %1$s</string>
     <string name="rate_clothing_best_guess_disclaimer">This is our best guess — lighting and camera color can shift the measured color.</string>
     <string name="rate_clothing_verdict_yes">Yes, take the color</string>
     <string name="rate_clothing_verdict_avoid">Avoid that color</string>

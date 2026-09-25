@@ -90,6 +90,34 @@ class FakeHistoryDao : HistoryDao {
         emit()
     }
 
+    override suspend fun updateClothingProfile(
+        entryId: Long,
+        profileId: Long,
+        profileName: String,
+        bestColorsArgb: List<Int>,
+        avoidColorsArgb: List<Int>,
+        nearestBestArgb: Int?,
+        nearestBestDeltaE: Double?,
+        nearestAvoidArgb: Int?,
+        nearestAvoidDeltaE: Double?,
+        closerToAvoid: Boolean,
+    ) {
+        entries[entryId]?.let {
+            entries[entryId] = it.copy(
+                profileId = profileId,
+                profileName = profileName,
+                bestColorsArgb = bestColorsArgb,
+                avoidColorsArgb = avoidColorsArgb,
+                nearestBestArgb = nearestBestArgb,
+                nearestBestDeltaE = nearestBestDeltaE,
+                nearestAvoidArgb = nearestAvoidArgb,
+                nearestAvoidDeltaE = nearestAvoidDeltaE,
+                closerToAvoid = closerToAvoid,
+            )
+        }
+        emit()
+    }
+
     override suspend fun delete(entryId: Long) {
         entries.remove(entryId)
         emit()

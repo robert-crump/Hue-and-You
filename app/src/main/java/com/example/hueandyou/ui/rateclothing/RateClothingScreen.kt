@@ -111,10 +111,6 @@ fun RateClothingScreen(
                     onCancel = onNavigateBack,
                     onGoToSettings = onNavigateToProfileSettings,
                 )
-                is RateClothingUiState.SelectingProfile -> SelectingProfileStep(
-                    profiles = state.profiles,
-                    onSelect = viewModel::selectProfile,
-                )
                 is RateClothingUiState.PickingPhoto -> PickPhotoStep(
                     onTakePhoto = {
                         val uri = createCameraPhotoUri(context)
@@ -136,8 +132,11 @@ fun RateClothingScreen(
                     sampleX = state.sampleX,
                     sampleY = state.sampleY,
                     score = state.score,
+                    profiles = state.profiles,
+                    selectedProfile = state.selectedProfile,
                     onPickCandidate = viewModel::pickCandidate,
                     onPickAtPoint = viewModel::pickAtPoint,
+                    onSwitchProfile = viewModel::switchProfile,
                 )
             }
         }
@@ -172,30 +171,34 @@ private fun NoProfileDialog(onCancel: () -> Unit, onGoToSettings: () -> Unit) {
 }
 
 @Composable
-private fun SelectingProfileStep(profiles: List<Profile>, onSelect: (Profile) -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Text(
-            text = stringResource(R.string.rate_clothing_select_profile_title),
-            style = MaterialTheme.typography.bodyLarge
-        )
-        LazyColumn(modifier = Modifier.padding(top = 16.dp)) {
-            items(profiles, key = { it.id }) { profile ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onSelect(profile) }
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = profile.name, style = MaterialTheme.typography.titleMedium)
+private fun ProfilePickerDialog(profiles: List<Profile>, onSelect: (Profile) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.rate_clothing_select_profile_title)) },
+        text = {
+            LazyColumn {
+                items(profiles, key = { it.id }) { profile ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelect(profile)
+                                onDismiss()
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = profile.name, style = MaterialTheme.typography.titleMedium)
+                    }
                 }
             }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.dialog_cancel))
+            }
         }
-    }
+    )
 }
 
 @Composable
@@ -243,9 +246,14 @@ private fun ResultStep(
     sampleX: Double?,
     sampleY: Double?,
     score: PaletteScore,
+    profiles: List<Profile>,
+    selectedProfile: Profile?,
     onPickCandidate: (Int) -> Unit,
     onPickAtPoint: (x: Double, y: Double) -> Unit,
+    onSwitchProfile: (Profile) -> Unit,
 ) {
+    var showProfilePicker by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -260,6 +268,15 @@ private fun ResultStep(
             maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
             onTap = onPickAtPoint,
         )
+        if (profiles.size >= 2 && selectedProfile != null) {
+            Text(
+                text = stringResource(R.string.rate_clothing_for_profile, selectedProfile.name),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .clickable { showProfilePicker = true }
+            )
+        }
         ColorChipRow(
             currentArgb = argb,
             alternativesArgb = alternativesArgb,
@@ -267,5 +284,13 @@ private fun ResultStep(
             modifier = Modifier.padding(top = 16.dp),
         )
         PaletteResultBody(argb = argb, score = score)
+    }
+
+    if (showProfilePicker) {
+        ProfilePickerDialog(
+            profiles = profiles,
+            onSelect = onSwitchProfile,
+            onDismiss = { showProfilePicker = false },
+        )
     }
 }

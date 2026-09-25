@@ -62,6 +62,27 @@ interface HistoryDao {
         sampleY: Double?,
     )
 
+    /** A profile switch on a CLOTHING entry: the new profile snapshot and its recomputed score. */
+    @Query(
+        "UPDATE history_entries SET profileId = :profileId, profileName = :profileName, " +
+            "bestColorsArgb = :bestColorsArgb, avoidColorsArgb = :avoidColorsArgb, " +
+            "nearestBestArgb = :nearestBestArgb, nearestBestDeltaE = :nearestBestDeltaE, " +
+            "nearestAvoidArgb = :nearestAvoidArgb, nearestAvoidDeltaE = :nearestAvoidDeltaE, " +
+            "closerToAvoid = :closerToAvoid WHERE id = :entryId"
+    )
+    suspend fun updateClothingProfile(
+        entryId: Long,
+        profileId: Long,
+        profileName: String,
+        bestColorsArgb: List<Int>,
+        avoidColorsArgb: List<Int>,
+        nearestBestArgb: Int?,
+        nearestBestDeltaE: Double?,
+        nearestAvoidArgb: Int?,
+        nearestAvoidDeltaE: Double?,
+        closerToAvoid: Boolean,
+    )
+
     @Query("DELETE FROM history_entries WHERE id = :entryId")
     suspend fun delete(entryId: Long)
 }

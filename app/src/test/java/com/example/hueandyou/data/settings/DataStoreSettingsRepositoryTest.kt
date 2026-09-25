@@ -61,4 +61,16 @@ class DataStoreSettingsRepositoryTest {
         assertEquals(HarmonyWheel.SCREEN, defaults.wheel)
         assertEquals(HarmonyBalance.SOFTENED, defaults.balance)
     }
+
+    @Test
+    fun observeLastUsedClothingProfileId_withNothingStored_isNull() = runBlocking {
+        assertEquals(null, repository.observeLastUsedClothingProfileId().first())
+    }
+
+    @Test
+    fun setLastUsedClothingProfileId_persists() = runBlocking {
+        repository.setLastUsedClothingProfileId(7L)
+
+        assertEquals(7L, repository.observeLastUsedClothingProfileId().first())
+    }
 }

@@ -232,6 +232,10 @@ class MatchObjectViewModelTest {
             throw UnsupportedOperationException("not used by this test")
         }
 
+        override suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore) {
+            throw UnsupportedOperationException("not used by this test")
+        }
+
         override suspend fun deleteEntry(entryId: Long) {
             throw UnsupportedOperationException("not used by this test")
         }
@@ -248,5 +252,7 @@ class MatchObjectViewModelTest {
         override fun observeDefaults(): Flow<HarmonyDefaults> = flowOf(HarmonyDefaults())
         override suspend fun setDefaultWheel(wheel: HarmonyWheel) = throw UnsupportedOperationException("not used by this test")
         override suspend fun setDefaultBalance(balance: HarmonyBalance) = throw UnsupportedOperationException("not used by this test")
+        override fun observeLastUsedClothingProfileId(): Flow<Long?> = throw UnsupportedOperationException("not used by this test")
+        override suspend fun setLastUsedClothingProfileId(profileId: Long) = throw UnsupportedOperationException("not used by this test")
     }
 }

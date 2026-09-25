@@ -233,6 +233,41 @@ class DefaultHistoryRepositoryTest {
         assertNull(stored.sampleY)
         assertEquals(1, repository.observeEntries().first().size)
     }
+
+    @Test
+    fun updateClothingProfile_updatesProfileSnapshotAndScoreInPlace() = runBlocking {
+        val entry = repository.saveClothingResult(
+            thumbnailPath = "thumb.jpg",
+            calibratedArgb = 0xFF778899.toInt(),
+            profile = autumnProfile(),
+            score = sampleScore(),
+        )
+        val winterProfile = Profile(
+            id = 99L,
+            name = "Winter",
+            createdAt = 0L,
+            updatedAt = 0L,
+            bestColors = listOf(PaletteColor(3L, com.example.hueandyou.data.profile.ColorKind.BEST, 0xFF000000.toInt())),
+            avoidColors = emptyList(),
+        )
+        val newScore = PaletteScore(
+            nearestBest = ColorMatch(0xFF000000.toInt(), 3.0),
+            nearestAvoid = null,
+            closerToAvoid = false,
+        )
+
+        repository.updateClothingProfile(entry.id, winterProfile, newScore)
+
+        val stored = repository.observeEntry(entry.id).first()!!
+        assertEquals(entry.id, stored.id)
+        assertEquals(0xFF778899.toInt(), stored.calibratedArgb)
+        assertEquals(winterProfile.id, stored.profileId)
+        assertEquals(winterProfile.name, stored.profileName)
+        assertEquals(listOf(0xFF000000.toInt()), stored.bestColorsArgb)
+        assertTrue(stored.avoidColorsArgb.isEmpty())
+        assertEquals(newScore, stored.score)
+        assertEquals(1, repository.observeEntries().first().size)
+    }
 }
 
 private class FakeThumbnailStore : com.example.hueandyou.data.history.ThumbnailStore {

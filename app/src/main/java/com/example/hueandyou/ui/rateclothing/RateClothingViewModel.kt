@@ -19,6 +19,7 @@ import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
+import com.example.hueandyou.data.settings.SettingsRepository
 import com.example.hueandyou.ui.common.toPixelSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -51,12 +52,14 @@ class RateClothingViewModel(
     private val profileRepository: ProfileRepository,
     private val historyRepository: HistoryRepository,
     private val thumbnailStore: ThumbnailStore,
+    private val settingsRepository: SettingsRepository,
     private val backgroundDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val pixelSourceOf: (Bitmap) -> PixelSource = Bitmap::toPixelSource,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<RateClothingUiState>(RateClothingUiState.LoadingProfiles)
     val uiState: StateFlow<RateClothingUiState> = _uiState.asStateFlow()
 
+    private var profiles: List<Profile> = emptyList()
     private var selectedProfile: Profile? = null
 
     /** Every candidate color from the current photo's center-box extraction, ranked by share. */
@@ -64,21 +67,28 @@ class RateClothingViewModel(
 
     init {
         viewModelScope.launch {
-            val profiles = profileRepository.observeProfiles().first()
-            _uiState.value = when {
-                profiles.isEmpty() -> RateClothingUiState.NoProfile
-                profiles.size == 1 -> {
-                    selectedProfile = profiles.first()
-                    RateClothingUiState.PickingPhoto
-                }
-                else -> RateClothingUiState.SelectingProfile(profiles)
+            profiles = profileRepository.observeProfiles().first()
+            if (profiles.isEmpty()) {
+                _uiState.value = RateClothingUiState.NoProfile
+            } else {
+                val lastUsedId = settingsRepository.observeLastUsedClothingProfileId().first()
+                selectedProfile = profiles.firstOrNull { it.id == lastUsedId } ?: profiles.first()
+                _uiState.value = RateClothingUiState.PickingPhoto
             }
         }
     }
 
-    fun selectProfile(profile: Profile) {
+    /** Switches the profile the current result is scored against; re-scores and remembers the choice. */
+    fun switchProfile(profile: Profile) {
+        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
+        if (profile.id == selectedProfile?.id) return
         selectedProfile = profile
-        _uiState.value = RateClothingUiState.PickingPhoto
+        val score = scoreFor(state.argb, profile)
+        _uiState.value = state.copy(score = score, selectedProfile = profile)
+        viewModelScope.launch {
+            settingsRepository.setLastUsedClothingProfileId(profile.id)
+            historyRepository.updateClothingProfile(state.historyEntryId, profile, score)
+        }
     }
 
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
@@ -115,6 +125,8 @@ class RateClothingViewModel(
                 sampleY = null,
                 score = score,
                 historyEntryId = entry.id,
+                profiles = profiles,
+                selectedProfile = profile,
             )
         }
     }
@@ -176,6 +188,7 @@ class RateClothingViewModel(
                     profileRepository = container.profileRepository,
                     historyRepository = container.historyRepository,
                     thumbnailStore = container.thumbnailStore,
+                    settingsRepository = container.settingsRepository,
                 )
             }
         }
