@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -52,6 +53,7 @@ import com.example.hueandyou.colorspace.formatHexColor
 import com.example.hueandyou.data.profile.ColorKind
 import com.example.hueandyou.data.profile.MoveDirection
 import com.example.hueandyou.data.profile.PaletteColor
+import com.example.hueandyou.ui.common.ColorCircle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -213,18 +215,8 @@ private fun ColorSection(
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(Color(color.argb))
-                        )
-                        Text(
-                            text = formatHexColor(color.argb),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 12.dp)
-                        )
+                        ColorCircle(argb = color.argb, size = 24.dp)
+                        Spacer(modifier = Modifier.weight(1f))
                         IconButton(
                             onClick = { onMoveColor(color.id, MoveDirection.UP) },
                             enabled = index > 0

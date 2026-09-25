@@ -1,5 +1,36 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #26: Long-press any color circle to copy its hex code
+
+New shared `ColorCircle` composable (`ui/common/ColorCircle.kt`) replaces every ad hoc
+`Box.clip(CircleShape).background(Color(argb))` swatch in the app: `PaletteResultBody`'s verdict
+circle, `HarmonyResultView`'s `ColorSwatch` (renamed away - callers now use `ColorCircle` directly),
+and `PhotoResultSection`'s `ColorChip` (current/alternative chips, which keeps its tap-to-pick
+`onClick` and selected-border via new `border: BorderStroke?`/`onClick: (() -> Unit)?` params) all
+route through it, as does the Best/Avoid list in `ProfileEditorScreen`. Since `PaletteResultBody`/
+`HarmonyResultBody` are shared with History detail (unchanged call sites), its circles pick up the
+same behavior there for free. Deliberately *not* touched: the AddColorDialog color-picker preview
+circle (hex is an input there, not a display) and the small best-colors preview strip in
+`SettingsScreen`/`PaletteImportScreen` - neither is in the issue's enumerated list of circles.
+
+Long-press copies `formatHexColor(argb)` via `LocalClipboard`/`ClipEntry` (not the deprecated
+`LocalClipboardManager.setText`, since this compose-bom already has the suspend-based clipboard
+API) inside a `rememberCoroutineScope().launch`, plus `LocalHapticFeedback.performHapticFeedback
+(HapticFeedbackType.LongPress)` - no app-side toast/snackbar per the AC (minSdk 37 shows the
+system's own confirmation). Built on `Modifier.combinedClickable` with `onClick` optional
+(non-interactive circles like the verdict card pass none, and get `indication = null` so they don't
+gain a spurious ripple) so existing tap behavior (chip selection) is unaffected. The hex `Text` under
+circles in `ProfileEditorScreen`'s Best/Avoid list is deleted (replaced by a `Spacer(weight(1f))` to
+keep the move/remove icon buttons right-aligned); hex is untouched in the color picker dialog, the
+share card and the JSON backup, none of which render a circle from this list.
+
+Test: no new Compose UI test for the clipboard-after-long-press AC - same Robolectric/JDK-26
+environment gap noted since #3 (confirmed still true: this JDK is 26.0.1, `adb` isn't available
+either, so no path to a real instrumented test in this environment) - verified by reading through
+`ColorCircle`'s `combinedClickable` wiring and each call site's parameters instead. No other tests
+affected (no new/changed pure functions - `formatHexColor` is unchanged and already covered).
+`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass.
+
 ## 2026-09-25 - Issue #25: Remember last-used profile and switch profile on the clothing result
 
 `RateClothingUiState.SelectingProfile` is gone - the profile-selection step never runs anymore.
@@ -161,45 +192,3 @@ clamping, dedup/cap/order for alternatives). `MatchObjectViewModelTest` gained
 `BackupSerializerTest` gained cases for the new update/roundtrip/missing-field paths. History
 detail screen re-pick (chips there) is explicitly out of scope - that's #27.
 `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug` all pass.
-
-## 2026-09-25 - Issue #21: Skip white calibration and auto-pick the main color from the center box
-
-Deleted `WhiteBalanceCalibrator` and its config constants/test wholesale (dead code, no more tap-to-
-calibrate step anywhere), plus the now-unused `CircleRegion` (it only existed to describe the white-
-sheet sample circle `ColorExtractor` excluded). `ColorExtractor.extract()` (candidate-list-with-share-
-filter, `isClearlyDominant`) is replaced by a single `extractMainColor(pixels, region = centerBox)` -
-quantizes with the same Celebi quantizer and returns the single largest-share `argb`, no `Double?`
-share or candidate list to plumb through. `RectRegion.centerBox(width, height, fraction)` computes the
-middle-40%-by-40% box (`CalibrationConfig.CENTER_BOX_FRACTION`); `CalibrationConfig` lost every
-calibration/dominance/share-filter constant that only that old API used.
-
-Both `MatchObjectViewModel` and `RateClothingViewModel` lost their `Calibrating`/`SelectingColor(s)`
-states, `onTap`/`confirmCalibration`/`chooseNewPhoto`/(for Match Object)
-`toggleColorSelection`/`confirmColorSelection` entirely. `onPhotoPicked` now decodes the bitmap, flips
-to `ExtractingColors`, then a private `extractAndSaveResult(bitmap)` calls `extractMainColor` on
-`backgroundDispatcher`, saves the history entry, and goes straight to `ShowingResult` - photo to result
-in one step, no `currentBitmap` field needed since the bitmap is a local all the way through. Match
-Object's `saveObjectResult` now always gets a single-element `inputColorsArgb` list; the stored field
-name and repository signature are unchanged (still a `List<Int>`, per the AC - no migration).
-`HarmonyResultBody` (shared by the live Match Object result and History detail) now takes one
-`inputColorArgb: Int` instead of iterating a list, so `HistoryDetailScreen` passing
-`entry.inputColorsArgb.first()` makes old multi-color entries display only their first color, satisfying
-that AC without any data change.
-
-Removed every white-sheet/calibration string (`rate_clothing_white_sheet_reminder`,
-`_tap_white_sheet`, `_calibration_failed*`, `_confirm_calibration`, `_choose_different_photo`,
-`_select_color`, `match_object_select_colors_title`, `match_object_continue`,
-`settings_about_calibration` and its `AboutSection` line) and replaced the pick-photo reminder (shared
-by both flows, as it already was) with a generic `pick_photo_reminder` that tells the user to center
-the subject instead of mentioning a white sheet.
-
-Test: rewrote `MatchObjectViewModelTest` around the new `extractAndSaveResult` (same off-main-thread
-assertion shape as #20 - spinner shows before the background dispatcher is pumped, extraction runs on
-the background dispatcher, then state lands on `ShowingResult`) with small local `Fake*` doubles for
-`HistoryRepository`/`ThumbnailStore`/`SettingsRepository` (matching `HistoryViewModelTest`'s existing
-fake-class style) rather than the old error-throwing `Proxy` stub, since this flow now actually reaches
-the save step within the same coroutine. `ColorExtractorTest` rewritten for `extractMainColor`
-(largest-share-in-box, out-of-box pixels ignored, explicit `region` override, single-color image).
-Rate Clothing still has no dedicated ViewModel test (unchanged from #20). `./gradlew :colorspace:test
-:app:testDebugUnitTest assembleDebug` all pass. Center-box overlay UI and in-app camera viewfinder are
-out of scope here (issue #28).
