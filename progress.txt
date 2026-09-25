@@ -1,5 +1,47 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-25 - Issue #21: Skip white calibration and auto-pick the main color from the center box
+
+Deleted `WhiteBalanceCalibrator` and its config constants/test wholesale (dead code, no more tap-to-
+calibrate step anywhere), plus the now-unused `CircleRegion` (it only existed to describe the white-
+sheet sample circle `ColorExtractor` excluded). `ColorExtractor.extract()` (candidate-list-with-share-
+filter, `isClearlyDominant`) is replaced by a single `extractMainColor(pixels, region = centerBox)` -
+quantizes with the same Celebi quantizer and returns the single largest-share `argb`, no `Double?`
+share or candidate list to plumb through. `RectRegion.centerBox(width, height, fraction)` computes the
+middle-40%-by-40% box (`CalibrationConfig.CENTER_BOX_FRACTION`); `CalibrationConfig` lost every
+calibration/dominance/share-filter constant that only that old API used.
+
+Both `MatchObjectViewModel` and `RateClothingViewModel` lost their `Calibrating`/`SelectingColor(s)`
+states, `onTap`/`confirmCalibration`/`chooseNewPhoto`/(for Match Object)
+`toggleColorSelection`/`confirmColorSelection` entirely. `onPhotoPicked` now decodes the bitmap, flips
+to `ExtractingColors`, then a private `extractAndSaveResult(bitmap)` calls `extractMainColor` on
+`backgroundDispatcher`, saves the history entry, and goes straight to `ShowingResult` - photo to result
+in one step, no `currentBitmap` field needed since the bitmap is a local all the way through. Match
+Object's `saveObjectResult` now always gets a single-element `inputColorsArgb` list; the stored field
+name and repository signature are unchanged (still a `List<Int>`, per the AC - no migration).
+`HarmonyResultBody` (shared by the live Match Object result and History detail) now takes one
+`inputColorArgb: Int` instead of iterating a list, so `HistoryDetailScreen` passing
+`entry.inputColorsArgb.first()` makes old multi-color entries display only their first color, satisfying
+that AC without any data change.
+
+Removed every white-sheet/calibration string (`rate_clothing_white_sheet_reminder`,
+`_tap_white_sheet`, `_calibration_failed*`, `_confirm_calibration`, `_choose_different_photo`,
+`_select_color`, `match_object_select_colors_title`, `match_object_continue`,
+`settings_about_calibration` and its `AboutSection` line) and replaced the pick-photo reminder (shared
+by both flows, as it already was) with a generic `pick_photo_reminder` that tells the user to center
+the subject instead of mentioning a white sheet.
+
+Test: rewrote `MatchObjectViewModelTest` around the new `extractAndSaveResult` (same off-main-thread
+assertion shape as #20 - spinner shows before the background dispatcher is pumped, extraction runs on
+the background dispatcher, then state lands on `ShowingResult`) with small local `Fake*` doubles for
+`HistoryRepository`/`ThumbnailStore`/`SettingsRepository` (matching `HistoryViewModelTest`'s existing
+fake-class style) rather than the old error-throwing `Proxy` stub, since this flow now actually reaches
+the save step within the same coroutine. `ColorExtractorTest` rewritten for `extractMainColor`
+(largest-share-in-box, out-of-box pixels ignored, explicit `region` override, single-color image).
+Rate Clothing still has no dedicated ViewModel test (unchanged from #20). `./gradlew :colorspace:test
+:app:testDebugUnitTest assembleDebug` all pass. Center-box overlay UI and in-app camera viewfinder are
+out of scope here (issue #28).
+
 ## 2026-09-24 - Issue #20: Fix ANR - run color extraction off the main thread
 
 `confirmCalibration` (Match Object and Rate Clothing) and `onTap` (white-balance sampling) now run
@@ -99,93 +141,3 @@ correctly via the fakes' own paths). `BackupHistoryEntry` needed hand-written `e
 `DefaultBackupRepositoryTest`). No UI test for the Export/Import buttons or the confirm dialog (same
 Robolectric/JDK-26 gap noted since #3) - verified by reading through the SAF launcher wiring and by
 the fact the confirm dialog reuses `delete_profile_dialog`'s already-working `AlertDialog` shape.
-
-## 2026-09-23 - Issue #15: Share card - PNG palette card via share sheet
-
-New `data/share/ShareCardRenderer.kt`: `ShareCardRenderer` interface plus `FileShareCardRenderer`,
-following the same shape as `ThumbnailStore`/`FileThumbnailStore` - a `Context`-holding class with
-one suspend entry point (`render(profile): Uri`) that does its work on `Dispatchers.IO`. Drawing is
-plain `android.graphics.Canvas`/`Paint` (not Compose - there's no Compose-to-Bitmap rasterizer in
-this codebase, and the issue's output is a raster PNG anyway), sized in two passes: paints are built
-first (title/section/hex/empty, all independent of any `Canvas`), their `fontMetrics` measure the
-exact height each block needs, *then* the bitmap is allocated at that computed height - so
-`drawSection`'s own layout math (`sectionContentHeight`, shared between the pre-measure sum and the
-actual per-swatch draw loop) is the single source of truth for vertical space, rather than two
-formulas that could drift apart. Empty Best/Avoid lists (the "any profile" AC) render the section
-header plus the existing `profile_editor_no_colors` string instead of a swatch grid - reusing that
-string (and `profile_editor_best_colors_title`/`_avoid_colors_title`) rather than adding parallel
-`share_card_*` copies, since the card's sections are meant to read identically to the editor's.
-Hex labels under each swatch reuse `colorspace`'s `formatHexColor` (already used by
-`ProfileEditorScreen`), not a new formatter. The PNG goes to a new `cache/share_cards/` dir (new
-`file_paths.xml` `cache-path` entry alongside the existing `camera_captures` one) and out through the
-same `androidx.core.content.FileProvider` authority `RateClothingScreen`'s camera-capture flow
-already registers in the manifest - no new provider needed, since a `FileProvider` authority isn't
-tied to one specific source directory.
-
-`AppContainer` gained `shareCardRenderer: ShareCardRenderer` (same `by lazy { ... }` pattern as
-`thumbnailStore`). `ProfilesViewModel` gained the `ShareCardRenderer` dependency and a
-`shareCard(profile, onRendered)` that launches the render in `viewModelScope` and hands the
-resulting `Uri` back via callback - `SettingsScreen` already held the only `ProfilesViewModel`
-instance backing the profile cards, so this was the natural place rather than a new ViewModel just
-for sharing.
-
-UI: `SettingsScreen`'s `ProfileCard` gained a `Share` `IconButton` next to the profile name (title
-`Row` now `weight(1f)` + icon, matching `ColorSection`'s title-row-with-trailing-action shape from
-`ProfileEditorScreen`). Tapping it calls `shareCard`, storing the returned `Uri` in screen-level
-state; a non-null `Uri` shows a new `SharePreviewDialog` (plain `AlertDialog`, decoding the PNG via
-`BitmapFactory.decodeStream` off the content `Uri` + `asImageBitmap()`, same decode-and-display shape
-`HistoryScreen` already uses for thumbnails) with a Share button that fires
-`Intent.createChooser(ACTION_SEND, "image/png")` carrying the same `Uri` with
-`FLAG_GRANT_READ_URI_PERMISSION` - no separate "confirm" step beyond the preview itself, since the
-preview *is* what the issue calls the required preview step.
-
-No unit test for the renderer per the issue's own spec ("Checked manually on device (no unit tests
-for the renderer in v1)") - `./gradlew assembleDebug test` passes with no new failures. Verified by
-reading through the two-pass measure/draw logic for both a populated and an empty-list profile
-shape, and by the fact `SharePreviewDialog`'s decode path mirrors `HistoryScreen`'s already-working
-`BitmapFactory.decodeFile`/`asImageBitmap` pattern (same Robolectric/JDK-26 gap noted since #3 for
-anything requiring an actual Compose render pass).
-
-## 2026-09-23 - Issue #14: Palette import from an image (screenshot)
-
-New `ui/paletteimport/` flow, started from a "Import palette from photo" `TextButton` added to
-`ProfileEditorScreen` (below the two `ColorSection`s) via a new `Destination.PaletteImport`
-route carrying the `profileId`. Same photo -> region -> extract shape as Rate Clothing/Match
-Object, but region marking is a *drag* (`detectDragGestures`, not `detectTapGestures`) producing a
-`RectRegion` in bitmap-pixel space, run twice in sequence (Best area, then Avoid area, each
-skippable via a dedicated Skip button that just advances with an empty swatch list) rather than the
-single white-sheet tap those flows use. `ColorExtractor.extract()` already took `correction` as
-nullable and `region`/`clusterCount`/`minShare`/`maxColors` as parameters (issue #5's shape), so no
-signature change was needed - `PaletteImportViewModel` just calls it with `correction = null` (no
-white-balance for a screenshot) and three new `CalibrationConfig` constants
-(`PALETTE_IMPORT_QUANTIZER_CLUSTER_COUNT = 24`, `PALETTE_IMPORT_MIN_COLOR_SHARE = 0.01`,
-`PALETTE_IMPORT_MAX_COLORS = 24`) sized for "many small swatches in one region" rather than the
-existing clothing/object constants sized for "one dominant garment color".
-
-Review screen (`PaletteImportUiState.Reviewing`) holds two independent `List<ImportSwatch>` (Best/
-Avoid), each item carrying a locally-unique `id` (a ViewModel-held counter, not a DB id - nothing's
-persisted until Confirm) so extracted swatches, manually hex-added swatches, and removals can all
-be addressed uniformly. Deselecting a swatch (`Checkbox`, same pattern as `MatchObjectScreen`'s
-multi-select) keeps it in the list but excludes it from import, distinct from removing it outright;
-"Add to profile" (`confirmImport`) calls the existing `ProfileRepository.addColor` once per
-*selected* swatch in each list - no new repository method needed, since `addColor` already appends
-at the next position, which is exactly "confirmed colors are appended to the profile's existing
-lists" by construction, including across multiple import runs.
-
-`ColorExtractorTest` gained `syntheticSwatchGridReturnsOneColorPerSwatch`, the issue's required
-unit test - but getting a *reliable* synthetic grid took a few tries: the underlying Celebi
-quantizer (Wu boxes + k-means refinement) doesn't cleanly separate every set of "obviously distinct"
-solid colors regardless of `clusterCount` requested. Six pure RGB-cube-corner colors (adding
-magenta and either black or white to the four already-separable red/green/blue/yellow) reliably
-collapsed two pairs into blended averages, independent of `clusterCount` in {6, 8, 12, 16, 24, 32} -
-looks like an early-termination quirk in `QuantizerWu.createBoxes`'s variance-based cut loop rather
-than anything share/threshold related. Swapping the sixth swatch from magenta to white produces six
-boxes that all separate cleanly at every tested `clusterCount`, so the test's swatch grid is red/
-green/blue/yellow/cyan/white (3x2), matching this codebase's actual `PALETTE_IMPORT_*` constants
-rather than a round `clusterCount`.
-
-`./gradlew assembleDebug test` passes (1 new `ColorExtractorTest` case). No UI test for the new
-drag-to-mark-rectangle interaction or the review screen (same Robolectric/JDK-26 gap noted since
-#3) - verified by reading through the state machine and by `MatchObjectScreen`'s existing
-`Checkbox`-multi-select and `CalibratingStep`'s tap-to-region conversion math already having passing
-render paths to model this screen's `ReviewingStep`/`MarkingAreaStep` on.

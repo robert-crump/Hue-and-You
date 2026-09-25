@@ -1,14 +1,5 @@
 package com.example.hueandyou.colorspace
 
-/** A circular region in pixel coordinates, e.g. the white-sheet sample tapped by the user. */
-data class CircleRegion(val centerX: Int, val centerY: Int, val radius: Int) {
-    fun contains(x: Int, y: Int): Boolean {
-        val dx = (x - centerX).toLong()
-        val dy = (y - centerY).toLong()
-        return dx * dx + dy * dy <= radius.toLong() * radius
-    }
-}
-
 /** An axis-aligned pixel region; [right] and [bottom] are exclusive, like a half-open range. */
 data class RectRegion(val left: Int, val top: Int, val right: Int, val bottom: Int) {
     fun clampTo(width: Int, height: Int): RectRegion = RectRegion(
@@ -20,5 +11,14 @@ data class RectRegion(val left: Int, val top: Int, val right: Int, val bottom: I
 
     companion object {
         fun fullImage(width: Int, height: Int) = RectRegion(0, 0, width, height)
+
+        /** The box covering the middle [fraction] of [width] and [height], centered in the image. */
+        fun centerBox(width: Int, height: Int, fraction: Double): RectRegion {
+            val boxWidth = (width * fraction).toInt().coerceAtLeast(1)
+            val boxHeight = (height * fraction).toInt().coerceAtLeast(1)
+            val left = (width - boxWidth) / 2
+            val top = (height - boxHeight) / 2
+            return RectRegion(left, top, left + boxWidth, top + boxHeight)
+        }
     }
 }

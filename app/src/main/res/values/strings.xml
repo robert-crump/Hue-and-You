@@ -74,18 +74,10 @@
     <string name="delete_profile_dialog_confirm">Delete</string>
 
     <string name="rate_clothing_title">Clothes</string>
-    <string name="rate_clothing_white_sheet_reminder">Choose a photo that includes a plain white sheet of paper — it\'s used to calibrate colors.</string>
+    <string name="pick_photo_reminder">Choose or take a photo with the color you want centered in the frame.</string>
     <string name="rate_clothing_take_photo">Take photo</string>
     <string name="rate_clothing_pick_photo">Pick from gallery</string>
-    <string name="rate_clothing_tap_white_sheet">Tap the white sheet of paper in the photo</string>
     <string name="rate_clothing_photo_content_description">Selected photo</string>
-    <string name="rate_clothing_calibration_failed">Couldn\'t sample that spot — try tapping again</string>
-    <string name="rate_clothing_calibration_failed_clipped">That spot is overexposed (washed out to pure white), so it can\'t be used to calibrate. Try tapping a less bright part of the sheet, or take/pick a new photo with less glare.</string>
-    <string name="rate_clothing_calibration_failed_too_dark">That spot looks too dark to be the white sheet. Try tapping a brighter part of it, or choose a better-lit photo.</string>
-    <string name="rate_clothing_calibration_failed_not_white">That spot doesn\'t look white — it\'s too strongly colored. Try tapping directly on the white sheet.</string>
-    <string name="rate_clothing_confirm_calibration">Continue</string>
-    <string name="rate_clothing_choose_different_photo">Choose a different photo</string>
-    <string name="rate_clothing_select_color">Pick the clothing color</string>
     <string name="rate_clothing_no_profile_title">No profile yet</string>
     <string name="rate_clothing_no_profile_body">Create a profile with Best and Avoid colors before rating clothing.</string>
     <string name="rate_clothing_go_to_settings">Go to Settings</string>
@@ -101,8 +93,6 @@
     <string name="color_match_band_far">Far</string>
 
     <string name="match_object_title">Object</string>
-    <string name="match_object_select_colors_title">Select one or more colors from the object</string>
-    <string name="match_object_continue">Continue</string>
     <string name="match_object_input_color_label">Selected color</string>
     <string name="harmony_relationship_complementary">Complementary</string>
     <string name="harmony_relationship_split_complementary">Split-complementary</string>
@@ -132,7 +122,6 @@
     <string name="settings_about_section_title">About these results</string>
     <string name="settings_about_how_it_works">Hue and You measures the color of clothing or an object from your photo, then compares it with the Best and Avoid colors in your profile using ΔE00, a perceptual color-difference formula.</string>
     <string name="settings_about_best_guess">This is our best guess, not a professional assessment. Seasonal color analysis — the idea that everyone has a best palette based on their skin, hair, and eye tone — has little scientific backing, so treat these results as a fun starting point rather than a verdict.</string>
-    <string name="settings_about_calibration">Before measuring a color, the app calibrates against a white sheet of paper you tap on in the photo, correcting for the color cast of the light and camera. This has limits: many office and printer papers contain optical brighteners that fluoresce under some lighting, making the sheet look bluer or brighter than true neutral white and skewing the correction, and mixed or unusual lighting can throw it off further.</string>
     <string name="settings_about_delta_e">ΔE00 (\"Delta E 2000\") is a standard way to measure how different two colors look to the human eye: the higher the number, the more noticeable the difference.</string>
     <string name="settings_about_bands_intro">Each measured color\'s closeness to a Best or Avoid color is grouped into one of four bands:</string>
     <string name="settings_about_band_row_upper">%1$s — ΔE00 up to %2$s</string>

@@ -15,8 +15,6 @@ import com.example.hueandyou.colorspace.ColorExtractor
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.PaletteScorer
 import com.example.hueandyou.colorspace.PixelSource
-import com.example.hueandyou.colorspace.WhiteBalanceCalibrator
-import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.profile.Profile
@@ -28,7 +26,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -60,7 +57,6 @@ class RateClothingViewModel(
     val uiState: StateFlow<RateClothingUiState> = _uiState.asStateFlow()
 
     private var selectedProfile: Profile? = null
-    private var currentBitmap: Bitmap? = null
 
     init {
         viewModelScope.launch {
@@ -85,65 +81,18 @@ class RateClothingViewModel(
         _uiState.value = RateClothingUiState.LoadingPhoto
         viewModelScope.launch {
             val bitmap = withContext(backgroundDispatcher) { decodeBitmap(contentResolver, uri) }
-            currentBitmap = bitmap
-            _uiState.value = RateClothingUiState.Calibrating(bitmap)
+            extractAndSaveResult(bitmap)
         }
     }
 
-    fun onTap(x: Int, y: Int) {
-        val state = _uiState.value as? RateClothingUiState.Calibrating ?: return
-        viewModelScope.launch {
-            val result = withContext(backgroundDispatcher) {
-                WhiteBalanceCalibrator.calibrate(pixelSourceOf(state.bitmap), x, y)
-            }
-            _uiState.update { current ->
-                if (current is RateClothingUiState.Calibrating && current.bitmap === state.bitmap) {
-                    current.copy(calibration = result)
-                } else {
-                    current
-                }
-            }
-        }
-    }
-
-    fun chooseNewPhoto() {
-        _uiState.value = RateClothingUiState.PickingPhoto
-    }
-
-    fun confirmCalibration() {
-        val state = _uiState.value as? RateClothingUiState.Calibrating ?: return
-        val success = state.calibration as? WhiteBalanceResult.Success ?: return
+    private fun extractAndSaveResult(bitmap: Bitmap) {
         _uiState.value = RateClothingUiState.ExtractingColors
         viewModelScope.launch {
-            val extraction = withContext(backgroundDispatcher) {
-                ColorExtractor.extract(
-                    pixels = pixelSourceOf(state.bitmap),
-                    correction = success.correction,
-                    exclusion = success.sampledRegion,
-                )
+            val argb = withContext(backgroundDispatcher) {
+                ColorExtractor.extractMainColor(pixelSourceOf(bitmap))
             }
-            if (extraction.isClearlyDominant && extraction.colors.isNotEmpty()) {
-                showResult(extraction.colors.first().argb)
-            } else {
-                _uiState.value = RateClothingUiState.SelectingColor(extraction.colors)
-            }
-        }
-    }
-
-    fun selectColor(argb: Int) {
-        showResult(argb)
-    }
-
-    fun renameResult(name: String) {
-        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
-        viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
-    }
-
-    private fun showResult(argb: Int) {
-        val profile = selectedProfile
-        val score = scoreFor(argb, profile)
-        val bitmap = requireNotNull(currentBitmap)
-        viewModelScope.launch {
+            val profile = selectedProfile
+            val score = scoreFor(argb, profile)
             val thumbnailPath = thumbnailStore.save(bitmap)
             val entry = historyRepository.saveClothingResult(
                 thumbnailPath = thumbnailPath,
@@ -158,6 +107,11 @@ class RateClothingViewModel(
                 historyEntryName = entry.name,
             )
         }
+    }
+
+    fun renameResult(name: String) {
+        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
+        viewModelScope.launch { historyRepository.renameEntry(state.historyEntryId, name) }
     }
 
     private fun scoreFor(argb: Int, profile: Profile?): PaletteScore = if (profile != null) {

@@ -314,7 +314,6 @@ private fun AboutSection() {
     ) {
         Text(stringResource(R.string.settings_about_how_it_works), style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.settings_about_best_guess), style = MaterialTheme.typography.bodyMedium)
-        Text(stringResource(R.string.settings_about_calibration), style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.settings_about_delta_e), style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.settings_about_bands_intro), style = MaterialTheme.typography.bodyMedium)
         listOf(

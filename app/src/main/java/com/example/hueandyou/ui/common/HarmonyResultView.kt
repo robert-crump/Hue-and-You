@@ -28,17 +28,14 @@ import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.formatHexColor
 
 /**
- * Renders one set of harmony suggestions per selected input color, recomputed from
- * [inputColorsArgb], [wheel] and [balance] rather than from any stored/precomputed colors - shared
- * by the live Match Colors for an Object result step and the History detail screen that reopens a
- * saved snapshot of the same inputs.
+ * Renders the harmony suggestions for [inputColorArgb], recomputed from it, [wheel] and [balance]
+ * rather than from any stored/precomputed colors - shared by the live Match Colors for an Object
+ * result step and the History detail screen that reopens a saved snapshot of the same input.
  */
 @Composable
-internal fun HarmonyResultBody(inputColorsArgb: List<Int>, wheel: HarmonyWheel, balance: HarmonyBalance) {
+internal fun HarmonyResultBody(inputColorArgb: Int, wheel: HarmonyWheel, balance: HarmonyBalance) {
     Column {
-        inputColorsArgb.forEach { inputArgb ->
-            HarmonyInputColorSection(inputArgb = inputArgb, wheel = wheel, balance = balance)
-        }
+        HarmonyInputColorSection(inputArgb = inputColorArgb, wheel = wheel, balance = balance)
         Text(
             text = stringResource(R.string.rate_clothing_best_guess_disclaimer),
             style = MaterialTheme.typography.bodySmall,

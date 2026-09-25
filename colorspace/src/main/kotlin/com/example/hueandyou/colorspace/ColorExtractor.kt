@@ -4,53 +4,31 @@ import me.tatarka.google.material.quantize.QuantizerCelebi
 
 data class ExtractedColor(val argb: Int, val share: Double)
 
-data class ColorExtractionResult(val colors: List<ExtractedColor>, val isClearlyDominant: Boolean)
-
 /**
- * Extracts dominant colors from a (optionally calibrated, cropped, and white-sample-excluded)
- * photo region, quantizing with Celebi - Wu boxes refined by weighted k-means, the same
- * quantizer Material Color Utilities uses to pick theme colors from a photo.
+ * Extracts the dominant color from a photo, quantizing with Celebi - Wu boxes refined by weighted
+ * k-means, the same quantizer Material Color Utilities uses to pick theme colors from a photo.
  */
 object ColorExtractor {
-    fun extract(
+    /**
+     * The largest-share color in [region] (the center box by default), so the user gets from
+     * photo to result without picking a spot themselves.
+     */
+    fun extractMainColor(
         pixels: PixelSource,
-        correction: WhiteBalanceCorrection? = null,
-        region: RectRegion? = null,
-        exclusion: CircleRegion? = null,
+        region: RectRegion = RectRegion.centerBox(pixels.width, pixels.height, CalibrationConfig.CENTER_BOX_FRACTION),
         clusterCount: Int = CalibrationConfig.QUANTIZER_CLUSTER_COUNT,
-        minShare: Double = CalibrationConfig.MIN_COLOR_SHARE,
-        maxColors: Int = CalibrationConfig.MAX_COLORS,
-        dominantMinShare: Double = CalibrationConfig.DOMINANT_MIN_SHARE,
-        dominantMinRatioToRunnerUp: Double = CalibrationConfig.DOMINANT_MIN_RATIO_TO_RUNNER_UP,
-    ): ColorExtractionResult {
-        val bounds = (region ?: RectRegion.fullImage(pixels.width, pixels.height))
-            .clampTo(pixels.width, pixels.height)
+    ): Int {
+        val bounds = region.clampTo(pixels.width, pixels.height)
 
         val buffer = IntArray(maxOf(0, bounds.right - bounds.left) * maxOf(0, bounds.bottom - bounds.top))
         var count = 0
         for (y in bounds.top until bounds.bottom) {
             for (x in bounds.left until bounds.right) {
-                if (exclusion != null && exclusion.contains(x, y)) continue
-                val argb = pixels.pixelAt(x, y)
-                buffer[count++] = correction?.apply(argb) ?: argb
+                buffer[count++] = pixels.pixelAt(x, y)
             }
         }
 
-        if (count == 0) return ColorExtractionResult(emptyList(), false)
-
         val quantized = QuantizerCelebi.quantize(if (count == buffer.size) buffer else buffer.copyOf(count), clusterCount)
-        val total = quantized.values.sumOf { it }.toDouble()
-
-        val allColors = quantized.entries
-            .map { ExtractedColor(it.key, it.value / total) }
-            .sortedByDescending { it.share }
-
-        val isClearlyDominant = allColors.isNotEmpty() &&
-            allColors[0].share >= dominantMinShare &&
-            (allColors.size == 1 || allColors[0].share >= allColors[1].share * dominantMinRatioToRunnerUp)
-
-        val colors = allColors.filter { it.share >= minShare }.take(maxColors)
-
-        return ColorExtractionResult(colors, isClearlyDominant)
+        return quantized.entries.maxBy { it.value }.key
     }
 }

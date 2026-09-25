@@ -15,8 +15,6 @@ import com.example.hueandyou.colorspace.ColorExtractor
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PixelSource
-import com.example.hueandyou.colorspace.WhiteBalanceCalibrator
-import com.example.hueandyou.colorspace.WhiteBalanceResult
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.settings.SettingsRepository
@@ -27,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -58,79 +55,30 @@ class MatchObjectViewModel(
     private val _uiState = MutableStateFlow<MatchObjectUiState>(MatchObjectUiState.PickingPhoto)
     val uiState: StateFlow<MatchObjectUiState> = _uiState.asStateFlow()
 
-    private var currentBitmap: Bitmap? = null
-
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
         _uiState.value = MatchObjectUiState.LoadingPhoto
         viewModelScope.launch {
             val bitmap = withContext(backgroundDispatcher) { decodeBitmap(contentResolver, uri) }
-            currentBitmap = bitmap
-            _uiState.value = MatchObjectUiState.Calibrating(bitmap)
+            extractAndSaveResult(bitmap)
         }
     }
 
-    fun onTap(x: Int, y: Int) {
-        val state = _uiState.value as? MatchObjectUiState.Calibrating ?: return
-        viewModelScope.launch {
-            val result = withContext(backgroundDispatcher) {
-                WhiteBalanceCalibrator.calibrate(pixelSourceOf(state.bitmap), x, y)
-            }
-            _uiState.update { current ->
-                if (current is MatchObjectUiState.Calibrating && current.bitmap === state.bitmap) {
-                    current.copy(calibration = result)
-                } else {
-                    current
-                }
-            }
-        }
-    }
-
-    fun chooseNewPhoto() {
-        _uiState.value = MatchObjectUiState.PickingPhoto
-    }
-
-    fun confirmCalibration() {
-        val state = _uiState.value as? MatchObjectUiState.Calibrating ?: return
-        val success = state.calibration as? WhiteBalanceResult.Success ?: return
+    private fun extractAndSaveResult(bitmap: Bitmap) {
         _uiState.value = MatchObjectUiState.ExtractingColors
         viewModelScope.launch {
-            val extraction = withContext(backgroundDispatcher) {
-                ColorExtractor.extract(
-                    pixels = pixelSourceOf(state.bitmap),
-                    correction = success.correction,
-                    exclusion = success.sampledRegion,
-                )
+            val mainColorArgb = withContext(backgroundDispatcher) {
+                ColorExtractor.extractMainColor(pixelSourceOf(bitmap))
             }
-            _uiState.value = MatchObjectUiState.SelectingColors(extraction.colors)
-        }
-    }
-
-    fun toggleColorSelection(argb: Int) {
-        val state = _uiState.value as? MatchObjectUiState.SelectingColors ?: return
-        val selected = if (argb in state.selectedArgb) {
-            state.selectedArgb - argb
-        } else {
-            state.selectedArgb + argb
-        }
-        _uiState.value = state.copy(selectedArgb = selected)
-    }
-
-    fun confirmColorSelection() {
-        val state = _uiState.value as? MatchObjectUiState.SelectingColors ?: return
-        if (state.selectedArgb.isEmpty()) return
-        val bitmap = requireNotNull(currentBitmap)
-        val inputColors = state.selectedArgb.toList()
-        viewModelScope.launch {
             val defaults = settingsRepository.observeDefaults().first()
             val thumbnailPath = thumbnailStore.save(bitmap)
             val entry = historyRepository.saveObjectResult(
                 thumbnailPath = thumbnailPath,
-                inputColorsArgb = inputColors,
+                inputColorsArgb = listOf(mainColorArgb),
                 wheel = defaults.wheel,
                 balance = defaults.balance,
             )
             _uiState.value = MatchObjectUiState.ShowingResult(
-                inputColorsArgb = entry.inputColorsArgb,
+                inputColorArgb = entry.inputColorsArgb.first(),
                 wheel = entry.wheel ?: defaults.wheel,
                 balance = entry.balance ?: defaults.balance,
                 historyEntryId = entry.id,

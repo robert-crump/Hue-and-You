@@ -92,7 +92,7 @@ fun HistoryDetailScreen(
                         modifier = Modifier.padding(top = 16.dp),
                     )
                     HarmonyResultBody(
-                        inputColorsArgb = current.inputColorsArgb,
+                        inputColorArgb = current.inputColorsArgb.first(),
                         wheel = wheel,
                         balance = balance,
                     )
