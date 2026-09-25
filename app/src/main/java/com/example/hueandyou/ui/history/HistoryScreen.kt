@@ -28,16 +28,21 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -58,11 +63,14 @@ fun HistoryScreen(
     scrollToTopRequested: Boolean,
     onScrolledToTop: () -> Unit,
     onOpenEntry: (Long) -> Unit,
+    onSnackbarHeightChange: (Int) -> Unit,
     viewModel: HistoryViewModel = viewModel(factory = HistoryViewModel.factory(LocalContext.current)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var isSnackbarVisible by remember { mutableStateOf(false) }
+    var snackbarHeightPx by remember { mutableIntStateOf(0) }
     val undoActionLabel = stringResource(R.string.history_entry_deleted_undo_action)
     val deletedMessage = uiState.pendingDeletion?.let {
         stringResource(R.string.history_entry_deleted_message, it.entryName)
@@ -71,15 +79,23 @@ fun HistoryScreen(
     LaunchedEffect(uiState.pendingDeletion?.entryId, deletedMessage) {
         val pending = uiState.pendingDeletion ?: return@LaunchedEffect
         val message = deletedMessage ?: return@LaunchedEffect
+        isSnackbarVisible = true
         val result = snackbarHostState.showSnackbar(
             message = message,
             actionLabel = undoActionLabel,
             duration = SnackbarDuration.Short
         )
+        isSnackbarVisible = false
         if (result == SnackbarResult.ActionPerformed) {
             viewModel.undoDelete(pending.entryId)
         }
     }
+
+    // Lets the parent lift its FAB clear of the snackbar while it is showing.
+    LaunchedEffect(isSnackbarVisible, snackbarHeightPx) {
+        onSnackbarHeightChange(if (isSnackbarVisible) snackbarHeightPx else 0)
+    }
+    DisposableEffect(Unit) { onDispose { onSnackbarHeightChange(0) } }
 
     LaunchedEffect(scrollToTopRequested) {
         if (!scrollToTopRequested) return@LaunchedEffect
@@ -87,7 +103,9 @@ fun HistoryScreen(
         onScrolledToTop()
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { innerPadding ->
+    Scaffold(snackbarHost = {
+        SnackbarHost(snackbarHostState, modifier = Modifier.onSizeChanged { snackbarHeightPx = it.height })
+    }) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             if (uiState.isEmpty) {
                 HistoryEmptyState()

@@ -64,7 +64,7 @@ class DefaultHistoryRepository(
         val entry = HistoryEntry(
             id = 0,
             type = HistoryEntryType.CLOTHING,
-            name = defaultHistoryEntryName(HistoryEntryType.CLOTHING, now),
+            name = defaultHistoryEntryName(HistoryEntryType.CLOTHING),
             createdAt = now,
             thumbnailPath = thumbnailPath,
             calibratedArgb = calibratedArgb,
@@ -89,7 +89,7 @@ class DefaultHistoryRepository(
         val entry = HistoryEntry(
             id = 0,
             type = HistoryEntryType.OBJECT,
-            name = defaultHistoryEntryName(HistoryEntryType.OBJECT, now),
+            name = defaultHistoryEntryName(HistoryEntryType.OBJECT),
             createdAt = now,
             thumbnailPath = thumbnailPath,
             calibratedArgb = inputColorsArgb.first(),

@@ -4,10 +4,6 @@ import com.example.hueandyou.colorspace.ColorMatch
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 data class HistoryEntry(
     val id: Long,
@@ -78,17 +74,9 @@ internal fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
     sampleY = sampleY,
 )
 
-private val defaultNameDateFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("MMM d, yyyy h:mm a", Locale.getDefault())
-
-/** Default "type + date/time" name a newly-saved entry gets, before the user edits it. */
-internal fun defaultHistoryEntryName(type: HistoryEntryType, timestampMillis: Long): String {
-    val label = when (type) {
+/** Default name a newly-saved entry gets, before the user edits it: just its type. */
+internal fun defaultHistoryEntryName(type: HistoryEntryType): String =
+    when (type) {
         HistoryEntryType.CLOTHING -> "Clothing"
         HistoryEntryType.OBJECT -> "Object"
     }
-    val formatted = Instant.ofEpochMilli(timestampMillis)
-        .atZone(ZoneId.systemDefault())
-        .format(defaultNameDateFormatter)
-    return "$label $formatted"
-}

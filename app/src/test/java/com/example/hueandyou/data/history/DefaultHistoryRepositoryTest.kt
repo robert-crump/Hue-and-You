@@ -52,7 +52,7 @@ class DefaultHistoryRepositoryTest {
             score = sampleScore(),
         )
 
-        assertEquals(defaultHistoryEntryName(HistoryEntryType.CLOTHING, clock), entry.name)
+        assertEquals(defaultHistoryEntryName(HistoryEntryType.CLOTHING), entry.name)
         assertEquals(HistoryEntryType.CLOTHING, entry.type)
         assertEquals(clock, entry.createdAt)
     }
@@ -165,7 +165,7 @@ class DefaultHistoryRepositoryTest {
             balance = HarmonyBalance.FAITHFUL,
         )
 
-        assertEquals(defaultHistoryEntryName(HistoryEntryType.OBJECT, clock), entry.name)
+        assertEquals(defaultHistoryEntryName(HistoryEntryType.OBJECT), entry.name)
         assertEquals(HistoryEntryType.OBJECT, entry.type)
         assertEquals(colors, entry.inputColorsArgb)
         assertEquals(HarmonyWheel.PERCEPTUAL, entry.wheel)

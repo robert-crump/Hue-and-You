@@ -4,10 +4,14 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
@@ -64,7 +68,15 @@ fun HueAndYouNavHost() {
         navController.popBackStack()
     }
 
-    val onHistory = currentDestination?.hierarchy?.any { it.route == Destination.History.route } == true
+    // History's undo snackbar shares the FAB's spot, so the FAB lifts by the snackbar's height while it shows.
+    var snackbarHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val fabOffset by animateDpAsState(
+        targetValue = if (snackbarHeightPx > 0) with(density) { -(snackbarHeightPx.toDp() + 8.dp) } else 0.dp,
+        label = "fabOffset"
+    )
+
+    val onHistory =currentDestination?.hierarchy?.any { it.route == Destination.History.route } == true
 
     Scaffold(
         bottomBar = {
@@ -76,12 +88,17 @@ fun HueAndYouNavHost() {
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
-                            navController.navigate(topLevel.navRoute) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+                            if (selected) {
+                                // Re-tapping the active tab returns to its root screen.
+                                navController.popBackStack(topLevel.destination.route, inclusive = false)
+                            } else {
+                                navController.navigate(topLevel.navRoute) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = {
@@ -120,7 +137,10 @@ fun HueAndYouNavHost() {
                             )
                         }
                     }
-                    FloatingActionButton(onClick = { showFabMenu = !showFabMenu }) {
+                    FloatingActionButton(
+                        onClick = { showFabMenu = !showFabMenu },
+                        modifier = Modifier.offset(y = fabOffset)
+                    ) {
                         Icon(
                             if (showFabMenu) Icons.Filled.Close else Icons.Filled.Add,
                             contentDescription = stringResource(R.string.history_fab_content_description)
@@ -142,6 +162,7 @@ fun HueAndYouNavHost() {
                 HistoryScreen(
                     scrollToTopRequested = scrollToTop,
                     onScrolledToTop = { historyEntry.savedStateHandle[KEY_SCROLL_HISTORY_TO_TOP] = false },
+                    onSnackbarHeightChange = { snackbarHeightPx = it },
                     onOpenEntry = { entryId ->
                         navController.navigate(Destination.HistoryDetail.route(entryId))
                     }
