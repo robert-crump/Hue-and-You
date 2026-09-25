@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -87,8 +88,8 @@ fun HueAndYouNavHost() {
         topBar = {
             if (rootTab != null) {
                 val barColor = MaterialTheme.colorScheme.primaryContainer
-                // Tonal step toward primary: close to the bar color, but visibly its own band.
-                val statusBarColor = lerp(barColor, MaterialTheme.colorScheme.primary, 0.25f)
+                // Darker than the bar in both themes (blending toward primary would lighten it in dark theme).
+                val statusBarColor = lerp(barColor, Color.Black, 0.2f)
                 Column {
                     Box(
                         Modifier
