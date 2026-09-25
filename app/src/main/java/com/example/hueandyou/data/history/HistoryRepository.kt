@@ -32,6 +32,12 @@ interface HistoryRepository {
     /** Updates the wheel/balance an OBJECT entry was last viewed with, so reopening restores it. */
     suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance)
 
+    /** Updates an OBJECT entry in place after a re-pick: the new color and its sample location. */
+    suspend fun updateObjectPick(entryId: Long, argb: Int, sampleX: Double?, sampleY: Double?)
+
+    /** Updates a CLOTHING entry in place after a re-pick: the new color, its recomputed score, and sample location. */
+    suspend fun updateClothingPick(entryId: Long, argb: Int, score: PaletteScore, sampleX: Double?, sampleY: Double?)
+
     /** Deletes an entry and its thumbnail file. */
     suspend fun deleteEntry(entryId: Long)
 }
@@ -106,6 +112,24 @@ class DefaultHistoryRepository(
 
     override suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance) {
         dao.updateHarmonyOptions(entryId, wheel, balance)
+    }
+
+    override suspend fun updateObjectPick(entryId: Long, argb: Int, sampleX: Double?, sampleY: Double?) {
+        dao.updateObjectPick(entryId, argb, listOf(argb), sampleX, sampleY)
+    }
+
+    override suspend fun updateClothingPick(entryId: Long, argb: Int, score: PaletteScore, sampleX: Double?, sampleY: Double?) {
+        dao.updateClothingPick(
+            entryId = entryId,
+            argb = argb,
+            nearestBestArgb = score.nearestBest?.argb,
+            nearestBestDeltaE = score.nearestBest?.deltaE,
+            nearestAvoidArgb = score.nearestAvoid?.argb,
+            nearestAvoidDeltaE = score.nearestAvoid?.deltaE,
+            closerToAvoid = score.closerToAvoid,
+            sampleX = sampleX,
+            sampleY = sampleY,
+        )
     }
 
     override suspend fun deleteEntry(entryId: Long) {

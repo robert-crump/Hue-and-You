@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
 
@@ -57,6 +58,9 @@ class RateClothingViewModel(
     val uiState: StateFlow<RateClothingUiState> = _uiState.asStateFlow()
 
     private var selectedProfile: Profile? = null
+
+    /** Every candidate color from the current photo's center-box extraction, ranked by share. */
+    private var candidates: List<Int> = emptyList()
 
     init {
         viewModelScope.launch {
@@ -88,9 +92,12 @@ class RateClothingViewModel(
     private fun extractAndSaveResult(bitmap: Bitmap) {
         _uiState.value = RateClothingUiState.ExtractingColors
         viewModelScope.launch {
-            val argb = withContext(backgroundDispatcher) {
-                ColorExtractor.extractMainColor(pixelSourceOf(bitmap))
+            val extractedCandidates = withContext(backgroundDispatcher) {
+                ColorExtractor.extractCandidates(pixelSourceOf(bitmap))
             }
+            candidates = extractedCandidates.map { it.argb }
+            val argb = candidates.first()
+            val alternatives = ColorExtractor.selectAlternatives(candidates, argb)
             val profile = selectedProfile
             val score = scoreFor(argb, profile)
             val thumbnailPath = thumbnailStore.save(bitmap)
@@ -101,11 +108,54 @@ class RateClothingViewModel(
                 score = score,
             )
             _uiState.value = RateClothingUiState.ShowingResult(
+                photo = bitmap,
                 argb = argb,
+                alternativesArgb = alternatives,
+                sampleX = null,
+                sampleY = null,
                 score = score,
                 historyEntryId = entry.id,
                 historyEntryName = entry.name,
             )
+        }
+    }
+
+    /** Re-picks the color from one of the chip alternatives (or the current color, a no-op). */
+    fun pickCandidate(argb: Int) {
+        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
+        if (argb == state.argb) return
+        applyPick(state, argb, sampleX = null, sampleY = null)
+    }
+
+    /** Re-picks the color by sampling around a tap on the photo, at normalized [x]/[y] in [0, 1]. */
+    fun pickAtPoint(x: Double, y: Double) {
+        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
+        viewModelScope.launch {
+            val argb = withContext(backgroundDispatcher) {
+                val pixels = pixelSourceOf(state.photo)
+                ColorExtractor.extractColorAtPoint(
+                    pixels,
+                    x = (x * pixels.width).roundToInt(),
+                    y = (y * pixels.height).roundToInt(),
+                )
+            }
+            val latest = _uiState.value as? RateClothingUiState.ShowingResult ?: return@launch
+            applyPick(latest, argb, sampleX = x, sampleY = y)
+        }
+    }
+
+    private fun applyPick(state: RateClothingUiState.ShowingResult, argb: Int, sampleX: Double?, sampleY: Double?) {
+        val alternatives = ColorExtractor.selectAlternatives(candidates, argb)
+        val score = scoreFor(argb, selectedProfile)
+        _uiState.value = state.copy(
+            argb = argb,
+            alternativesArgb = alternatives,
+            sampleX = sampleX,
+            sampleY = sampleY,
+            score = score,
+        )
+        viewModelScope.launch {
+            historyRepository.updateClothingPick(state.historyEntryId, argb, score, sampleX, sampleY)
         }
     }
 

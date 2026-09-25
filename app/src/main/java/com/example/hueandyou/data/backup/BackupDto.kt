@@ -40,6 +40,9 @@ internal data class BackupHistoryDto(
     val thumbnailBase64: String,
     /** Object-only: the colors selected from the photo. Empty for a clothing entry. */
     val inputColors: List<String> = emptyList(),
+    /** Where the calibrated color was sampled from, normalized to the photo's size; null/absent = center box. */
+    val sampleX: Double? = null,
+    val sampleY: Double? = null,
     /** Present only for a clothing entry. */
     val clothing: BackupClothingDto? = null,
     /** Present only for an object entry. `object` is reserved in Kotlin, hence the [SerialName]. */

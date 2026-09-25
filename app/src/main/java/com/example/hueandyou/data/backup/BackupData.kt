@@ -38,6 +38,9 @@ data class BackupHistoryEntry(
     val inputColorsArgb: List<Int>,
     val wheel: HarmonyWheel?,
     val balance: HarmonyBalance?,
+    /** Where [calibratedArgb] was sampled from, normalized to the photo's size; null = center box. */
+    val sampleX: Double? = null,
+    val sampleY: Double? = null,
 ) {
     // ByteArray breaks data-class equals/hashCode (identity, not content) - compare content instead.
     override fun equals(other: Any?): Boolean {
@@ -56,7 +59,9 @@ data class BackupHistoryEntry(
             score == other.score &&
             inputColorsArgb == other.inputColorsArgb &&
             wheel == other.wheel &&
-            balance == other.balance
+            balance == other.balance &&
+            sampleX == other.sampleX &&
+            sampleY == other.sampleY
     }
 
     override fun hashCode(): Int {
@@ -74,6 +79,8 @@ data class BackupHistoryEntry(
         result = 31 * result + inputColorsArgb.hashCode()
         result = 31 * result + (wheel?.hashCode() ?: 0)
         result = 31 * result + (balance?.hashCode() ?: 0)
+        result = 31 * result + (sampleX?.hashCode() ?: 0)
+        result = 31 * result + (sampleY?.hashCode() ?: 0)
         return result
     }
 }

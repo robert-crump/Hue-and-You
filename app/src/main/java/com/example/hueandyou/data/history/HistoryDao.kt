@@ -35,6 +35,38 @@ interface HistoryDao {
     @Query("UPDATE history_entries SET wheel = :wheel, balance = :balance WHERE id = :entryId")
     suspend fun updateHarmonyOptions(entryId: Long, wheel: HarmonyWheel, balance: HarmonyBalance)
 
+    /** A re-pick on an OBJECT entry: the new color and where it was sampled from (null = center box). */
+    @Query(
+        "UPDATE history_entries SET calibratedArgb = :argb, inputColorsArgb = :inputColorsArgb, " +
+            "sampleX = :sampleX, sampleY = :sampleY WHERE id = :entryId"
+    )
+    suspend fun updateObjectPick(
+        entryId: Long,
+        argb: Int,
+        inputColorsArgb: List<Int>,
+        sampleX: Double?,
+        sampleY: Double?,
+    )
+
+    /** A re-pick on a CLOTHING entry: the new color, its recomputed score, and where it was sampled from. */
+    @Query(
+        "UPDATE history_entries SET calibratedArgb = :argb, " +
+            "nearestBestArgb = :nearestBestArgb, nearestBestDeltaE = :nearestBestDeltaE, " +
+            "nearestAvoidArgb = :nearestAvoidArgb, nearestAvoidDeltaE = :nearestAvoidDeltaE, " +
+            "closerToAvoid = :closerToAvoid, sampleX = :sampleX, sampleY = :sampleY WHERE id = :entryId"
+    )
+    suspend fun updateClothingPick(
+        entryId: Long,
+        argb: Int,
+        nearestBestArgb: Int?,
+        nearestBestDeltaE: Double?,
+        nearestAvoidArgb: Int?,
+        nearestAvoidDeltaE: Double?,
+        closerToAvoid: Boolean,
+        sampleX: Double?,
+        sampleY: Double?,
+    )
+
     @Query("DELETE FROM history_entries WHERE id = :entryId")
     suspend fun delete(entryId: Long)
 }

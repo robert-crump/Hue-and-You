@@ -99,6 +99,8 @@ private fun BackupHistoryEntry.toDto(): BackupHistoryDto = BackupHistoryDto(
     createdAt = createdAt,
     thumbnailBase64 = Base64.getEncoder().encodeToString(thumbnailBytes),
     inputColors = inputColorsArgb.map(::formatHexColor),
+    sampleX = sampleX,
+    sampleY = sampleY,
     clothing = if (type == HistoryEntryType.CLOTHING) {
         BackupClothingDto(
             calibratedArgb = formatHexColor(calibratedArgb),
@@ -169,6 +171,8 @@ private fun BackupHistoryDto.toDomain(): BackupHistoryEntry {
                 inputColorsArgb = emptyList(),
                 wheel = null,
                 balance = null,
+                sampleX = sampleX,
+                sampleY = sampleY,
             )
         }
         HistoryEntryType.OBJECT -> {
@@ -193,6 +197,8 @@ private fun BackupHistoryDto.toDomain(): BackupHistoryEntry {
                 inputColorsArgb = colors,
                 wheel = objectResult.wheel.toEnumOrThrow(),
                 balance = objectResult.balance.toEnumOrThrow(),
+                sampleX = sampleX,
+                sampleY = sampleY,
             )
         }
     }

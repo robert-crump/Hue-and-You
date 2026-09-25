@@ -28,4 +28,7 @@ data class HistoryEntryEntity(
     val wheel: HarmonyWheel? = null,
     /** Object-only: null for [HistoryEntryType.CLOTHING]. */
     val balance: HarmonyBalance? = null,
+    /** Where [calibratedArgb] was sampled from, normalized to the photo's size; null = center box. */
+    val sampleX: Double? = null,
+    val sampleY: Double? = null,
 )

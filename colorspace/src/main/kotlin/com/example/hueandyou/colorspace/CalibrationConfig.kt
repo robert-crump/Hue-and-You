@@ -11,6 +11,15 @@ object CalibrationConfig {
     /** Number of clusters requested from the quantizer. */
     const val QUANTIZER_CLUSTER_COUNT = 16
 
+    /** A tap-to-pick sample circle's radius, as a fraction of the image's short edge. */
+    const val TAP_SAMPLE_RADIUS_FRACTION = 0.03
+
+    /** Maximum number of alternative color chips shown alongside the current pick. */
+    const val ALTERNATIVE_MAX_COUNT = 4
+
+    /** Candidate colors closer than this ΔE00 to the current pick or to each other are folded together. */
+    const val ALTERNATIVE_MIN_DELTA_E = 5.0
+
     /**
      * Candidate swatch colors below this share of the marked region are dropped. Low enough to
      * keep swatches the marked rectangle only partly covers.

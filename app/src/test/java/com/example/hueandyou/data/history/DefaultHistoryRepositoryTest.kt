@@ -189,6 +189,51 @@ class DefaultHistoryRepositoryTest {
         assertEquals(HarmonyWheel.PERCEPTUAL, stored.wheel)
         assertEquals(HarmonyBalance.FAITHFUL, stored.balance)
     }
+
+    @Test
+    fun updateObjectPick_updatesColorAndSampleLocationInPlace() = runBlocking {
+        val entry = repository.saveObjectResult(
+            thumbnailPath = "thumb.jpg",
+            inputColorsArgb = listOf(0xFF112233.toInt()),
+            wheel = HarmonyWheel.PERCEPTUAL,
+            balance = HarmonyBalance.FAITHFUL,
+        )
+
+        repository.updateObjectPick(entry.id, 0xFF445566.toInt(), sampleX = 0.25, sampleY = 0.75)
+
+        val stored = repository.observeEntry(entry.id).first()!!
+        assertEquals(entry.id, stored.id)
+        assertEquals(0xFF445566.toInt(), stored.calibratedArgb)
+        assertEquals(listOf(0xFF445566.toInt()), stored.inputColorsArgb)
+        assertEquals(0.25, stored.sampleX)
+        assertEquals(0.75, stored.sampleY)
+        assertEquals(1, repository.observeEntries().first().size)
+    }
+
+    @Test
+    fun updateClothingPick_updatesColorScoreAndSampleLocationInPlace() = runBlocking {
+        val entry = repository.saveClothingResult(
+            thumbnailPath = "thumb.jpg",
+            calibratedArgb = 0xFF778899.toInt(),
+            profile = autumnProfile(),
+            score = sampleScore(),
+        )
+        val newScore = PaletteScore(
+            nearestBest = ColorMatch(0xFF445566.toInt(), 1.0, ColorMatchBand.MATCH),
+            nearestAvoid = null,
+            closerToAvoid = false,
+        )
+
+        repository.updateClothingPick(entry.id, 0xFF445566.toInt(), newScore, sampleX = null, sampleY = null)
+
+        val stored = repository.observeEntry(entry.id).first()!!
+        assertEquals(entry.id, stored.id)
+        assertEquals(0xFF445566.toInt(), stored.calibratedArgb)
+        assertEquals(newScore, stored.score)
+        assertNull(stored.sampleX)
+        assertNull(stored.sampleY)
+        assertEquals(1, repository.observeEntries().first().size)
+    }
 }
 
 private class FakeThumbnailStore : com.example.hueandyou.data.history.ThumbnailStore {

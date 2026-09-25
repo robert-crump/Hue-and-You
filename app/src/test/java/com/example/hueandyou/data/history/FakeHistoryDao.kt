@@ -53,6 +53,50 @@ class FakeHistoryDao : HistoryDao {
         emit()
     }
 
+    override suspend fun updateObjectPick(
+        entryId: Long,
+        argb: Int,
+        inputColorsArgb: List<Int>,
+        sampleX: Double?,
+        sampleY: Double?,
+    ) {
+        entries[entryId]?.let {
+            entries[entryId] = it.copy(
+                calibratedArgb = argb,
+                inputColorsArgb = inputColorsArgb,
+                sampleX = sampleX,
+                sampleY = sampleY,
+            )
+        }
+        emit()
+    }
+
+    override suspend fun updateClothingPick(
+        entryId: Long,
+        argb: Int,
+        nearestBestArgb: Int?,
+        nearestBestDeltaE: Double?,
+        nearestAvoidArgb: Int?,
+        nearestAvoidDeltaE: Double?,
+        closerToAvoid: Boolean,
+        sampleX: Double?,
+        sampleY: Double?,
+    ) {
+        entries[entryId]?.let {
+            entries[entryId] = it.copy(
+                calibratedArgb = argb,
+                nearestBestArgb = nearestBestArgb,
+                nearestBestDeltaE = nearestBestDeltaE,
+                nearestAvoidArgb = nearestAvoidArgb,
+                nearestAvoidDeltaE = nearestAvoidDeltaE,
+                closerToAvoid = closerToAvoid,
+                sampleX = sampleX,
+                sampleY = sampleY,
+            )
+        }
+        emit()
+    }
+
     override suspend fun delete(entryId: Long) {
         entries.remove(entryId)
         emit()

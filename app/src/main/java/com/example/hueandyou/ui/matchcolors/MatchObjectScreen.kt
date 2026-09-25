@@ -1,6 +1,7 @@
 package com.example.hueandyou.ui.matchcolors
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -42,8 +43,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
+import com.example.hueandyou.ui.common.ColorChipRow
 import com.example.hueandyou.ui.common.HarmonyOptionsControls
 import com.example.hueandyou.ui.common.HarmonyResultBody
+import com.example.hueandyou.ui.common.PhotoResultSection
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,7 +106,11 @@ fun MatchObjectScreen(
                 is MatchObjectUiState.LoadingPhoto -> LoadingStep()
                 is MatchObjectUiState.ExtractingColors -> LoadingStep()
                 is MatchObjectUiState.ShowingResult -> ResultStep(
+                    photo = state.photo,
                     inputColorArgb = state.inputColorArgb,
+                    alternativesArgb = state.alternativesArgb,
+                    sampleX = state.sampleX,
+                    sampleY = state.sampleY,
                     wheel = state.wheel,
                     balance = state.balance,
                     entryId = state.historyEntryId,
@@ -111,6 +118,8 @@ fun MatchObjectScreen(
                     onRenameChange = viewModel::renameResult,
                     onWheelChange = viewModel::setWheel,
                     onBalanceChange = viewModel::setBalance,
+                    onPickCandidate = viewModel::pickCandidate,
+                    onPickAtPoint = viewModel::pickAtPoint,
                 )
             }
         }
@@ -152,9 +161,15 @@ private fun LoadingStep() {
     }
 }
 
+private const val PHOTO_MAX_HEIGHT_FRACTION = 0.35f
+
 @Composable
 private fun ResultStep(
+    photo: Bitmap,
     inputColorArgb: Int,
+    alternativesArgb: List<Int>,
+    sampleX: Double?,
+    sampleY: Double?,
     wheel: HarmonyWheel,
     balance: HarmonyBalance,
     entryId: Long,
@@ -162,6 +177,8 @@ private fun ResultStep(
     onRenameChange: (String) -> Unit,
     onWheelChange: (HarmonyWheel) -> Unit,
     onBalanceChange: (HarmonyBalance) -> Unit,
+    onPickCandidate: (Int) -> Unit,
+    onPickAtPoint: (x: Double, y: Double) -> Unit,
 ) {
     var currentName by rememberSaveable(entryId) { mutableStateOf(name) }
 
@@ -172,6 +189,19 @@ private fun ResultStep(
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        PhotoResultSection(
+            photo = photo,
+            sampleX = sampleX,
+            sampleY = sampleY,
+            maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
+            onTap = onPickAtPoint,
+        )
+        ColorChipRow(
+            currentArgb = inputColorArgb,
+            alternativesArgb = alternativesArgb,
+            onPick = onPickCandidate,
+            modifier = Modifier.padding(top = 16.dp),
+        )
         OutlinedTextField(
             value = currentName,
             onValueChange = {
@@ -179,7 +209,9 @@ private fun ResultStep(
                 onRenameChange(it)
             },
             label = { Text(stringResource(R.string.history_entry_name_label)) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp)
         )
         HarmonyOptionsControls(
             wheel = wheel,

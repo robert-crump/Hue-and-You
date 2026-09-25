@@ -7,11 +7,14 @@ import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.data.history.HistoryEntryType
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,6 +73,8 @@ class BackupSerializerTest {
                 inputColorsArgb = listOf(0xFF001122.toInt(), 0xFF334455.toInt()),
                 wheel = HarmonyWheel.TRADITIONAL,
                 balance = HarmonyBalance.FAITHFUL,
+                sampleX = 0.25,
+                sampleY = 0.75,
             ),
         ),
     )
@@ -114,6 +119,24 @@ class BackupSerializerTest {
 
         assertThrows(BackupImportException::class.java) {
             serializer.deserialize(withoutSettings)
+        }
+    }
+
+    @Test
+    fun deserialize_withoutSampleFields_defaultsToNullForOldBackups() {
+        val json = serializer.serialize(sampleData())
+        val withoutSampleFields = mutated(json) { obj ->
+            val history = obj.getValue("history").jsonArray.map { entry ->
+                JsonObject(entry.jsonObject.filterKeys { it != "sampleX" && it != "sampleY" })
+            }
+            obj["history"] = JsonArray(history)
+        }
+
+        val restored = serializer.deserialize(withoutSampleFields)
+
+        restored.history.forEach { entry ->
+            assertNull(entry.sampleX)
+            assertNull(entry.sampleY)
         }
     }
 

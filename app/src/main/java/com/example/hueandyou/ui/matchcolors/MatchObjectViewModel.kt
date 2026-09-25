@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
 
@@ -55,6 +56,9 @@ class MatchObjectViewModel(
     private val _uiState = MutableStateFlow<MatchObjectUiState>(MatchObjectUiState.PickingPhoto)
     val uiState: StateFlow<MatchObjectUiState> = _uiState.asStateFlow()
 
+    /** Every candidate color from the current photo's center-box extraction, ranked by share. */
+    private var candidates: List<Int> = emptyList()
+
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
         _uiState.value = MatchObjectUiState.LoadingPhoto
         viewModelScope.launch {
@@ -66,9 +70,12 @@ class MatchObjectViewModel(
     private fun extractAndSaveResult(bitmap: Bitmap) {
         _uiState.value = MatchObjectUiState.ExtractingColors
         viewModelScope.launch {
-            val mainColorArgb = withContext(backgroundDispatcher) {
-                ColorExtractor.extractMainColor(pixelSourceOf(bitmap))
+            val extractedCandidates = withContext(backgroundDispatcher) {
+                ColorExtractor.extractCandidates(pixelSourceOf(bitmap))
             }
+            candidates = extractedCandidates.map { it.argb }
+            val mainColorArgb = candidates.first()
+            val alternatives = ColorExtractor.selectAlternatives(candidates, mainColorArgb)
             val defaults = settingsRepository.observeDefaults().first()
             val thumbnailPath = thumbnailStore.save(bitmap)
             val entry = historyRepository.saveObjectResult(
@@ -78,13 +85,52 @@ class MatchObjectViewModel(
                 balance = defaults.balance,
             )
             _uiState.value = MatchObjectUiState.ShowingResult(
+                photo = bitmap,
                 inputColorArgb = entry.inputColorsArgb.first(),
+                alternativesArgb = alternatives,
+                sampleX = null,
+                sampleY = null,
                 wheel = entry.wheel ?: defaults.wheel,
                 balance = entry.balance ?: defaults.balance,
                 historyEntryId = entry.id,
                 historyEntryName = entry.name,
             )
         }
+    }
+
+    /** Re-picks the color from one of the chip alternatives (or the current color, a no-op). */
+    fun pickCandidate(argb: Int) {
+        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
+        if (argb == state.inputColorArgb) return
+        applyPick(state, argb, sampleX = null, sampleY = null)
+    }
+
+    /** Re-picks the color by sampling around a tap on the photo, at normalized [x]/[y] in [0, 1]. */
+    fun pickAtPoint(x: Double, y: Double) {
+        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
+        viewModelScope.launch {
+            val argb = withContext(backgroundDispatcher) {
+                val pixels = pixelSourceOf(state.photo)
+                ColorExtractor.extractColorAtPoint(
+                    pixels,
+                    x = (x * pixels.width).roundToInt(),
+                    y = (y * pixels.height).roundToInt(),
+                )
+            }
+            val latest = _uiState.value as? MatchObjectUiState.ShowingResult ?: return@launch
+            applyPick(latest, argb, sampleX = x, sampleY = y)
+        }
+    }
+
+    private fun applyPick(state: MatchObjectUiState.ShowingResult, argb: Int, sampleX: Double?, sampleY: Double?) {
+        val alternatives = ColorExtractor.selectAlternatives(candidates, argb)
+        _uiState.value = state.copy(
+            inputColorArgb = argb,
+            alternativesArgb = alternatives,
+            sampleX = sampleX,
+            sampleY = sampleY,
+        )
+        viewModelScope.launch { historyRepository.updateObjectPick(state.historyEntryId, argb, sampleX, sampleY) }
     }
 
     fun renameResult(name: String) {

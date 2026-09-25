@@ -141,6 +141,20 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         throw UnsupportedOperationException("not used by this test")
     }
 
+    override suspend fun updateObjectPick(entryId: Long, argb: Int, sampleX: Double?, sampleY: Double?) {
+        throw UnsupportedOperationException("not used by this test")
+    }
+
+    override suspend fun updateClothingPick(
+        entryId: Long,
+        argb: Int,
+        score: PaletteScore,
+        sampleX: Double?,
+        sampleY: Double?,
+    ) {
+        throw UnsupportedOperationException("not used by this test")
+    }
+
     override suspend fun deleteEntry(entryId: Long) {
         deletedIds += entryId
         entriesFlow.value = entriesFlow.value.filterNot { it.id == entryId }

@@ -28,6 +28,9 @@ data class HistoryEntry(
     val wheel: HarmonyWheel? = null,
     /** Object-only: null for [HistoryEntryType.CLOTHING]. */
     val balance: HarmonyBalance? = null,
+    /** Where [calibratedArgb] was sampled from, normalized to the photo's size; null = center box. */
+    val sampleX: Double? = null,
+    val sampleY: Double? = null,
 )
 
 internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
@@ -54,6 +57,8 @@ internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
         inputColorsArgb = inputColorsArgb,
         wheel = wheel,
         balance = balance,
+        sampleX = sampleX,
+        sampleY = sampleY,
     )
 }
 
@@ -76,6 +81,8 @@ internal fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
     inputColorsArgb = inputColorsArgb,
     wheel = wheel,
     balance = balance,
+    sampleX = sampleX,
+    sampleY = sampleY,
 )
 
 private val defaultNameDateFormatter: DateTimeFormatter =

@@ -77,7 +77,6 @@
     <string name="pick_photo_reminder">Choose or take a photo with the color you want centered in the frame.</string>
     <string name="rate_clothing_take_photo">Take photo</string>
     <string name="rate_clothing_pick_photo">Pick from gallery</string>
-    <string name="rate_clothing_photo_content_description">Selected photo</string>
     <string name="rate_clothing_no_profile_title">No profile yet</string>
     <string name="rate_clothing_no_profile_body">Create a profile with Best and Avoid colors before rating clothing.</string>
     <string name="rate_clothing_go_to_settings">Go to Settings</string>
@@ -107,6 +106,7 @@
     <string name="harmony_balance_softened">Softened</string>
 
     <string name="navigate_back">Back</string>
+    <string name="result_photo_content_description">Photo</string>
 
     <string name="settings_backup_section_title">Backup</string>
     <string name="settings_backup_export">Export backup</string>

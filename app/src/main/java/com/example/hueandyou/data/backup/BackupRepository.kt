@@ -66,6 +66,8 @@ class DefaultBackupRepository(
                 inputColorsArgb = entry.inputColorsArgb,
                 wheel = entry.wheel,
                 balance = entry.balance,
+                sampleX = entry.sampleX,
+                sampleY = entry.sampleY,
             )
         }
         return serializer.serialize(
@@ -136,6 +138,8 @@ class DefaultBackupRepository(
                     inputColorsArgb = entry.inputColorsArgb,
                     wheel = entry.wheel,
                     balance = entry.balance,
+                    sampleX = entry.sampleX,
+                    sampleY = entry.sampleY,
                 )
             }
             if (historyEntities.isNotEmpty()) historyDao.insertAll(historyEntities)

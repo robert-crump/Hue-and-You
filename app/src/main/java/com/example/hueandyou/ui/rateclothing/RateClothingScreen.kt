@@ -1,6 +1,7 @@
 package com.example.hueandyou.ui.rateclothing
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -48,7 +49,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.data.profile.Profile
+import com.example.hueandyou.ui.common.ColorChipRow
 import com.example.hueandyou.ui.common.PaletteResultBody
+import com.example.hueandyou.ui.common.PhotoResultSection
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -118,11 +121,17 @@ fun RateClothingScreen(
                 is RateClothingUiState.LoadingPhoto -> LoadingStep()
                 is RateClothingUiState.ExtractingColors -> LoadingStep()
                 is RateClothingUiState.ShowingResult -> ResultStep(
+                    photo = state.photo,
                     argb = state.argb,
+                    alternativesArgb = state.alternativesArgb,
+                    sampleX = state.sampleX,
+                    sampleY = state.sampleY,
                     score = state.score,
                     entryId = state.historyEntryId,
                     name = state.historyEntryName,
                     onRenameChange = viewModel::renameResult,
+                    onPickCandidate = viewModel::pickCandidate,
+                    onPickAtPoint = viewModel::pickAtPoint,
                 )
             }
         }
@@ -210,13 +219,21 @@ private fun LoadingStep() {
     }
 }
 
+private const val PHOTO_MAX_HEIGHT_FRACTION = 0.40f
+
 @Composable
 private fun ResultStep(
+    photo: Bitmap,
     argb: Int,
+    alternativesArgb: List<Int>,
+    sampleX: Double?,
+    sampleY: Double?,
     score: PaletteScore,
     entryId: Long,
     name: String,
     onRenameChange: (String) -> Unit,
+    onPickCandidate: (Int) -> Unit,
+    onPickAtPoint: (x: Double, y: Double) -> Unit,
 ) {
     var currentName by rememberSaveable(entryId) { mutableStateOf(name) }
 
@@ -227,6 +244,19 @@ private fun ResultStep(
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        PhotoResultSection(
+            photo = photo,
+            sampleX = sampleX,
+            sampleY = sampleY,
+            maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
+            onTap = onPickAtPoint,
+        )
+        ColorChipRow(
+            currentArgb = argb,
+            alternativesArgb = alternativesArgb,
+            onPick = onPickCandidate,
+            modifier = Modifier.padding(top = 16.dp),
+        )
         OutlinedTextField(
             value = currentName,
             onValueChange = {
@@ -234,7 +264,9 @@ private fun ResultStep(
                 onRenameChange(it)
             },
             label = { Text(stringResource(R.string.history_entry_name_label)) },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 16.dp)
         )
         PaletteResultBody(argb = argb, score = score)
     }
