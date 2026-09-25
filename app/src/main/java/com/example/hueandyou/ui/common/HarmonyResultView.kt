@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -93,15 +94,17 @@ private fun HarmonySuggestionRow(suggestion: HarmonySuggestion) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.Top) {
             Text(
                 text = stringResource(harmonyRelationshipLabel(suggestion.relationship)),
                 style = MaterialTheme.typography.titleSmall
             )
-            IconButton(onClick = { showInfo = true }, modifier = Modifier.size(32.dp)) {
+            // The 32dp touch target is taller than the title line; nudge it up so the icon stays
+            // vertically centered on the title text while the title itself sits at the row's top.
+            IconButton(onClick = { showInfo = true }, modifier = Modifier.size(32.dp).offset(y = (-6).dp)) {
                 Icon(
                     Icons.Filled.Info,
                     contentDescription = stringResource(R.string.harmony_relationship_info_content_description),

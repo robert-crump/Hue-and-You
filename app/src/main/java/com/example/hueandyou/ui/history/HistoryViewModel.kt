@@ -37,11 +37,14 @@ class HistoryViewModel(private val repository: HistoryRepository) : ViewModel() 
     private val pendingDeletions = MutableStateFlow<Map<Long, HistoryEntry>>(emptyMap())
     private val pendingDeletionJobs = mutableMapOf<Long, Job>()
 
+    /** IDs already deleted from the repository; kept hidden in case the list flow is briefly stale. */
+    private val deletedIds = MutableStateFlow<Set<Long>>(emptySet())
+
     val uiState: StateFlow<HistoryUiState> = combine(
-        repository.observeEntries(), pendingDeletions
-    ) { entries, pending ->
+        repository.observeEntries(), pendingDeletions, deletedIds
+    ) { entries, pending, deleted ->
         HistoryUiState(
-            entries = entries.filterNot { it.id in pending },
+            entries = entries.filterNot { it.id in pending || it.id in deleted },
             pendingDeletion = pending.values.lastOrNull()?.let { PendingDeletion(it.id, it.name) }
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
@@ -52,6 +55,9 @@ class HistoryViewModel(private val repository: HistoryRepository) : ViewModel() 
         pendingDeletionJobs[entry.id] = viewModelScope.launch {
             delay(UNDO_WINDOW_MILLIS)
             repository.deleteEntry(entry.id)
+            // Stay hidden after the delete: the list flow may still emit a stale list containing
+            // the entry, which would flash it back into view when the pending state is cleared.
+            deletedIds.update { it + entry.id }
             pendingDeletions.update { it - entry.id }
             pendingDeletionJobs.remove(entry.id)
         }
