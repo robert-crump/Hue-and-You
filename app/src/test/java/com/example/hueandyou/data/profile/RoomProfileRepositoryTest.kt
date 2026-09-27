@@ -3,6 +3,7 @@ package com.example.hueandyou.data.profile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -61,76 +62,38 @@ class RoomProfileRepositoryTest {
     }
 
     @Test
-    fun removeColor_deletesOnlyThatColor() = runBlocking {
+    fun addColor_whenListIsFull_returnsNullAndDoesNotInsert() = runBlocking {
+        val id = repository.createProfile("Autumn")
+        repeat(MAX_COLORS_PER_KIND) { repository.addColor(id, ColorKind.BEST, it) }
+
+        val result = repository.addColor(id, ColorKind.BEST, 0xFF112233.toInt())
+
+        assertNull(result)
+        assertEquals(MAX_COLORS_PER_KIND, repository.observeProfile(id).first()!!.bestColors.size)
+    }
+
+    @Test
+    fun addColor_capIsPerKind() = runBlocking {
+        val id = repository.createProfile("Autumn")
+        repeat(MAX_COLORS_PER_KIND) { repository.addColor(id, ColorKind.BEST, it) }
+
+        val result = repository.addColor(id, ColorKind.AVOID, 0xFF112233.toInt())
+
+        assertNotNull(result)
+    }
+
+    @Test
+    fun removeColors_deletesOnlyThoseColors() = runBlocking {
         val id = repository.createProfile("Autumn")
         val keepId = repository.addColor(id, ColorKind.BEST, 0xFF112233.toInt())
-        val removeId = repository.addColor(id, ColorKind.BEST, 0xFF445566.toInt())
+        val removeBest = repository.addColor(id, ColorKind.BEST, 0xFF445566.toInt())!!
+        val removeAvoid = repository.addColor(id, ColorKind.AVOID, 0xFF778899.toInt())!!
 
-        repository.removeColor(removeId)
+        repository.removeColors(listOf(removeBest, removeAvoid))
 
         val profile = repository.observeProfile(id).first()!!
         assertEquals(listOf(keepId), profile.bestColors.map { it.id })
-    }
-
-    @Test
-    fun moveColor_down_swapsWithNextInSameKind() = runBlocking {
-        val id = repository.createProfile("Autumn")
-        val first = repository.addColor(id, ColorKind.BEST, 0xFF111111.toInt())
-        val second = repository.addColor(id, ColorKind.BEST, 0xFF222222.toInt())
-
-        repository.moveColor(first, MoveDirection.DOWN)
-
-        val profile = repository.observeProfile(id).first()!!
-        assertEquals(listOf(second, first), profile.bestColors.map { it.id })
-    }
-
-    @Test
-    fun moveColor_up_swapsWithPreviousInSameKind() = runBlocking {
-        val id = repository.createProfile("Autumn")
-        val first = repository.addColor(id, ColorKind.BEST, 0xFF111111.toInt())
-        val second = repository.addColor(id, ColorKind.BEST, 0xFF222222.toInt())
-
-        repository.moveColor(second, MoveDirection.UP)
-
-        val profile = repository.observeProfile(id).first()!!
-        assertEquals(listOf(second, first), profile.bestColors.map { it.id })
-    }
-
-    @Test
-    fun moveColor_atTopBoundary_isNoOp() = runBlocking {
-        val id = repository.createProfile("Autumn")
-        val first = repository.addColor(id, ColorKind.BEST, 0xFF111111.toInt())
-        val second = repository.addColor(id, ColorKind.BEST, 0xFF222222.toInt())
-
-        repository.moveColor(first, MoveDirection.UP)
-
-        val profile = repository.observeProfile(id).first()!!
-        assertEquals(listOf(first, second), profile.bestColors.map { it.id })
-    }
-
-    @Test
-    fun moveColor_atBottomBoundary_isNoOp() = runBlocking {
-        val id = repository.createProfile("Autumn")
-        val first = repository.addColor(id, ColorKind.BEST, 0xFF111111.toInt())
-        val second = repository.addColor(id, ColorKind.BEST, 0xFF222222.toInt())
-
-        repository.moveColor(second, MoveDirection.DOWN)
-
-        val profile = repository.observeProfile(id).first()!!
-        assertEquals(listOf(first, second), profile.bestColors.map { it.id })
-    }
-
-    @Test
-    fun moveColor_doesNotAffectOtherKind() = runBlocking {
-        val id = repository.createProfile("Autumn")
-        val best = repository.addColor(id, ColorKind.BEST, 0xFF111111.toInt())
-        val avoid = repository.addColor(id, ColorKind.AVOID, 0xFF222222.toInt())
-
-        repository.moveColor(avoid, MoveDirection.UP)
-
-        val profile = repository.observeProfile(id).first()!!
-        assertEquals(listOf(best), profile.bestColors.map { it.id })
-        assertEquals(listOf(avoid), profile.avoidColors.map { it.id })
+        assertTrue(profile.avoidColors.isEmpty())
     }
 
     @Test

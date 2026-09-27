@@ -1,11 +1,18 @@
 package com.example.hueandyou.ui.profiles
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -14,22 +21,21 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -43,17 +49,47 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.formatHexColor
 import com.example.hueandyou.data.profile.ColorKind
-import com.example.hueandyou.data.profile.MoveDirection
+import com.example.hueandyou.data.profile.MAX_COLORS_PER_KIND
 import com.example.hueandyou.data.profile.PaletteColor
 import com.example.hueandyou.ui.common.ColorCircle
+import com.example.hueandyou.ui.common.HexColorDialog
+
+private const val GRID_COLUMNS = 5
+private const val GRID_ROWS = MAX_COLORS_PER_KIND / GRID_COLUMNS
+private const val BADGE_FRACTION = 0.4f
+private val GRID_GAP = 8.dp
+private val HORIZONTAL_PADDING = 16.dp
+private val MIN_CIRCLE_SIZE = 32.dp
+private val MAX_CIRCLE_SIZE = 56.dp
+
+/**
+ * Everything on the screen that isn't a grid row: name field (72), import button (52), two
+ * section headers with their padding (2 x 56) and bottom padding (16). An estimate, not a
+ * measurement - the column still scrolls as a safety net if it's off.
+ */
+private val FIXED_CONTENT_HEIGHT = 252.dp
+
+/**
+ * The circle size for the worst case of two full 5x5 grids, so circles don't resize as colors
+ * come and go: whatever height is left for the grid rows, split over ten rows, but never wider
+ * than a grid column and clamped to 32-56dp.
+ */
+internal fun worstCaseCircleSize(maxWidth: Dp, maxHeight: Dp): Dp {
+    val rows = GRID_ROWS * 2
+    val byHeight = (maxHeight - FIXED_CONTENT_HEIGHT - GRID_GAP * (rows - 2)) / rows
+    val byWidth = (maxWidth - HORIZONTAL_PADDING * 2) / GRID_COLUMNS - GRID_GAP
+    return minOf(byHeight, byWidth).coerceIn(MIN_CIRCLE_SIZE, MAX_CIRCLE_SIZE)
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,84 +102,154 @@ fun ProfileEditorScreen(
     )
 ) {
     val profile by viewModel.profile.collectAsState()
+    val isEditing by viewModel.isEditing.collectAsState()
+    val pendingRemovals by viewModel.pendingRemovals.collectAsState()
     var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     var addColorKind by remember { mutableStateOf<ColorKind?>(null) }
 
+    BackHandler(enabled = isEditing) { viewModel.cancelEditing() }
+
     val currentProfile = profile
+    val hasColors = currentProfile != null &&
+        (currentProfile.bestColors.isNotEmpty() || currentProfile.avoidColors.isNotEmpty())
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.profile_editor_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.navigate_back)
-                        )
+            if (isEditing) {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.profile_editor_edit_colors_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = viewModel::cancelEditing) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = stringResource(
+                                    R.string.profile_editor_cancel_edit_content_description
+                                )
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = viewModel::commitEditing) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = stringResource(
+                                    R.string.profile_editor_confirm_edit_content_description
+                                )
+                            )
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { showDeleteConfirm = true }) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = stringResource(R.string.profile_editor_delete_content_description)
-                        )
+                )
+            } else {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.profile_editor_title)) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back)
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = viewModel::startEditing, enabled = hasColors) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = stringResource(
+                                    R.string.profile_editor_edit_content_description
+                                )
+                            )
+                        }
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.profile_editor_delete_content_description)
+                            )
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
         if (currentProfile == null) {
             return@Scaffold
         }
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .fillMaxSize()
         ) {
-            OutlinedTextField(
-                value = name,
-                onValueChange = {
-                    name = it
-                    viewModel.renameProfile(it)
-                },
-                label = { Text(stringResource(R.string.profile_editor_name_label)) },
+            val circleSize = worstCaseCircleSize(maxWidth, maxHeight)
+            // Designed to fit without scrolling; scrolls only for over-cap legacy lists, very
+            // small screens or large font scales.
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            )
-
-            ColorSection(
-                title = stringResource(R.string.profile_editor_best_colors_title),
-                colors = currentProfile.bestColors,
-                onAddClick = { addColorKind = ColorKind.BEST },
-                onRemoveColor = { viewModel.removeColor(it) },
-                onMoveColor = { colorId, direction -> viewModel.moveColor(colorId, direction) }
-            )
-
-            ColorSection(
-                title = stringResource(R.string.profile_editor_avoid_colors_title),
-                colors = currentProfile.avoidColors,
-                onAddClick = { addColorKind = ColorKind.AVOID },
-                onRemoveColor = { viewModel.removeColor(it) },
-                onMoveColor = { colorId, direction -> viewModel.moveColor(colorId, direction) }
-            )
-
-            TextButton(
-                onClick = onNavigateToImportPalette,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 16.dp)
             ) {
-                Text(stringResource(R.string.profile_editor_import_palette))
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it
+                        viewModel.renameProfile(it)
+                    },
+                    label = { Text(stringResource(R.string.profile_editor_name_label)) },
+                    enabled = !isEditing,
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = HORIZONTAL_PADDING, end = HORIZONTAL_PADDING, top = 8.dp)
+                )
+
+                if (!isEditing) {
+                    FilledTonalButton(
+                        onClick = onNavigateToImportPalette,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = HORIZONTAL_PADDING, end = HORIZONTAL_PADDING, top = 12.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Palette,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                        Spacer(modifier = Modifier.size(ButtonDefaults.IconSpacing))
+                        Text(stringResource(R.string.profile_editor_import_palette))
+                    }
+                }
+
+                ColorSection(
+                    title = stringResource(R.string.profile_editor_best_colors_title),
+                    colors = currentProfile.bestColors.filterNot { it.id in pendingRemovals },
+                    circleSize = circleSize,
+                    isEditing = isEditing,
+                    onAddClick = { addColorKind = ColorKind.BEST },
+                    onRemoveColor = viewModel::stageRemoval
+                )
+
+                ColorSection(
+                    title = stringResource(R.string.profile_editor_avoid_colors_title),
+                    colors = currentProfile.avoidColors.filterNot { it.id in pendingRemovals },
+                    circleSize = circleSize,
+                    isEditing = isEditing,
+                    onAddClick = { addColorKind = ColorKind.AVOID },
+                    onRemoveColor = viewModel::stageRemoval
+                )
             }
         }
     }
 
     addColorKind?.let { kind ->
-        AddColorDialog(
-            kind = kind,
+        HexColorDialog(
+            title = stringResource(
+                if (kind == ColorKind.BEST) {
+                    R.string.add_color_dialog_title_best
+                } else {
+                    R.string.add_color_dialog_title_avoid
+                }
+            ),
             onDismiss = { addColorKind = null },
-            onAdd = { hex, invalidHexMessage -> viewModel.addColor(kind, hex, invalidHexMessage) }
+            onAdd = { argb -> viewModel.addColor(kind, argb) }
         )
     }
 
@@ -180,13 +286,16 @@ fun ProfileEditorScreen(
 private fun ColorSection(
     title: String,
     colors: List<PaletteColor>,
+    circleSize: Dp,
+    isEditing: Boolean,
     onAddClick: () -> Unit,
-    onRemoveColor: (Long) -> Unit,
-    onMoveColor: (colorId: Long, direction: MoveDirection) -> Unit
+    onRemoveColor: (Long) -> Unit
 ) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(horizontal = HORIZONTAL_PADDING, vertical = 4.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -194,11 +303,22 @@ private fun ColorSection(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onAddClick) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.profile_editor_add_color_content_description)
-                )
+            Text(
+                text = stringResource(R.string.profile_editor_color_count, colors.size, MAX_COLORS_PER_KIND),
+                style = MaterialTheme.typography.labelLarge,
+                color = if (colors.size > MAX_COLORS_PER_KIND) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+            if (!isEditing) {
+                IconButton(onClick = onAddClick, enabled = colors.size < MAX_COLORS_PER_KIND) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.profile_editor_add_color_content_description)
+                    )
+                }
             }
         }
         if (colors.isEmpty()) {
@@ -207,45 +327,21 @@ private fun ColorSection(
                 style = MaterialTheme.typography.bodySmall
             )
         } else {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                colors.forEachIndexed { index, color ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ColorCircle(argb = color.argb, size = 24.dp)
-                        Spacer(modifier = Modifier.weight(1f))
-                        IconButton(
-                            onClick = { onMoveColor(color.id, MoveDirection.UP) },
-                            enabled = index > 0
-                        ) {
-                            Icon(
-                                Icons.Filled.KeyboardArrowUp,
-                                contentDescription = stringResource(
-                                    R.string.profile_editor_move_up_content_description
+            Column(verticalArrangement = Arrangement.spacedBy(GRID_GAP)) {
+                colors.chunked(GRID_COLUMNS).forEach { row ->
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        row.forEach { color ->
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                ColorCell(
+                                    color = color,
+                                    size = circleSize,
+                                    isEditing = isEditing,
+                                    onRemove = { onRemoveColor(color.id) }
                                 )
-                            )
+                            }
                         }
-                        IconButton(
-                            onClick = { onMoveColor(color.id, MoveDirection.DOWN) },
-                            enabled = index < colors.lastIndex
-                        ) {
-                            Icon(
-                                Icons.Filled.KeyboardArrowDown,
-                                contentDescription = stringResource(
-                                    R.string.profile_editor_move_down_content_description
-                                )
-                            )
-                        }
-                        IconButton(onClick = { onRemoveColor(color.id) }) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = stringResource(
-                                    R.string.profile_editor_remove_color_content_description
-                                )
-                            )
+                        repeat(GRID_COLUMNS - row.size) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -254,121 +350,49 @@ private fun ColorSection(
     }
 }
 
-private enum class ColorEntryMode { HEX, PICKER }
-
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * One grid circle. In edit mode it carries a Quick-Settings-style "-" badge, and tapping anywhere
+ * on the circle (the badge alone would be too small a target) stages its removal.
+ */
 @Composable
-private fun AddColorDialog(
-    kind: ColorKind,
-    onDismiss: () -> Unit,
-    onAdd: (hex: String, invalidHexMessage: String) -> String?
+private fun ColorCell(
+    color: PaletteColor,
+    size: Dp,
+    isEditing: Boolean,
+    onRemove: () -> Unit
 ) {
-    var mode by rememberSaveable { mutableStateOf(ColorEntryMode.HEX) }
-    var hex by rememberSaveable { mutableStateOf("") }
-    var error by rememberSaveable { mutableStateOf<String?>(null) }
-    var hue by rememberSaveable { mutableStateOf(0f) }
-    var saturation by rememberSaveable { mutableStateOf(1f) }
-    var brightness by rememberSaveable { mutableStateOf(1f) }
-    val invalidHexMessage = stringResource(R.string.add_color_dialog_invalid_hex)
-
-    val pickedArgb = remember(hue, saturation, brightness) {
-        android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, brightness))
-    }
-    val pickedHex = remember(pickedArgb) { formatHexColor(pickedArgb) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(
-                    if (kind == ColorKind.BEST) {
-                        R.string.add_color_dialog_title_best
-                    } else {
-                        R.string.add_color_dialog_title_avoid
-                    }
-                )
+    Box(modifier = Modifier.size(size)) {
+        if (isEditing) {
+            val description = stringResource(
+                R.string.profile_editor_remove_color_content_description,
+                formatHexColor(color.argb)
             )
-        },
-        text = {
-            Column {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = mode == ColorEntryMode.HEX,
-                        onClick = { mode = ColorEntryMode.HEX },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) {
-                        Text(stringResource(R.string.add_color_dialog_mode_hex))
-                    }
-                    SegmentedButton(
-                        selected = mode == ColorEntryMode.PICKER,
-                        onClick = { mode = ColorEntryMode.PICKER },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) {
-                        Text(stringResource(R.string.add_color_dialog_mode_picker))
-                    }
-                }
-
-                if (mode == ColorEntryMode.HEX) {
-                    OutlinedTextField(
-                        value = hex,
-                        onValueChange = {
-                            hex = it
-                            error = null
-                        },
-                        label = { Text(stringResource(R.string.add_color_dialog_hex_label)) },
-                        isError = error != null,
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-                    error?.let {
-                        Text(text = it, color = MaterialTheme.colorScheme.error)
-                    }
-                } else {
-                    Column(modifier = Modifier.padding(top = 12.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(pickedArgb))
-                            )
-                            Text(text = pickedHex, modifier = Modifier.padding(start = 12.dp))
-                        }
-                        Text(
-                            text = stringResource(R.string.add_color_dialog_hue_label),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Slider(value = hue, onValueChange = { hue = it }, valueRange = 0f..360f)
-                        Text(
-                            text = stringResource(R.string.add_color_dialog_saturation_label),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Slider(value = saturation, onValueChange = { saturation = it }, valueRange = 0f..1f)
-                        Text(
-                            text = stringResource(R.string.add_color_dialog_brightness_label),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Slider(value = brightness, onValueChange = { brightness = it }, valueRange = 0f..1f)
-                    }
-                }
+            ColorCircle(
+                argb = color.argb,
+                size = size,
+                modifier = Modifier.semantics { contentDescription = description },
+                onClick = onRemove
+            )
+            val badgeSize = size * BADGE_FRACTION
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = badgeSize / 4, y = -badgeSize / 4)
+                    .size(badgeSize)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Remove,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(badgeSize * 0.8f)
+                )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val hexToAdd = if (mode == ColorEntryMode.PICKER) pickedHex else hex
-                val result = onAdd(hexToAdd, invalidHexMessage)
-                if (result == null) {
-                    onDismiss()
-                } else {
-                    error = result
-                }
-            }) {
-                Text(stringResource(R.string.dialog_add))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.dialog_cancel))
-            }
+        } else {
+            ColorCircle(argb = color.argb, size = size)
         }
-    )
+    }
 }

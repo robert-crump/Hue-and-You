@@ -9,9 +9,15 @@ interface ProfileRepository {
     suspend fun createProfile(name: String): Long
     suspend fun renameProfile(profileId: Long, name: String)
     suspend fun deleteProfile(profileId: Long)
-    suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long
-    suspend fun removeColor(colorId: Long)
-    suspend fun moveColor(colorId: Long, direction: MoveDirection)
+
+    /**
+     * Appends a color to the end of [kind]'s list. Returns the new color's id, or null if that
+     * list already holds [MAX_COLORS_PER_KIND] colors.
+     */
+    suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long?
+
+    /** Removes all of [colorIds] in one statement. */
+    suspend fun removeColors(colorIds: Collection<Long>)
 }
 
 class RoomProfileRepository(
@@ -39,7 +45,8 @@ class RoomProfileRepository(
         dao.deleteProfile(profileId)
     }
 
-    override suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long {
+    override suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long? {
+        if (dao.countColors(profileId, kind) >= MAX_COLORS_PER_KIND) return null
         val position = dao.nextPosition(profileId, kind)
         val id = dao.insertColor(
             PaletteColorEntity(profileId = profileId, kind = kind, argb = argb, position = position)
@@ -48,21 +55,8 @@ class RoomProfileRepository(
         return id
     }
 
-    override suspend fun removeColor(colorId: Long) {
-        dao.deleteColor(colorId)
-    }
-
-    override suspend fun moveColor(colorId: Long, direction: MoveDirection) {
-        val color = dao.getColor(colorId) ?: return
-        val siblings = dao.getColorsForKind(color.profileId, color.kind)
-        val index = siblings.indexOfFirst { it.id == colorId }
-        if (index < 0) return
-        val targetIndex = if (direction == MoveDirection.UP) index - 1 else index + 1
-        if (targetIndex < 0 || targetIndex >= siblings.size) return
-
-        val target = siblings[targetIndex]
-        dao.updateColor(color.copy(position = target.position))
-        dao.updateColor(target.copy(position = color.position))
-        dao.getProfile(color.profileId)?.let { dao.updateProfile(it.copy(updatedAt = currentTimeMillis())) }
+    override suspend fun removeColors(colorIds: Collection<Long>) {
+        if (colorIds.isEmpty()) return
+        dao.deleteColors(colorIds.toList())
     }
 }

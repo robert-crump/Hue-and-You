@@ -13,18 +13,21 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.colorspace.RectRegion
 import com.example.hueandyou.colorspace.SwatchExtractor
-import com.example.hueandyou.colorspace.parseHexColor
 import com.example.hueandyou.data.profile.ColorKind
+import com.example.hueandyou.data.profile.MAX_COLORS_PER_KIND
 import com.example.hueandyou.data.profile.ProfileRepository
 import com.example.hueandyou.ui.common.toPixelSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val MAX_PHOTO_DIMENSION_PX = 1024
+
+private fun remainingSlots(existing: Int): Int = (MAX_COLORS_PER_KIND - existing).coerceAtLeast(0)
 
 class PaletteImportViewModel(
     private val profileRepository: ProfileRepository,
@@ -60,11 +63,21 @@ class PaletteImportViewModel(
     }
 
     private fun advanceAfterArea(state: PaletteImportUiState.MarkingArea, swatches: List<ImportSwatch>) {
-        _uiState.value = if (state.kind == ColorKind.BEST) {
+        if (state.kind == ColorKind.BEST) {
             pendingBestSwatches = swatches
-            PaletteImportUiState.MarkingArea(state.bitmap, ColorKind.AVOID)
-        } else {
-            PaletteImportUiState.Reviewing(bestSwatches = pendingBestSwatches, avoidSwatches = swatches)
+            _uiState.value = PaletteImportUiState.MarkingArea(state.bitmap, ColorKind.AVOID)
+            return
+        }
+        viewModelScope.launch {
+            val profile = profileRepository.observeProfile(profileId).first()
+            val bestSlots = remainingSlots(profile?.bestColors?.size ?: 0)
+            val avoidSlots = remainingSlots(profile?.avoidColors?.size ?: 0)
+            _uiState.value = PaletteImportUiState.Reviewing(
+                bestSwatches = preselectWithinSlots(pendingBestSwatches, bestSlots),
+                avoidSwatches = preselectWithinSlots(swatches, avoidSlots),
+                bestSlots = bestSlots,
+                avoidSlots = avoidSlots,
+            )
         }
     }
 
@@ -74,20 +87,19 @@ class PaletteImportViewModel(
     }
 
     fun toggleSwatch(kind: ColorKind, swatchId: Int) {
-        updateReviewing(kind) { swatches ->
-            swatches.map { if (it.id == swatchId) it.copy(selected = !it.selected) else it }
-        }
+        val slots = (_uiState.value as? PaletteImportUiState.Reviewing)?.slots(kind) ?: return
+        updateReviewing(kind) { swatches -> toggleWithinSlots(swatches, swatchId, slots) }
     }
 
     fun removeSwatch(kind: ColorKind, swatchId: Int) {
         updateReviewing(kind) { swatches -> swatches.filterNot { it.id == swatchId } }
     }
 
-    /** Returns null on success, or an error message if [hex] isn't a valid hex color. */
-    fun addManualSwatch(kind: ColorKind, hex: String, invalidHexMessage: String): String? {
-        val argb = parseHexColor(hex) ?: return invalidHexMessage
+    /** Adds a selected swatch, unless [kind]'s list has no free slot left. */
+    fun addManualSwatch(kind: ColorKind, argb: Int) {
+        val state = _uiState.value as? PaletteImportUiState.Reviewing ?: return
+        if (state.swatches(kind).count { it.selected } >= state.slots(kind)) return
         updateReviewing(kind) { swatches -> swatches + ImportSwatch(id = nextSwatchId++, argb = argb, share = 0.0) }
-        return null
     }
 
     private fun updateReviewing(kind: ColorKind, transform: (List<ImportSwatch>) -> List<ImportSwatch>) {

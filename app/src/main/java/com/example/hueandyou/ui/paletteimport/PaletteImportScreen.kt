@@ -25,7 +25,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,10 +32,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +42,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -67,6 +64,7 @@ import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.RectRegion
 import com.example.hueandyou.colorspace.formatHexColor
 import com.example.hueandyou.data.profile.ColorKind
+import com.example.hueandyou.ui.common.HexColorDialog
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -129,8 +127,7 @@ fun PaletteImportScreen(
                     onSkip = viewModel::skipArea,
                 )
                 is PaletteImportUiState.Reviewing -> ReviewingStep(
-                    bestSwatches = state.bestSwatches,
-                    avoidSwatches = state.avoidSwatches,
+                    state = state,
                     onToggle = viewModel::toggleSwatch,
                     onRemove = viewModel::removeSwatch,
                     onAddManual = viewModel::addManualSwatch,
@@ -345,11 +342,10 @@ private fun dragRect(start: RectRegion, mode: RectDragMode, dx: Float, dy: Float
 
 @Composable
 private fun ReviewingStep(
-    bestSwatches: List<ImportSwatch>,
-    avoidSwatches: List<ImportSwatch>,
+    state: PaletteImportUiState.Reviewing,
     onToggle: (ColorKind, Int) -> Unit,
     onRemove: (ColorKind, Int) -> Unit,
-    onAddManual: (ColorKind, String, String) -> String?,
+    onAddManual: (ColorKind, Int) -> Unit,
     onConfirm: () -> Unit,
 ) {
     var addSwatchKind by remember { mutableStateOf<ColorKind?>(null) }
@@ -362,14 +358,16 @@ private fun ReviewingStep(
     ) {
         SwatchSection(
             title = stringResource(R.string.palette_import_reviewing_best_title),
-            swatches = bestSwatches,
+            swatches = state.bestSwatches,
+            slots = state.bestSlots,
             onToggle = { onToggle(ColorKind.BEST, it) },
             onRemove = { onRemove(ColorKind.BEST, it) },
             onAddClick = { addSwatchKind = ColorKind.BEST },
         )
         SwatchSection(
             title = stringResource(R.string.palette_import_reviewing_avoid_title),
-            swatches = avoidSwatches,
+            swatches = state.avoidSwatches,
+            slots = state.avoidSlots,
             onToggle = { onToggle(ColorKind.AVOID, it) },
             onRemove = { onRemove(ColorKind.AVOID, it) },
             onAddClick = { addSwatchKind = ColorKind.AVOID },
@@ -380,10 +378,16 @@ private fun ReviewingStep(
     }
 
     addSwatchKind?.let { kind ->
-        AddSwatchDialog(
-            kind = kind,
+        HexColorDialog(
+            title = stringResource(
+                if (kind == ColorKind.BEST) {
+                    R.string.add_color_dialog_title_best
+                } else {
+                    R.string.add_color_dialog_title_avoid
+                }
+            ),
             onDismiss = { addSwatchKind = null },
-            onAdd = { hex, invalidHexMessage -> onAddManual(kind, hex, invalidHexMessage) }
+            onAdd = { argb -> onAddManual(kind, argb) }
         )
     }
 }
@@ -392,10 +396,13 @@ private fun ReviewingStep(
 private fun SwatchSection(
     title: String,
     swatches: List<ImportSwatch>,
+    slots: Int,
     onToggle: (Int) -> Unit,
     onRemove: (Int) -> Unit,
     onAddClick: () -> Unit,
 ) {
+    val selectedCount = swatches.count { it.selected }
+    val isFull = selectedCount >= slots
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -406,7 +413,12 @@ private fun SwatchSection(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = onAddClick) {
+            Text(
+                text = pluralStringResource(R.plurals.palette_import_slots, slots, selectedCount, slots),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            IconButton(onClick = onAddClick, enabled = !isFull) {
                 Icon(
                     Icons.Filled.Add,
                     contentDescription = stringResource(R.string.palette_import_add_color_content_description)
@@ -421,16 +433,18 @@ private fun SwatchSection(
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
                 swatches.forEach { swatch ->
+                    val canToggle = swatch.selected || !isFull
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onToggle(swatch.id) }
+                            .clickable(enabled = canToggle) { onToggle(swatch.id) }
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
                             checked = swatch.selected,
-                            onCheckedChange = { onToggle(swatch.id) }
+                            onCheckedChange = { onToggle(swatch.id) },
+                            enabled = canToggle
                         )
                         Box(
                             modifier = Modifier
@@ -457,63 +471,4 @@ private fun SwatchSection(
             }
         }
     }
-}
-
-@Composable
-private fun AddSwatchDialog(
-    kind: ColorKind,
-    onDismiss: () -> Unit,
-    onAdd: (hex: String, invalidHexMessage: String) -> String?
-) {
-    var hex by rememberSaveable { mutableStateOf("") }
-    var error by rememberSaveable { mutableStateOf<String?>(null) }
-    val invalidHexMessage = stringResource(R.string.add_color_dialog_invalid_hex)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(
-                    if (kind == ColorKind.BEST) {
-                        R.string.add_color_dialog_title_best
-                    } else {
-                        R.string.add_color_dialog_title_avoid
-                    }
-                )
-            )
-        },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = hex,
-                    onValueChange = {
-                        hex = it
-                        error = null
-                    },
-                    label = { Text(stringResource(R.string.add_color_dialog_hex_label)) },
-                    isError = error != null,
-                )
-                error?.let {
-                    Text(text = it, color = MaterialTheme.colorScheme.error)
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val result = onAdd(hex, invalidHexMessage)
-                if (result == null) {
-                    onDismiss()
-                } else {
-                    error = result
-                }
-            }) {
-                Text(stringResource(R.string.dialog_add))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.dialog_cancel))
-            }
-        }
-    )
 }

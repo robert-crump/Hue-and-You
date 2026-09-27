@@ -1,7 +1,6 @@
 package com.example.hueandyou.ui.profiles
 
 import com.example.hueandyou.data.profile.ColorKind
-import com.example.hueandyou.data.profile.MoveDirection
 import com.example.hueandyou.data.profile.PaletteColor
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
@@ -14,12 +13,12 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
 private const val PROFILE_ID = 1L
-private const val INVALID_HEX_MESSAGE = "Enter a valid hex code"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProfileEditorViewModelTest {
@@ -40,27 +39,64 @@ class ProfileEditorViewModelTest {
     }
 
     @Test
-    fun addColor_withInvalidHex_returnsErrorAndDoesNotPersist() {
-        val error = viewModel.addColor(ColorKind.BEST, "not-a-hex", INVALID_HEX_MESSAGE)
+    fun addColor_persists() {
+        viewModel.addColor(ColorKind.BEST, 0xFF3A7DFF.toInt())
 
-        assertEquals(INVALID_HEX_MESSAGE, error)
-        assertEquals(0, repository.addedColors.size)
+        assertEquals(listOf(PROFILE_ID to ColorKind.BEST), repository.addedColors)
     }
 
     @Test
-    fun addColor_withValidHex_persistsAndReturnsNull() {
-        val error = viewModel.addColor(ColorKind.BEST, "#3A7DFF", INVALID_HEX_MESSAGE)
+    fun stageRemoval_outsideEditMode_isIgnored() {
+        viewModel.stageRemoval(7L)
 
-        assertNull(error)
-        assertEquals(1, repository.addedColors.size)
-        assertEquals(ColorKind.BEST, repository.addedColors[0].second)
+        assertEquals(emptySet<Long>(), viewModel.pendingRemovals.value)
     }
 
     @Test
-    fun moveColor_delegatesToRepository() {
-        viewModel.moveColor(colorId = 7L, direction = MoveDirection.DOWN)
+    fun stageRemoval_inEditMode_stagesWithoutPersisting() {
+        viewModel.startEditing()
 
-        assertEquals(listOf(7L to MoveDirection.DOWN), repository.movedColors)
+        viewModel.stageRemoval(7L)
+        viewModel.stageRemoval(8L)
+
+        assertTrue(viewModel.isEditing.value)
+        assertEquals(setOf(7L, 8L), viewModel.pendingRemovals.value)
+        assertTrue(repository.removedBatches.isEmpty())
+    }
+
+    @Test
+    fun cancelEditing_discardsStagedRemovals() {
+        viewModel.startEditing()
+        viewModel.stageRemoval(7L)
+
+        viewModel.cancelEditing()
+
+        assertFalse(viewModel.isEditing.value)
+        assertEquals(emptySet<Long>(), viewModel.pendingRemovals.value)
+        assertTrue(repository.removedBatches.isEmpty())
+    }
+
+    @Test
+    fun commitEditing_removesStagedColorsInOneBatch() {
+        viewModel.startEditing()
+        viewModel.stageRemoval(7L)
+        viewModel.stageRemoval(8L)
+
+        viewModel.commitEditing()
+
+        assertFalse(viewModel.isEditing.value)
+        assertEquals(emptySet<Long>(), viewModel.pendingRemovals.value)
+        assertEquals(listOf(setOf(7L, 8L)), repository.removedBatches)
+    }
+
+    @Test
+    fun commitEditing_withNothingStaged_justExits() {
+        viewModel.startEditing()
+
+        viewModel.commitEditing()
+
+        assertFalse(viewModel.isEditing.value)
+        assertTrue(repository.removedBatches.isEmpty())
     }
 
     @Test
@@ -76,7 +112,7 @@ class ProfileEditorViewModelTest {
 
 private class FakeProfileRepository : ProfileRepository {
     val addedColors = mutableListOf<Pair<Long, ColorKind>>()
-    val movedColors = mutableListOf<Pair<Long, MoveDirection>>()
+    val removedBatches = mutableListOf<Set<Long>>()
     var deletedProfileId: Long? = null
     private val profiles = MutableStateFlow<Profile?>(
         Profile(
@@ -105,7 +141,7 @@ private class FakeProfileRepository : ProfileRepository {
         deletedProfileId = profileId
     }
 
-    override suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long {
+    override suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long? {
         addedColors += profileId to kind
         val color = PaletteColor(id = addedColors.size.toLong(), kind = kind, argb = argb)
         val current = profiles.value ?: return color.id
@@ -117,15 +153,7 @@ private class FakeProfileRepository : ProfileRepository {
         return color.id
     }
 
-    override suspend fun removeColor(colorId: Long) {
-        val current = profiles.value ?: return
-        profiles.value = current.copy(
-            bestColors = current.bestColors.filterNot { it.id == colorId },
-            avoidColors = current.avoidColors.filterNot { it.id == colorId }
-        )
-    }
-
-    override suspend fun moveColor(colorId: Long, direction: MoveDirection) {
-        movedColors += colorId to direction
+    override suspend fun removeColors(colorIds: Collection<Long>) {
+        removedBatches += colorIds.toSet()
     }
 }

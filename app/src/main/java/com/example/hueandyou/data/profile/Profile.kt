@@ -1,5 +1,12 @@
 package com.example.hueandyou.data.profile
 
+/**
+ * How many colors each of a profile's lists (Best / Avoid) may hold, so the Profile editor's two
+ * 5x5 grids fit on screen without scrolling. Enforced on add only: lists restored from a backup or
+ * created before the cap are kept as-is.
+ */
+const val MAX_COLORS_PER_KIND = 25
+
 data class PaletteColor(
     val id: Long,
     val kind: ColorKind,

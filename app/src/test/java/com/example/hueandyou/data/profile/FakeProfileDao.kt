@@ -64,22 +64,13 @@ class FakeProfileDao : ProfileDao {
         emit()
     }
 
-    override suspend fun updateColor(color: PaletteColorEntity) {
-        colors[color.id] = color
+    override suspend fun deleteColors(colorIds: List<Long>) {
+        colorIds.forEach { colors.remove(it) }
         emit()
     }
 
-    override suspend fun deleteColor(colorId: Long) {
-        colors.remove(colorId)
-        emit()
-    }
-
-    override suspend fun getColor(colorId: Long): PaletteColorEntity? = colors[colorId]
-
-    override suspend fun getColorsForKind(profileId: Long, kind: ColorKind): List<PaletteColorEntity> =
-        colors.values
-            .filter { it.profileId == profileId && it.kind == kind }
-            .sortedBy { it.position }
+    override suspend fun countColors(profileId: Long, kind: ColorKind): Int =
+        colors.values.count { it.profileId == profileId && it.kind == kind }
 
     override suspend fun nextPosition(profileId: Long, kind: ColorKind): Int =
         (

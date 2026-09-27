@@ -1,5 +1,22 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-27 - Issue #32: Profile editor redesign (grids, edit mode, 25-color cap, hex-only add)
+
+The Profile editor now shows Best/Avoid as 5-column grids of circles (no reorder arrows or per-row
+remove icons), with a full-width tonal "Import palette from photo" button between the name field and
+Best colors. Circle size comes from `worstCaseCircleSize` (two full 5x5 grids, 32-56dp), so it stays
+stable as colors change; `verticalScroll` is kept only as a safety net. The pencil opens an edit mode
+(X / "Edit colors" / tick) where tapping a circle with its "-" badge stages its removal in
+`ProfileEditorViewModel`; the tick commits via the new batch `ProfileRepository.removeColors`, and
+X or back discards. Reordering is gone (`MoveDirection`, `moveColor` and the unused DAO methods
+deleted). Each list is capped at `MAX_COLORS_PER_KIND` = 25: `addColor` returns null when full, and
+palette import pre-selects only the most dominant swatches that fit the remaining slots
+(`preselectWithinSlots`/`toggleWithinSlots`) with an "n of m slots" counter. Existing over-cap lists
+are kept and shown in full. Both add dialogs are replaced by a shared hex-only `HexColorDialog`
+(filtered `#`-prefixed input, live preview, Add disabled until valid). Verified by
+`:colorspace:test :app:testDebugUnitTest assembleDebug`, not on a device; `lintDebug` fails only on
+the existing `CameraAdjustmentSliders` opt-in errors.
+
 ## 2026-09-27 - Issue #31: Settings miscellaneous changes
 
 The About section header now reads "About clothing colors", and the verdict legend shows just the
@@ -77,53 +94,3 @@ No new Compose UI test for the non-tappable photo/chip-row layout (same Robolect
 noted since #3) - verified by reading through `PhotoResultSection`'s nullable-`onTap` branch and
 `HistoryDetailScreen`'s composition. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug
 lintDebug` all pass.
-
-## 2026-09-25 - Issue #28: In-app CameraX viewfinder with center-box overlay and gallery button
-
-Both photo flows' `PickingPhoto` step now renders a new shared `CameraCaptureStep`
-(`ui/common/CameraCaptureStep.kt`) instead of the old two-button "Take photo / Pick photo" screen -
-`MatchObjectScreen` and `RateClothingScreen` each just wire its `onPhotoUri` callback straight to
-their existing `viewModel.onPhotoPicked(context.contentResolver, uri)`, unchanged from here on (same
-decode-and-downscale-off-main-thread pipeline as every other photo entry point). `CameraCaptureStep`
-requests the `CAMERA` runtime permission once on first composition; granted shows `CameraViewfinder`
-(new CameraX `Preview` + `ImageCapture` bound to `ProcessCameraProvider` via an `AndroidView`-wrapped
-`PreviewView`, the back camera, a shutter `FloatingActionButton`, and a corner gallery `IconButton`),
-denied falls back to `CameraPermissionFallback` (a "Pick from gallery" button plus, only after an
-actual denial rather than merely not-yet-granted, a denial message and an "Open Settings" button so
-permission can still be granted later) and auto-launches the gallery picker once so the user isn't
-stuck. The shutter captures to a temp file in the same `cacheDir/camera_captures` FileProvider path
-the old system-camera intent used (`ImageCapture.OutputFileOptions` + `FileProvider.getUriForFile`),
-guarded by an `isCapturing` flag against double-taps; the gallery button and the fallback's button
-both reuse one `ActivityResultContracts.PickVisualMedia()` launcher owned by `CameraCaptureStep`.
-
-The overlay box reuses `CalibrationConfig.CENTER_BOX_FRACTION` and the same `drawMarkerRect`
-`DrawScope` extension `PhotoResultSection` already draws its center-box marker with (widened from
-`private` to `internal` so both files in `ui.common` share it) - the two are guaranteed to match
-since they're the same constant and the same drawing code, not just visually similar. The old
-`ActivityResultContracts.TakePicture()` system-camera launch (and its per-screen
-`createCameraPhotoUri`/`pendingCameraUri`) is deleted from both screens; the `FileProvider`
-declaration and its `camera_captures`/`share_cards` cache-paths are untouched since CameraX's own
-file output and `ShareCardRenderer` still need them. Added the CameraX (`camera-core`/`camera2`/
-`lifecycle`/`view`, 1.4.2) and `lifecycle-runtime-compose` dependencies, plus a manifest
-`CAMERA` permission and an optional `android.hardware.camera` `<uses-feature>` (optional since the
-gallery fallback means the app still works on a camera-less device). Removed the now-orphaned
-`pick_photo_reminder`/`rate_clothing_take_photo` strings (the old screen's copy) and added
-`camera_viewfinder_hint`/`camera_shutter_content_description`/`camera_permission_denied_message`/
-`camera_open_settings`.
-
-Rotation and the live-preview/capture pipeline itself are standard CameraX behavior (`PreviewView`
-and `ImageCapture` both handle sensor/device rotation internally) rather than anything this issue's
-code manages by hand, so there's nothing bespoke to unit-test there. Back from the viewfinder was
-already correct with no change needed - `PickingPhoto` is a state within the existing screen, not a
-separate nav destination, so the screen's existing top-bar back arrow (`onNavigateBack` ->
-`navController.popBackStack()`, both routes are one hop from home) already lands on the home screen.
-
-Test: no new automated test - this issue is almost entirely `PreviewView`/`ProcessCameraProvider`/
-`ImageCapture` wiring plus runtime-permission branching, none of which is unit-testable without
-Robolectric or an instrumented device (same JDK-26/no-`adb` gap noted since #3, and CameraX's own
-Compose/`AndroidView` integration has no meaningful pure-function surface to extract here) - verified
-by reading through the permission branches (granted/first-request/denied-with-fallback) and the
-shutter's file-write-then-`FileProvider`-wrap-then-existing-`onPhotoPicked` call chain. No manual
-on-device check was possible in this environment (no attached device/emulator) - flagged per the
-issue's own "manual check on device" AC as unverified rather than claimed done.
-`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass.

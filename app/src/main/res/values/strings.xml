@@ -39,10 +39,13 @@
     <string name="profile_editor_avoid_colors_title">Colors to Avoid</string>
     <string name="profile_editor_no_colors">No colors yet</string>
     <string name="profile_editor_add_color_content_description">Add color</string>
-    <string name="profile_editor_remove_color_content_description">Remove color</string>
+    <string name="profile_editor_remove_color_content_description">Remove %1$s</string>
+    <string name="profile_editor_edit_colors_title">Edit colors</string>
+    <string name="profile_editor_edit_content_description">Edit colors</string>
+    <string name="profile_editor_confirm_edit_content_description">Apply changes</string>
+    <string name="profile_editor_cancel_edit_content_description">Discard changes</string>
+    <string name="profile_editor_color_count">%1$d/%2$d</string>
     <string name="profile_editor_delete_content_description">Delete profile</string>
-    <string name="profile_editor_move_up_content_description">Move up</string>
-    <string name="profile_editor_move_down_content_description">Move down</string>
     <string name="profile_editor_import_palette">Import palette from photo</string>
 
     <string name="palette_import_title">Import palette from photo</string>
@@ -57,18 +60,16 @@
     <string name="palette_import_reviewing_avoid_title">Colors to Avoid</string>
     <string name="palette_import_no_swatches">No colors extracted</string>
     <string name="palette_import_add_color_content_description">Add color</string>
+    <plurals name="palette_import_slots">
+        <item quantity="one">%1$d of %2$d slot</item>
+        <item quantity="other">%1$d of %2$d slots</item>
+    </plurals>
     <string name="palette_import_remove_color_content_description">Remove color</string>
     <string name="palette_import_confirm_import">Add to profile</string>
 
     <string name="add_color_dialog_title_best">Add a Best Color</string>
     <string name="add_color_dialog_title_avoid">Add a Color to Avoid</string>
-    <string name="add_color_dialog_mode_hex">Hex</string>
-    <string name="add_color_dialog_mode_picker">Picker</string>
     <string name="add_color_dialog_hex_label">Hex code</string>
-    <string name="add_color_dialog_invalid_hex">Enter a valid hex code, like #3A7DFF</string>
-    <string name="add_color_dialog_hue_label">Hue</string>
-    <string name="add_color_dialog_saturation_label">Saturation</string>
-    <string name="add_color_dialog_brightness_label">Brightness</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_add">Add</string>
 

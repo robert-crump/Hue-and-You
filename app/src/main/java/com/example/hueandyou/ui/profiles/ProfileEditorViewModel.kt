@@ -7,14 +7,15 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.hueandyou.HueAndYouApplication
-import com.example.hueandyou.colorspace.parseHexColor
 import com.example.hueandyou.data.profile.ColorKind
-import com.example.hueandyou.data.profile.MoveDirection
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class ProfileEditorViewModel(
@@ -29,19 +30,43 @@ class ProfileEditorViewModel(
         viewModelScope.launch { repository.renameProfile(profileId, name) }
     }
 
-    /** Returns null on success, or an error message if [hex] isn't a valid hex color. */
-    fun addColor(kind: ColorKind, hex: String, invalidHexMessage: String): String? {
-        val argb = parseHexColor(hex) ?: return invalidHexMessage
+    private val _isEditing = MutableStateFlow(false)
+
+    /** Whether the pencil's edit mode (staged color removal) is active. */
+    val isEditing: StateFlow<Boolean> = _isEditing.asStateFlow()
+
+    private val _pendingRemovals = MutableStateFlow<Set<Long>>(emptySet())
+
+    /** Ids of colors removed in edit mode but not yet committed with the tick. */
+    val pendingRemovals: StateFlow<Set<Long>> = _pendingRemovals.asStateFlow()
+
+    fun addColor(kind: ColorKind, argb: Int) {
         viewModelScope.launch { repository.addColor(profileId, kind, argb) }
-        return null
     }
 
-    fun removeColor(colorId: Long) {
-        viewModelScope.launch { repository.removeColor(colorId) }
+    fun startEditing() {
+        _pendingRemovals.value = emptySet()
+        _isEditing.value = true
     }
 
-    fun moveColor(colorId: Long, direction: MoveDirection) {
-        viewModelScope.launch { repository.moveColor(colorId, direction) }
+    fun stageRemoval(colorId: Long) {
+        if (_isEditing.value) _pendingRemovals.update { it + colorId }
+    }
+
+    /** Leaves edit mode, discarding every staged removal (X and system back). */
+    fun cancelEditing() {
+        _pendingRemovals.value = emptySet()
+        _isEditing.value = false
+    }
+
+    /** Leaves edit mode, removing every staged color in one batch (the tick). */
+    fun commitEditing() {
+        val removals = _pendingRemovals.value
+        _pendingRemovals.value = emptySet()
+        _isEditing.value = false
+        if (removals.isNotEmpty()) {
+            viewModelScope.launch { repository.removeColors(removals) }
+        }
     }
 
     fun deleteProfile(onDeleted: () -> Unit) {

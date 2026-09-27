@@ -11,7 +11,6 @@ import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.profile.ColorKind
-import com.example.hueandyou.data.profile.MoveDirection
 import com.example.hueandyou.data.profile.PaletteColor
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
@@ -233,14 +232,10 @@ class RateClothingViewModelTest {
             throw UnsupportedOperationException("not used by this test")
         }
 
-        override suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long =
+        override suspend fun addColor(profileId: Long, kind: ColorKind, argb: Int): Long? =
             throw UnsupportedOperationException("not used by this test")
 
-        override suspend fun removeColor(colorId: Long) {
-            throw UnsupportedOperationException("not used by this test")
-        }
-
-        override suspend fun moveColor(colorId: Long, direction: MoveDirection) {
+        override suspend fun removeColors(colorIds: Collection<Long>) {
             throw UnsupportedOperationException("not used by this test")
         }
     }
