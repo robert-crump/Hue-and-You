@@ -1,25 +1,32 @@
 package com.example.hueandyou.ui.history
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,8 +35,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
@@ -39,8 +54,6 @@ import com.example.hueandyou.ui.common.HarmonyResultBody
 import com.example.hueandyou.ui.common.InfoDialog
 import com.example.hueandyou.ui.common.PaletteResultBody
 import com.example.hueandyou.ui.common.PhotoResultSection
-
-private const val PHOTO_MAX_HEIGHT_FRACTION = 0.35f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,30 +66,69 @@ fun HistoryDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showDisclaimer by remember { mutableStateOf(false) }
+    var isRenaming by rememberSaveable { mutableStateOf(false) }
+    var draft by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue()) }
+    val loaded = uiState as? HistoryDetailUiState.Loaded
+    val editing = isRenaming && loaded != null
+
+    fun startRenaming(name: String) {
+        draft = TextFieldValue(name, selection = TextRange(0, name.length))
+        isRenaming = true
+    }
+
+    fun commitRename() {
+        if (draft.text.isBlank()) return
+        viewModel.rename(draft.text)
+        isRenaming = false
+    }
+
+    // While renaming, back cancels the edit instead of leaving the screen - same as the X.
+    BackHandler(enabled = editing) { isRenaming = false }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.history_detail_title)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.navigate_back)
+            if (editing) {
+                RenameTopBar(
+                    draft = draft,
+                    onDraftChange = { draft = it },
+                    onCancel = { isRenaming = false },
+                    onConfirm = ::commitRename,
+                )
+            } else {
+                TopAppBar(
+                    title = {
+                        Text(
+                            text = loaded?.entry?.name.orEmpty(),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                },
-                actions = {
-                    if (uiState is HistoryDetailUiState.Loaded) {
-                        IconButton(onClick = { showDisclaimer = true }) {
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
                             Icon(
-                                Icons.Filled.Info,
-                                contentDescription = stringResource(R.string.harmony_disclaimer_content_description)
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.navigate_back)
                             )
                         }
+                    },
+                    actions = {
+                        if (loaded != null) {
+                            IconButton(onClick = { startRenaming(loaded.entry.name) }) {
+                                Icon(
+                                    Icons.Filled.Edit,
+                                    contentDescription = stringResource(R.string.history_rename_content_description)
+                                )
+                            }
+                            IconButton(onClick = { showDisclaimer = true }) {
+                                Icon(
+                                    Icons.Filled.Info,
+                                    contentDescription = stringResource(R.string.harmony_disclaimer_content_description)
+                                )
+                            }
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     ) { innerPadding ->
         when (val state = uiState) {
@@ -85,7 +137,6 @@ fun HistoryDetailScreen(
             is HistoryDetailUiState.Loaded -> LoadedContent(
                 state = state,
                 innerPadding = innerPadding,
-                onRename = viewModel::rename,
                 onPickCandidate = viewModel::pickCandidate,
             )
         }
@@ -100,6 +151,69 @@ fun HistoryDetailScreen(
     }
 }
 
+/**
+ * The app bar while renaming: X (discard) on the left, the name as an in-place field styled like
+ * the normal title, and a tick (save, disabled while blank) on the right. The field takes focus -
+ * and with it the keyboard - as soon as the bar appears.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RenameTopBar(
+    draft: TextFieldValue,
+    onDraftChange: (TextFieldValue) -> Unit,
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+    TopAppBar(
+        title = {
+            BasicTextField(
+                value = draft,
+                onValueChange = onDraftChange,
+                singleLine = true,
+                textStyle = MaterialTheme.typography.titleLarge.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { onConfirm() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
+                decorationBox = { innerTextField ->
+                    Column {
+                        innerTextField()
+                        HorizontalDivider(
+                            thickness = 2.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                },
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onCancel) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.history_rename_cancel_content_description)
+                )
+            }
+        },
+        actions = {
+            IconButton(onClick = onConfirm, enabled = draft.text.isNotBlank()) {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = stringResource(R.string.history_rename_confirm_content_description)
+                )
+            }
+        }
+    )
+}
+
 @Composable
 private fun LoadingStep(innerPadding: PaddingValues) {
     Box(
@@ -112,39 +226,31 @@ private fun LoadingStep(innerPadding: PaddingValues) {
     }
 }
 
+/**
+ * Same non-scrolling layout as the live result steps: the photo takes whatever height the chips
+ * and the verdict/harmony body leave over.
+ */
 @Composable
 private fun LoadedContent(
     state: HistoryDetailUiState.Loaded,
     innerPadding: PaddingValues,
-    onRename: (String) -> Unit,
     onPickCandidate: (Int) -> Unit,
 ) {
     val entry = state.entry
-    var name by rememberSaveable(entry.id) { mutableStateOf(entry.name) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(innerPadding)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        OutlinedTextField(
-            value = name,
-            onValueChange = {
-                name = it
-                onRename(it)
-            },
-            label = { Text(stringResource(R.string.history_entry_name_label)) },
-            modifier = Modifier.fillMaxWidth()
-        )
         PhotoResultSection(
             photo = state.photo,
             sampleX = entry.sampleX,
             sampleY = entry.sampleY,
-            maxHeightFraction = PHOTO_MAX_HEIGHT_FRACTION,
-            modifier = Modifier.padding(top = 16.dp),
+            maxHeightFraction = 1f,
+            modifier = Modifier.weight(1f),
         )
         ColorChipRow(
             chipColorsArgb = state.chipColorsArgb,

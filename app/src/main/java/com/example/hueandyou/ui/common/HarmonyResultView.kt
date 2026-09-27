@@ -44,8 +44,8 @@ private val SUGGESTION_ROW_HEIGHT = RELATIONSHIP_SWATCH_SIZE + 12.dp
  * Renders the harmony suggestions for [inputColorArgb], recomputed from it, [wheel] and [balance]
  * rather than from any stored/precomputed colors - shared by the live Match Colors for an Object
  * result step and the History detail screen that reopens a saved snapshot of the same input. No
- * hex codes, name field or wheel/balance controls here - those live elsewhere (chips, History's
- * own rename field, and Settings, respectively).
+ * hex codes, name or wheel/balance controls here - those live elsewhere (chips, History's
+ * app bar rename, and Settings, respectively).
  */
 @Composable
 internal fun HarmonyResultBody(inputColorArgb: Int, wheel: HarmonyWheel, balance: HarmonyBalance) {

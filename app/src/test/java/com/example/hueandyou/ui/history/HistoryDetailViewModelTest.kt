@@ -238,6 +238,30 @@ class HistoryDetailViewModelTest {
     }
 
     @Test
+    fun rename_trimsSurroundingWhitespace() {
+        val repository = FakeHistoryRepository(clothingEntry())
+        val model = viewModel(repository)
+        mainDispatcher.scheduler.runCurrent()
+
+        model.rename("  Red scarf \n")
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(listOf(1L to "Red scarf"), repository.renamedNames)
+    }
+
+    @Test
+    fun rename_blankName_isIgnored() {
+        val repository = FakeHistoryRepository(clothingEntry())
+        val model = viewModel(repository)
+        mainDispatcher.scheduler.runCurrent()
+
+        model.rename("   ")
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(emptyList<Pair<Long, String>>(), repository.renamedNames)
+    }
+
+    @Test
     fun entryDeletedElsewhere_showsNotFound() {
         val repository = FakeHistoryRepository(clothingEntry())
         val model = viewModel(repository)

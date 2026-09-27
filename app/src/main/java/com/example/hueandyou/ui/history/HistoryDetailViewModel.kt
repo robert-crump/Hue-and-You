@@ -76,8 +76,11 @@ class HistoryDetailViewModel(
         _uiState.value = HistoryDetailUiState.Loaded(entry, bitmap, ColorExtractor.selectTopColors(extractedCandidates))
     }
 
+    /** Saves [name] trimmed; a blank name is ignored so an entry never ends up nameless. */
     fun rename(name: String) {
-        viewModelScope.launch { repository.renameEntry(entryId, name) }
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch { repository.renameEntry(entryId, trimmed) }
     }
 
     /** Re-picks the entry's color from one of the chips; resets the sample point to the center box. */

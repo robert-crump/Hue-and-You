@@ -9,8 +9,9 @@
     <string name="history_empty_state_body">Tap the camera button to take a photo. Your results will show up here.</string>
 
     <string name="history_fab_content_description">Take a photo</string>
-    <string name="history_entry_name_label">Name</string>
-    <string name="history_detail_title">Result</string>
+    <string name="history_rename_content_description">Rename</string>
+    <string name="history_rename_confirm_content_description">Save name</string>
+    <string name="history_rename_cancel_content_description">Cancel renaming</string>
     <string name="history_entry_delete_content_description">Delete entry</string>
     <string name="history_entry_deleted_message">Deleted \"%1$s\"</string>
     <string name="history_entry_deleted_undo_action">Undo</string>

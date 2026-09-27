@@ -1,5 +1,18 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-27 - Issue #33: History detail - rename in the app bar, no scrolling
+
+History detail's app bar title is now the entry name (1 line, ellipsis) with a pencil next to the
+info icon; the "Name" text field and the fixed "Result" title (`history_entry_name_label`,
+`history_detail_title`) are gone. The pencil swaps in `RenameTopBar`: X / an in-place
+`BasicTextField` (`titleLarge`, primary underline, focused with the whole name selected) / tick.
+Tick and IME Done save once; X and system back (`BackHandler`) discard. The tick is disabled while
+the draft is blank. Draft + mode live in `rememberSaveable`. `HistoryDetailViewModel.rename` now
+trims and ignores blank names (it no longer runs per keystroke). The body uses the live result
+layout (photo `weight(1f)`, `maxHeightFraction = 1f`, no `verticalScroll`). Landscape/short screens
+are split out to #36. Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`,
+not on a device.
+
 ## 2026-09-27 - Issue #32: Profile editor redesign (grids, edit mode, 25-color cap, hex-only add)
 
 The Profile editor now shows Best/Avoid as 5-column grids of circles (no reorder arrows or per-row
@@ -52,45 +65,3 @@ from Home (History), so result Back -> `finishResult` and viewfinder Back -> `po
 Test: `startNewPhoto` cases in `RateClothingViewModelTest` (state -> PickingPhoto, profile switch kept,
 next result saved as a new entry) and `MatchObjectViewModelTest`. No Compose/navigation UI test for the
 FAB overlap or Back (same Robolectric/JDK-26 gap as before); verified by construction only.
-
-## 2026-09-25 - Issue #27: Re-pick color with chips in History detail
-
-History detail now goes through a new `HistoryDetailUiState` (`Loading`/`NotFound`/`Loaded`)
-instead of rendering straight off `repository.observeEntry`'s nullable value - `Loaded` carries
-the decoded thumbnail `Bitmap` and a freshly-recomputed `alternativesArgb` chip list alongside the
-domain `HistoryEntry`, so the screen has everything it needs without a second query. On each
-`observeEntry` emission, `HistoryDetailViewModel` decodes the thumbnail file (`BitmapFactory.decodeFile`,
-injectable as `bitmapDecoder` for tests) and runs `ColorExtractor.extractCandidates` over it -
-both off `backgroundDispatcher` - but only once per entry open (`photo`/`candidates` are cached
-`var`s checked before redoing either), matching the AC that extraction is a one-time cost, not a
-per-pick one. Since the thumbnail is the 512px JPEG `ThumbnailStore` already saves (not the
-original photo), re-picks can land a few ΔE from the original live pick, which the issue accepts.
-
-`HistoryDetailScreen` renders the shared `PhotoResultSection` (photo + marker at the entry's stored
-`sampleX`/`sampleY`, center box when `null`) and `ColorChipRow` from `ui/common` - the same
-composables the live Rate Clothing/Match Object result pages use from #22 - for both entry types.
-`PhotoResultSection.onTap` became nullable (`((x, y) -> Unit)?`) rather than adding a parallel
-read-only composable, since the only behavioral difference for History detail is skipping the
-`pointerInput`/`detectTapGestures` chain entirely; live-result call sites are unchanged (`onTap` is
-always a lambda there). Picking a chip calls `HistoryDetailViewModel.pickCandidate(argb)`, a no-op
-if it's already the current color, which persists via the existing `HistoryRepository.updateObjectPick`
-(OBJECT) or `updateClothingPick` (CLOTHING, re-scored with `PaletteScorer.score` against the
-entry's own stored `bestColorsArgb`/`avoidColorsArgb` snapshot rather than a live profile lookup -
-this is what makes pre-migration clothing entries with an empty snapshot still score correctly,
-same null-safe shape `PaletteScorer` already handles) with `sampleX`/`sampleY` reset to `null` -
-both already reset the sample point in their SQL, so no DAO change was needed. The updated row
-flows back through the same `observeEntry` Flow, so the screen picks up the new color/score without
-any locally-held pick state. Object entries keep rendering with the wheel/balance they were saved
-with since `HarmonyResultBody` never grew editing controls back after #23 - nothing to change there.
-
-Test: new `HistoryDetailViewModelTest` (the screen had no dedicated ViewModel test before this
-issue) covers off-main-thread decode+extraction on open, extraction-not-repeated-on-repick,
-same-color-repick-is-a-no-op, OBJECT and CLOTHING re-pick persisting with the sample point reset,
-a pre-migration CLOTHING entry (empty best/avoid snapshot) still scoring and updating, rename, and
-the entry-deleted-elsewhere -> `NotFound` case - using the same reflection-free background-dispatcher
-pattern as `MatchObjectViewModelTest`/`RateClothingViewModelTest` (no private method to invoke here,
-since extraction runs from `init` via the repository `Flow` rather than a public entry point).
-No new Compose UI test for the non-tappable photo/chip-row layout (same Robolectric/JDK-26 gap
-noted since #3) - verified by reading through `PhotoResultSection`'s nullable-`onTap` branch and
-`HistoryDetailScreen`'s composition. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug
-lintDebug` all pass.
