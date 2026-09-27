@@ -1,5 +1,15 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-27 - Issue #31: Settings miscellaneous changes
+
+The About section header now reads "About clothing colors", and the verdict legend shows just the
+icon plus "Great color!" / "Avoid" / "Ambiguous" (the `settings_about_verdict_*` sub-descriptions were
+removed). The Settings Color wheel and Color balance `ChoiceDialog`s now show a short `bodySmall`
+description under each option, from new `harmonyWheelDescription`/`harmonyBalanceDescription` next to
+the label helpers in `HarmonyOptionsControls.kt`. Rows use `Modifier.selectable` (RadioButton role)
+with `spacedBy(4.dp)` between them and no padding after the last one, which tightens the gap above
+Cancel. Verified by `assembleDebug test` only, not on a device.
+
 ## 2026-09-25 - Issue #19: Material 3 theme and palette app icon
 
 `Color.kt` now holds the Material Theme Builder (default settings) light/dark palette, replacing the old
@@ -116,35 +126,4 @@ by reading through the permission branches (granted/first-request/denied-with-fa
 shutter's file-write-then-`FileProvider`-wrap-then-existing-`onPhotoPicked` call chain. No manual
 on-device check was possible in this environment (no attached device/emulator) - flagged per the
 issue's own "manual check on device" AC as unverified rather than claimed done.
-`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass.
-
-## 2026-09-25 - Issue #26: Long-press any color circle to copy its hex code
-
-New shared `ColorCircle` composable (`ui/common/ColorCircle.kt`) replaces every ad hoc
-`Box.clip(CircleShape).background(Color(argb))` swatch in the app: `PaletteResultBody`'s verdict
-circle, `HarmonyResultView`'s `ColorSwatch` (renamed away - callers now use `ColorCircle` directly),
-and `PhotoResultSection`'s `ColorChip` (current/alternative chips, which keeps its tap-to-pick
-`onClick` and selected-border via new `border: BorderStroke?`/`onClick: (() -> Unit)?` params) all
-route through it, as does the Best/Avoid list in `ProfileEditorScreen`. Since `PaletteResultBody`/
-`HarmonyResultBody` are shared with History detail (unchanged call sites), its circles pick up the
-same behavior there for free. Deliberately *not* touched: the AddColorDialog color-picker preview
-circle (hex is an input there, not a display) and the small best-colors preview strip in
-`SettingsScreen`/`PaletteImportScreen` - neither is in the issue's enumerated list of circles.
-
-Long-press copies `formatHexColor(argb)` via `LocalClipboard`/`ClipEntry` (not the deprecated
-`LocalClipboardManager.setText`, since this compose-bom already has the suspend-based clipboard
-API) inside a `rememberCoroutineScope().launch`, plus `LocalHapticFeedback.performHapticFeedback
-(HapticFeedbackType.LongPress)` - no app-side toast/snackbar per the AC (minSdk 37 shows the
-system's own confirmation). Built on `Modifier.combinedClickable` with `onClick` optional
-(non-interactive circles like the verdict card pass none, and get `indication = null` so they don't
-gain a spurious ripple) so existing tap behavior (chip selection) is unaffected. The hex `Text` under
-circles in `ProfileEditorScreen`'s Best/Avoid list is deleted (replaced by a `Spacer(weight(1f))` to
-keep the move/remove icon buttons right-aligned); hex is untouched in the color picker dialog, the
-share card and the JSON backup, none of which render a circle from this list.
-
-Test: no new Compose UI test for the clipboard-after-long-press AC - same Robolectric/JDK-26
-environment gap noted since #3 (confirmed still true: this JDK is 26.0.1, `adb` isn't available
-either, so no path to a real instrumented test in this environment) - verified by reading through
-`ColorCircle`'s `combinedClickable` wiring and each call site's parameters instead. No other tests
-affected (no new/changed pure functions - `formatHexColor` is unchanged and already covered).
 `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass.

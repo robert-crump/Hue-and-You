@@ -90,3 +90,14 @@ internal fun harmonyBalanceLabel(balance: HarmonyBalance): Int = when (balance) 
     HarmonyBalance.FAITHFUL -> R.string.harmony_balance_faithful
     HarmonyBalance.SOFTENED -> R.string.harmony_balance_softened
 }
+
+internal fun harmonyWheelDescription(wheel: HarmonyWheel): Int = when (wheel) {
+    HarmonyWheel.TRADITIONAL -> R.string.harmony_wheel_traditional_description
+    HarmonyWheel.SCREEN -> R.string.harmony_wheel_screen_description
+    HarmonyWheel.PERCEPTUAL -> R.string.harmony_wheel_perceptual_description
+}
+
+internal fun harmonyBalanceDescription(balance: HarmonyBalance): Int = when (balance) {
+    HarmonyBalance.FAITHFUL -> R.string.harmony_balance_faithful_description
+    HarmonyBalance.SOFTENED -> R.string.harmony_balance_softened_description
+}

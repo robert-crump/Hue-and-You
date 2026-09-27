@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,6 +63,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -69,7 +71,9 @@ import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.data.profile.Profile
+import com.example.hueandyou.ui.common.harmonyBalanceDescription
 import com.example.hueandyou.ui.common.harmonyBalanceLabel
+import com.example.hueandyou.ui.common.harmonyWheelDescription
 import com.example.hueandyou.ui.common.harmonyWheelLabel
 import com.example.hueandyou.ui.profiles.ProfilesViewModel
 import com.example.hueandyou.ui.theme.LocalSuccessColors
@@ -245,6 +249,7 @@ fun SettingsScreen(
             options = HarmonyWheel.entries,
             selected = defaults.wheel,
             label = { stringResource(harmonyWheelLabel(it)) },
+            description = { stringResource(harmonyWheelDescription(it)) },
             onSelect = {
                 settingsViewModel.setDefaultWheel(it)
                 showWheelDialog = false
@@ -259,6 +264,7 @@ fun SettingsScreen(
             options = HarmonyBalance.entries,
             selected = defaults.balance,
             label = { stringResource(harmonyBalanceLabel(it)) },
+            description = { stringResource(harmonyBalanceDescription(it)) },
             onSelect = {
                 settingsViewModel.setDefaultBalance(it)
                 showBalanceDialog = false
@@ -423,6 +429,7 @@ private fun <T> ChoiceDialog(
     options: List<T>,
     selected: T,
     label: @Composable (T) -> String,
+    description: @Composable (T) -> String,
     onSelect: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -430,17 +437,28 @@ private fun <T> ChoiceDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            Column {
+            // No padding after the last option: the dialog already spaces the text from the buttons.
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 options.forEach { option ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(option) }
-                            .padding(vertical = 4.dp),
+                            .selectable(
+                                selected = option == selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(option) }
+                            ),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(selected = option == selected, onClick = { onSelect(option) })
-                        Text(label(option), style = MaterialTheme.typography.bodyLarge)
+                        RadioButton(selected = option == selected, onClick = null, modifier = Modifier.padding(12.dp))
+                        Column {
+                            Text(label(option), style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                description(option),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
@@ -470,21 +488,18 @@ private fun AboutSection(modifier: Modifier = Modifier) {
             VerdictLine(
                 icon = Icons.Filled.ThumbUpAlt,
                 name = stringResource(R.string.rate_clothing_verdict_yes),
-                meaning = stringResource(R.string.settings_about_verdict_yes),
                 containerColor = successColors.container,
                 contentColor = successColors.onContainer
             )
             VerdictLine(
                 icon = Icons.Filled.ThumbDownAlt,
                 name = stringResource(R.string.rate_clothing_verdict_avoid),
-                meaning = stringResource(R.string.settings_about_verdict_avoid),
                 containerColor = MaterialTheme.colorScheme.errorContainer,
                 contentColor = MaterialTheme.colorScheme.onErrorContainer
             )
             VerdictLine(
                 icon = Icons.Filled.HorizontalRule,
                 name = stringResource(R.string.rate_clothing_verdict_neither),
-                meaning = stringResource(R.string.settings_about_verdict_neither),
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -502,7 +517,6 @@ private fun AboutSection(modifier: Modifier = Modifier) {
 private fun VerdictLine(
     icon: ImageVector,
     name: String,
-    meaning: String,
     containerColor: Color,
     contentColor: Color,
 ) {
@@ -513,10 +527,7 @@ private fun VerdictLine(
         ) {
             Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
         }
-        Column {
-            Text(name, style = MaterialTheme.typography.titleSmall)
-            Text(meaning, style = MaterialTheme.typography.bodyMedium)
-        }
+        Text(name, style = MaterialTheme.typography.titleSmall)
     }
 }
 

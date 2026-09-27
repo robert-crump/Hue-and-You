@@ -105,6 +105,11 @@
     <string name="harmony_wheel_perceptual">Perceptual</string>
     <string name="harmony_balance_faithful">Faithful</string>
     <string name="harmony_balance_softened">Softened</string>
+    <string name="harmony_wheel_traditional_description">Classic painter\'s red-yellow-blue wheel</string>
+    <string name="harmony_wheel_screen_description">Red-green-blue wheel of screens</string>
+    <string name="harmony_wheel_perceptual_description">Steps look evenly spaced</string>
+    <string name="harmony_balance_faithful_description">Keeps your color\'s strength</string>
+    <string name="harmony_balance_softened_description">Calmer, more muted suggestions</string>
 
     <string name="navigate_back">Back</string>
     <string name="result_photo_content_description">Photo</string>
@@ -122,11 +127,8 @@
     <string name="settings_backup_import_confirm_action">Replace</string>
     <string name="settings_backup_import_success">Backup restored</string>
 
-    <string name="settings_about_section_title">About these results</string>
+    <string name="settings_about_section_title">About clothing colors</string>
     <string name="settings_about_intro">We look at the color in your photo and check how close it is to your Best and Avoid colors.</string>
-    <string name="settings_about_verdict_yes">close to a Best color</string>
-    <string name="settings_about_verdict_avoid">close to a color you avoid</string>
-    <string name="settings_about_verdict_neither">not close to either</string>
     <string name="settings_about_disclaimer">This is a fun guess, not expert advice. Color-type ideas aren\'t proven by science.</string>
 
     <string name="camera_viewfinder_hint">Put the item in the middle of the frame, in daylight if you can.</string>
