@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -36,7 +37,7 @@ class HistoryViewModelTest {
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
-        repository = FakeHistoryRepository(entry(1L, "Clothing A"), entry(2L, "Clothing B"))
+        repository = FakeHistoryRepository(entry(1L, "Clothing A"), entry(2L, "Clothing B"), entry(3L, "Clothing C"))
         viewModel = HistoryViewModel(repository)
     }
 
@@ -46,33 +47,124 @@ class HistoryViewModelTest {
     }
 
     @Test
-    fun deleteEntry_hidesFromListImmediatelyWithoutTellingTheRepository() = runTest(dispatcher) {
+    fun enterSelectionMode_selectsOnlyTheLongPressedEntry() = runTest(dispatcher) {
         val states = mutableListOf<HistoryUiState>()
         val job = launch { viewModel.uiState.toList(states) }
         runCurrent()
 
-        viewModel.deleteEntry(entry(1L, "Clothing A"))
+        viewModel.enterSelectionMode(2L)
         runCurrent()
 
-        assertEquals(listOf(2L), states.last().entries.map { it.id })
-        assertEquals(1L, states.last().pendingDeletion?.entryId)
+        assertTrue(states.last().isSelectionMode)
+        assertEquals(setOf(2L), states.last().selectedIds)
+
+        job.cancel()
+    }
+
+    @Test
+    fun toggleSelected_addsAndRemovesAndStaysInSelectionModeWhenEmpty() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        viewModel.toggleSelected(2L)
+        runCurrent()
+        assertEquals(setOf(1L, 2L), states.last().selectedIds)
+
+        viewModel.toggleSelected(1L)
+        viewModel.toggleSelected(2L)
+        runCurrent()
+        assertTrue(states.last().isSelectionMode)
+        assertTrue(states.last().selectedIds.isEmpty())
+
+        job.cancel()
+    }
+
+    @Test
+    fun toggleSelected_outsideSelectionMode_doesNothing() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.toggleSelected(1L)
+        runCurrent()
+
+        assertFalse(states.last().isSelectionMode)
+        assertTrue(states.last().selectedIds.isEmpty())
+
+        job.cancel()
+    }
+
+    @Test
+    fun exitSelectionMode_clearsSelection() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        viewModel.toggleSelected(2L)
+        viewModel.exitSelectionMode()
+        runCurrent()
+
+        assertFalse(states.last().isSelectionMode)
+        assertTrue(states.last().selectedIds.isEmpty())
+
+        job.cancel()
+    }
+
+    @Test
+    fun deleteSelected_hidesBatchImmediatelyExitsSelectionAndDoesNotTellRepositoryYet() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        viewModel.toggleSelected(2L)
+        runCurrent()
+        viewModel.deleteSelected()
+        runCurrent()
+
+        assertEquals(listOf(3L), states.last().entries.map { it.id })
+        assertEquals(listOf(1L, 2L), states.last().pendingDeletion?.entryIds)
+        assertNull(states.last().pendingDeletion?.entryName)
+        assertFalse(states.last().isSelectionMode)
         assertTrue(repository.deletedIds.isEmpty())
 
         job.cancel()
     }
 
     @Test
-    fun undoDelete_beforeWindowElapses_fullyRestoresEntryAndNeverDeletes() = runTest(dispatcher) {
+    fun deleteSelected_singleEntry_carriesItsNameForTheSnackbar() = runTest(dispatcher) {
         val states = mutableListOf<HistoryUiState>()
         val job = launch { viewModel.uiState.toList(states) }
         runCurrent()
 
-        viewModel.deleteEntry(entry(1L, "Clothing A"))
+        viewModel.enterSelectionMode(1L)
         runCurrent()
-        viewModel.undoDelete(1L)
+        viewModel.deleteSelected()
+        runCurrent()
+
+        assertEquals("Clothing A", states.last().pendingDeletion?.entryName)
+
+        job.cancel()
+    }
+
+    @Test
+    fun undoDelete_beforeWindowElapses_restoresWholeBatchAndNeverDeletes() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        viewModel.toggleSelected(2L)
+        runCurrent()
+        viewModel.deleteSelected()
+        runCurrent()
+        viewModel.undoDelete(requireNotNull(states.last().pendingDeletion))
         dispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(listOf(1L, 2L), states.last().entries.map { it.id }.sorted())
+        assertEquals(listOf(1L, 2L, 3L), states.last().entries.map { it.id }.sorted())
         assertNull(states.last().pendingDeletion)
         assertTrue(repository.deletedIds.isEmpty())
 
@@ -80,17 +172,47 @@ class HistoryViewModelTest {
     }
 
     @Test
-    fun deleteEntry_afterWindowElapses_finalizesDeletionInRepository() = runTest(dispatcher) {
+    fun deleteSelected_afterWindowElapses_finalizesWholeBatchInRepository() = runTest(dispatcher) {
         val states = mutableListOf<HistoryUiState>()
         val job = launch { viewModel.uiState.toList(states) }
         runCurrent()
 
-        viewModel.deleteEntry(entry(1L, "Clothing A"))
+        viewModel.enterSelectionMode(1L)
+        viewModel.toggleSelected(2L)
+        runCurrent()
+        viewModel.deleteSelected()
+        dispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(listOf(1L, 2L), repository.deletedIds.sorted())
+        assertEquals(listOf(3L), states.last().entries.map { it.id })
+        assertNull(states.last().pendingDeletion)
+
+        job.cancel()
+    }
+
+    @Test
+    fun secondDelete_replacesUndoTargetAndPreviousBatchStillFinalizes() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        runCurrent()
+        viewModel.deleteSelected()
+        runCurrent()
+        viewModel.enterSelectionMode(2L)
+        runCurrent()
+        viewModel.deleteSelected()
+        runCurrent()
+
+        val pending = requireNotNull(states.last().pendingDeletion)
+        assertEquals(listOf(2L), pending.entryIds)
+
+        viewModel.undoDelete(pending)
         dispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(listOf(1L), repository.deletedIds)
-        assertEquals(listOf(2L), states.last().entries.map { it.id })
-        assertNull(states.last().pendingDeletion)
+        assertEquals(listOf(2L, 3L), states.last().entries.map { it.id }.sorted())
 
         job.cancel()
     }

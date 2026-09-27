@@ -1,5 +1,33 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-27 - Issue #34: History rows - color summary line, long-press multiselect
+
+Each History row gets a bodySmall summary line between the name and the date. Clothing:
+`chosen | verdict`, verdict text colored by a new `SuccessColors.content` token (on-surface green;
+`onContainer` was only legible on the green card), `error` for Avoid, `onSurfaceVariant` for
+Ambiguous. Object: `chosen | complementary | analogous | tonal`, recomputed via
+`HarmonyEngine.generate` from the entry's stored wheel/balance, Tonal only for a neutral color
+(same rule as `HarmonyResultBody`). Circles are 12dp with a 1dp `outlineVariant` ring and are
+drawn as plain Boxes, not `ColorCircle`, because that one always consumes click/long-press
+(hex copy) and would steal the row's gestures. Object entries always have wheel/balance (detail
+already `requireNotNull`s them), so a null just shows the chosen circle alone rather than
+reading Settings defaults.
+
+Trash icon removed in favor of Velometrics' Home selection pattern: long-press enters selection
+mode, tap toggles, 0 selected stays in the mode with delete disabled. The contextual bar
+(`X | N selected | delete`) is drawn by the NavHost (it owns the tab top bar), so `HistoryScreen`
+reports `HistorySelectionBarState` up via `onSelectionChange`, like snackbar height. FAB is hidden
+during selection; any bottom-nav tap, back or X exits. Selected rows get a `secondaryContainer`
+tint and a check badge on the thumbnail. No confirm dialog: the undo snackbar was generalized
+from one entry to a batch (`PendingDeletion.entryIds`, name only for a single entry, plural
+"Deleted N entries" otherwise); a second delete takes over the snackbar while the earlier batch
+finalizes on its own timer.
+
+Test: `HistoryViewModelTest` now covers enter/toggle/exit selection, toggle-outside-mode no-op,
+batch delete hide + exit selection, single-entry name, batch undo, batch finalize, and a second
+delete replacing the undo target. `./gradlew :colorspace:test :app:testDebugUnitTest
+assembleDebug lintDebug` all pass.
+
 ## 2026-09-27 - Issue #33: History detail - rename in the app bar, no scrolling
 
 History detail's app bar title is now the entry name (1 line, ellipsis) with a pencil next to the
@@ -50,18 +78,3 @@ for the Yes verdict are unchanged. Launcher icon uses the Material Symbols "pale
 issue's "Compare") as a white foreground scaled to 48dp inside the 66dp safe zone, on the theme's primary
 `#904B3F`; the existing monochrome layer reuses the foreground. Verified by `assembleDebug test` only, not
 on a device launcher.
-
-## 2026-09-25 - Issue #29: New photo FAB on result pages, Back goes home
-
-Both result pages (Rate Clothing, Match Object) now show a "New photo" `ExtendedFloatingActionButton`
-(camera icon) via the screen's own `Scaffold.floatingActionButton`, only while `ShowingResult`. It calls
-new `startNewPhoto()` on each ViewModel, which drops the cached candidates and sets state back to
-`PickingPhoto` (the CameraX viewfinder); the saved entry is untouched and the next photo saves a new one.
-`RateClothingViewModel` keeps `selectedProfile` across it, so clothing keeps the same profile. Result
-columns reserve 88dp bottom padding (56dp FAB + margins); the photo is `weight(1f)` so it shrinks rather
-than the verdict/harmony rows being covered. Back needed no nav change: both screens are pushed straight
-from Home (History), so result Back -> `finishResult` and viewfinder Back -> `popBackStack` both land there.
-
-Test: `startNewPhoto` cases in `RateClothingViewModelTest` (state -> PickingPhoto, profile switch kept,
-next result saved as a new entry) and `MatchObjectViewModelTest`. No Compose/navigation UI test for the
-FAB overlap or Back (same Robolectric/JDK-26 gap as before); verified by construction only.

@@ -12,7 +12,19 @@
     <string name="history_rename_content_description">Rename</string>
     <string name="history_rename_confirm_content_description">Save name</string>
     <string name="history_rename_cancel_content_description">Cancel renaming</string>
-    <string name="history_entry_delete_content_description">Delete entry</string>
+    <string name="history_selection_close_content_description">Exit selection</string>
+    <string name="history_selection_delete_content_description">Delete selected entries</string>
+    <plurals name="history_selection_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="history_entries_deleted_message">
+        <item quantity="one">Deleted %d entry</item>
+        <item quantity="other">Deleted %d entries</item>
+    </plurals>
+    <string name="history_entry_selected_content_description">Selected</string>
+    <string name="history_clothing_summary_content_description">Chosen color: %1$s</string>
+    <string name="history_object_summary_content_description">Chosen color with suggested harmonies</string>
     <string name="history_entry_deleted_message">Deleted \"%1$s\"</string>
     <string name="history_entry_deleted_undo_action">Undo</string>
 

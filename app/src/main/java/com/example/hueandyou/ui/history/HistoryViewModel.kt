@@ -20,14 +20,19 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** How long a deleted entry stays recoverable via the Undo snackbar before it's finalized. */
+/** How long a deleted batch stays recoverable via the Undo snackbar before it's finalized. */
 private const val UNDO_WINDOW_MILLIS = 4_000L
 
-data class PendingDeletion(val entryId: Long, val entryName: String)
+/** The most recent deleted batch, still undoable. [entryName] is set only for a single-entry batch. */
+data class PendingDeletion(val entryIds: List<Long>, val entryName: String?) {
+    val count: Int get() = entryIds.size
+}
 
 data class HistoryUiState(
     val entries: List<HistoryEntry> = emptyList(),
-    val pendingDeletion: PendingDeletion? = null
+    val pendingDeletion: PendingDeletion? = null,
+    val isSelectionMode: Boolean = false,
+    val selectedIds: Set<Long> = emptySet(),
 ) {
     val isEmpty: Boolean get() = entries.isEmpty()
 }
@@ -37,40 +42,71 @@ class HistoryViewModel(
     private val type: HistoryEntryType? = null,
 ) : ViewModel() {
 
-    /** Entries currently within their undo window: hidden from the list, not yet deleted for real. */
-    private val pendingDeletions = MutableStateFlow<Map<Long, HistoryEntry>>(emptyMap())
-    private val pendingDeletionJobs = mutableMapOf<Long, Job>()
+    /**
+     * Batches currently within their undo window, oldest first: hidden from the list, not yet
+     * deleted for real. Only the newest batch is offered for undo; older ones just run out their timer.
+     */
+    private val pendingBatches = MutableStateFlow<List<List<HistoryEntry>>>(emptyList())
+    private val pendingBatchJobs = mutableMapOf<List<Long>, Job>()
 
     /** IDs already deleted from the repository; kept hidden in case the list flow is briefly stale. */
     private val deletedIds = MutableStateFlow<Set<Long>>(emptySet())
 
+    /** Null outside selection mode; may be empty inside it (delete is then disabled). */
+    private val selectedIds = MutableStateFlow<Set<Long>?>(null)
+
     val uiState: StateFlow<HistoryUiState> = combine(
-        repository.observeEntries(), pendingDeletions, deletedIds
-    ) { entries, pending, deleted ->
+        repository.observeEntries(), pendingBatches, deletedIds, selectedIds
+    ) { entries, batches, deleted, selected ->
+        val pendingIds = batches.flatten().mapTo(HashSet()) { it.id }
         HistoryUiState(
-            entries = entries.filter { (type == null || it.type == type) && it.id !in pending && it.id !in deleted },
-            pendingDeletion = pending.values.lastOrNull()?.let { PendingDeletion(it.id, it.name) }
+            entries = entries.filter { (type == null || it.type == type) && it.id !in pendingIds && it.id !in deleted },
+            pendingDeletion = batches.lastOrNull()?.let { batch ->
+                PendingDeletion(batch.map { it.id }, batch.singleOrNull()?.name)
+            },
+            isSelectionMode = selected != null,
+            selectedIds = selected.orEmpty(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
 
-    /** Hides [entry] immediately; it's only actually deleted once the undo window elapses. */
-    fun deleteEntry(entry: HistoryEntry) {
-        pendingDeletions.update { it + (entry.id to entry) }
-        pendingDeletionJobs[entry.id] = viewModelScope.launch {
+    /** Long-press: enters selection mode with just [entryId] selected. */
+    fun enterSelectionMode(entryId: Long) {
+        selectedIds.value = setOf(entryId)
+    }
+
+    /** Tap while in selection mode: multiselect toggle. Deselecting the last one stays in selection mode. */
+    fun toggleSelected(entryId: Long) {
+        selectedIds.update { current -> current?.let { if (entryId in it) it - entryId else it + entryId } }
+    }
+
+    /** Close (X), back, or leaving the tab: exits selection mode and clears all selections. */
+    fun exitSelectionMode() {
+        selectedIds.value = null
+    }
+
+    /** Hides every selected entry immediately as one undoable batch and exits selection mode. */
+    fun deleteSelected() {
+        val selected = selectedIds.value.orEmpty()
+        val batch = uiState.value.entries.filter { it.id in selected }
+        exitSelectionMode()
+        if (batch.isEmpty()) return
+        val ids = batch.map { it.id }
+        pendingBatches.update { it + listOf(batch) }
+        pendingBatchJobs[ids] = viewModelScope.launch {
             delay(UNDO_WINDOW_MILLIS)
-            repository.deleteEntry(entry.id)
+            ids.forEach { repository.deleteEntry(it) }
             // Stay hidden after the delete: the list flow may still emit a stale list containing
-            // the entry, which would flash it back into view when the pending state is cleared.
-            deletedIds.update { it + entry.id }
-            pendingDeletions.update { it - entry.id }
-            pendingDeletionJobs.remove(entry.id)
+            // the entries, which would flash them back into view when the pending state is cleared.
+            deletedIds.update { it + ids }
+            pendingBatches.update { batches -> batches.filterNot { batch -> batch.map { it.id } == ids } }
+            pendingBatchJobs.remove(ids)
         }
     }
 
-    /** Cancels a pending deletion, fully restoring the entry (it was never actually removed). */
-    fun undoDelete(entryId: Long) {
-        pendingDeletionJobs.remove(entryId)?.cancel()
-        pendingDeletions.update { it - entryId }
+    /** Cancels a pending batch deletion, fully restoring its entries (they were never actually removed). */
+    fun undoDelete(pending: PendingDeletion) {
+        pendingBatchJobs.remove(pending.entryIds)?.cancel()
+        pendingBatches.update { batches -> batches.filterNot { batch -> batch.map { it.id } == pending.entryIds } }
     }
 
     companion object {

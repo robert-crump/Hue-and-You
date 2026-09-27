@@ -94,9 +94,9 @@ fun HueAndYouTheme(
     }
 
     val successColors = if (darkTheme) {
-        SuccessColors(SuccessContainerDark, SuccessOnContainerDark)
+        SuccessColors(SuccessContainerDark, SuccessOnContainerDark, SuccessContentDark)
     } else {
-        SuccessColors(SuccessContainerLight, SuccessOnContainerLight)
+        SuccessColors(SuccessContainerLight, SuccessOnContainerLight, SuccessContentLight)
     }
 
     CompositionLocalProvider(LocalSuccessColors provides successColors) {

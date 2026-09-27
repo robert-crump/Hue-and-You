@@ -81,9 +81,12 @@ val SuccessContainerLight = Color(0xFFC6EFCE)
 val SuccessOnContainerLight = Color(0xFF0B4619)
 val SuccessContainerDark = Color(0xFF1E4B2A)
 val SuccessOnContainerDark = Color(0xFFB6F2C1)
+// "Yes" verdict text drawn straight on the surface (History rows), not on the container.
+val SuccessContentLight = Color(0xFF1B6B2F)
+val SuccessContentDark = Color(0xFF7DD99A)
 
-internal data class SuccessColors(val container: Color, val onContainer: Color)
+internal data class SuccessColors(val container: Color, val onContainer: Color, val content: Color)
 
 internal val LocalSuccessColors = staticCompositionLocalOf {
-    SuccessColors(SuccessContainerLight, SuccessOnContainerLight)
+    SuccessColors(SuccessContainerLight, SuccessOnContainerLight, SuccessContentLight)
 }

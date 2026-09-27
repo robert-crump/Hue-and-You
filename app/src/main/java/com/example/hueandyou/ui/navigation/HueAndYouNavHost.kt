@@ -12,7 +12,10 @@ import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.LargeFloatingActionButton
 import com.example.hueandyou.data.history.HistoryEntryType
@@ -36,8 +39,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -50,6 +55,7 @@ import androidx.navigation.navArgument
 import com.example.hueandyou.R
 import com.example.hueandyou.ui.history.HistoryDetailScreen
 import com.example.hueandyou.ui.history.HistoryScreen
+import com.example.hueandyou.ui.history.HistorySelectionBarState
 import com.example.hueandyou.ui.matchcolors.MatchObjectScreen
 import com.example.hueandyou.ui.paletteimport.PaletteImportScreen
 import com.example.hueandyou.ui.profiles.ProfileEditorScreen
@@ -79,6 +85,9 @@ fun HueAndYouNavHost() {
         label = "fabOffset"
     )
 
+    // Set while a History tab is in selection mode: swaps the tab bar for the contextual bar and hides the FAB.
+    var historySelection by remember { mutableStateOf<HistorySelectionBarState?>(null) }
+
     val currentRoute = currentDestination?.route
 
     // Only the three tab roots get this bar; every other screen brings its own top bar.
@@ -97,14 +106,47 @@ fun HueAndYouNavHost() {
                             .windowInsetsTopHeight(WindowInsets.statusBars)
                             .background(statusBarColor)
                     )
-                    TopAppBar(
-                        title = { Text(stringResource(rootTab.labelRes), fontWeight = FontWeight.Bold) },
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = barColor,
-                            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
+                    val barColors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = barColor,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
+                    val selection = historySelection
+                    if (selection != null) {
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    pluralStringResource(R.plurals.history_selection_count, selection.count, selection.count),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            navigationIcon = {
+                                IconButton(onClick = selection.onClose) {
+                                    Icon(
+                                        Icons.Filled.Close,
+                                        contentDescription = stringResource(R.string.history_selection_close_content_description)
+                                    )
+                                }
+                            },
+                            actions = {
+                                IconButton(onClick = selection.onDelete, enabled = selection.count > 0) {
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = stringResource(R.string.history_selection_delete_content_description)
+                                    )
+                                }
+                            },
+                            windowInsets = WindowInsets(0, 0, 0, 0),
+                            colors = barColors
+                        )
+                    } else {
+                        TopAppBar(
+                            title = { Text(stringResource(rootTab.labelRes), fontWeight = FontWeight.Bold) },
+                            windowInsets = WindowInsets(0, 0, 0, 0),
+                            colors = barColors
+                        )
+                    }
                 }
             }
         },
@@ -120,6 +162,8 @@ fun HueAndYouNavHost() {
                     NavigationBarItem(
                         selected = selected,
                         onClick = {
+                            // Any tab tap leaves History's selection mode, including re-tapping the same tab.
+                            historySelection?.onClose?.invoke()
                             if (selected) {
                                 // Re-tapping the active tab returns to its root screen.
                                 navController.popBackStack(topLevel.destination.route, inclusive = false)
@@ -145,9 +189,10 @@ fun HueAndYouNavHost() {
             }
         },
         floatingActionButton = {
-            val fabTarget = when (currentRoute) {
-                Destination.Clothes.route -> Destination.RateClothing
-                Destination.Objects.route -> Destination.MatchObject
+            val fabTarget = when {
+                historySelection != null -> null
+                currentRoute == Destination.Clothes.route -> Destination.RateClothing
+                currentRoute == Destination.Objects.route -> Destination.MatchObject
                 else -> null
             }
             if (fabTarget != null) {
@@ -182,6 +227,7 @@ fun HueAndYouNavHost() {
                         scrollToTopRequested = scrollToTop,
                         onScrolledToTop = { historyEntry.savedStateHandle[KEY_SCROLL_HISTORY_TO_TOP] = false },
                         onSnackbarHeightChange = { snackbarHeightPx = it },
+                        onSelectionChange = { historySelection = it },
                         onOpenEntry = { entryId ->
                             navController.navigate(Destination.HistoryDetail.route(entryId))
                         }

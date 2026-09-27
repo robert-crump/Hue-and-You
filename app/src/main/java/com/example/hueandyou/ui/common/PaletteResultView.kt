@@ -60,7 +60,7 @@ internal fun PaletteResultBody(score: PaletteScore, modifier: Modifier = Modifie
     }
 }
 
-private fun verdictLabel(verdict: ClothingVerdict): Int = when (verdict) {
+internal fun verdictLabel(verdict: ClothingVerdict): Int = when (verdict) {
     ClothingVerdict.YES -> R.string.rate_clothing_verdict_yes
     ClothingVerdict.AVOID -> R.string.rate_clothing_verdict_avoid
     ClothingVerdict.NEITHER -> R.string.rate_clothing_verdict_neither
