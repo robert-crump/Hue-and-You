@@ -22,9 +22,11 @@ sealed class Destination(val route: String) {
         const val ARG_PROFILE_ID = "profileId"
         fun route(profileId: Long) = "profile_editor/$profileId"
     }
-    data object PaletteImport : Destination("palette_import/{profileId}") {
+    /** Without a profileId (new-profile mode) the import creates a new profile on confirm. */
+    data object PaletteImport : Destination("palette_import?profileId={profileId}") {
         const val ARG_PROFILE_ID = "profileId"
-        fun route(profileId: Long) = "palette_import/$profileId"
+        const val NO_PROFILE_ID = -1L
+        fun route(profileId: Long? = null) = "palette_import?profileId=${profileId ?: NO_PROFILE_ID}"
     }
     data object RateClothing : Destination("rate_clothing")
     data object MatchObject : Destination("match_object")

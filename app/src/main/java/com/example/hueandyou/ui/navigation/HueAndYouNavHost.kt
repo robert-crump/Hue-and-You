@@ -261,6 +261,9 @@ fun HueAndYouNavHost() {
                     scrollToProfiles = scrollToProfiles,
                     onOpenProfile = { profileId ->
                         navController.navigate(Destination.ProfileEditor.route(profileId))
+                    },
+                    onImportNewProfile = {
+                        navController.navigate(Destination.PaletteImport.route())
                     }
                 )
             }
@@ -282,13 +285,27 @@ fun HueAndYouNavHost() {
             composable(
                 Destination.PaletteImport.route,
                 arguments = listOf(
-                    navArgument(Destination.PaletteImport.ARG_PROFILE_ID) { type = NavType.LongType }
+                    navArgument(Destination.PaletteImport.ARG_PROFILE_ID) {
+                        type = NavType.LongType
+                        defaultValue = Destination.PaletteImport.NO_PROFILE_ID
+                    }
                 )
             ) { backStackEntry ->
-                val profileId = backStackEntry.arguments?.getLong(Destination.PaletteImport.ARG_PROFILE_ID) ?: 0L
+                val profileId = backStackEntry.arguments
+                    ?.getLong(Destination.PaletteImport.ARG_PROFILE_ID)
+                    ?.takeIf { it != Destination.PaletteImport.NO_PROFILE_ID }
                 PaletteImportScreen(
                     profileId = profileId,
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onImported = { importedId ->
+                        if (profileId != null) {
+                            navController.popBackStack()
+                        } else {
+                            navController.navigate(Destination.ProfileEditor.route(importedId)) {
+                                popUpTo(Destination.PaletteImport.route) { inclusive = true }
+                            }
+                        }
+                    }
                 )
             }
             composable(Destination.RateClothing.route) {

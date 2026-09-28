@@ -13,32 +13,38 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbDownAlt
 import androidx.compose.material.icons.filled.ThumbUpAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -46,6 +52,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -86,6 +93,7 @@ private const val PROFILES_HEADER_INDEX = 3
 fun SettingsScreen(
     scrollToProfiles: Boolean = false,
     onOpenProfile: (Long) -> Unit,
+    onImportNewProfile: () -> Unit,
     profilesViewModel: ProfilesViewModel = viewModel(factory = ProfilesViewModel.factory(LocalContext.current)),
     settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(LocalContext.current)),
 ) {
@@ -100,6 +108,7 @@ fun SettingsScreen(
     var pendingImportJson by remember { mutableStateOf<String?>(null) }
     var showWheelDialog by remember { mutableStateOf(false) }
     var showBalanceDialog by remember { mutableStateOf(false) }
+    var showAddProfileSheet by remember { mutableStateOf(false) }
 
     val exportSuccessMessage = stringResource(R.string.settings_backup_export_success)
     val exportFailedMessage = stringResource(R.string.settings_backup_export_failed)
@@ -202,9 +211,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Filled.Add,
                         title = stringResource(R.string.profile_add_content_description),
-                        onClick = {
-                            profilesViewModel.createProfile(defaultProfileName) { id -> onOpenProfile(id) }
-                        }
+                        onClick = { showAddProfileSheet = true }
                     )
                 }
                 SettingsGroup(rows = profileRows + addRow)
@@ -243,6 +250,15 @@ fun SettingsScreen(
         }
     }
 
+    if (showAddProfileSheet) {
+        AddProfileSheet(
+            onDismiss = { showAddProfileSheet = false },
+            onImport = onImportNewProfile,
+            onCustom = {
+                profilesViewModel.createProfile(defaultProfileName) { id -> onOpenProfile(id) }
+            }
+        )
+    }
     if (showWheelDialog) {
         ChoiceDialog(
             title = stringResource(R.string.settings_wheel_title),
@@ -353,6 +369,48 @@ private fun SettingsGroup(rows: List<@Composable () -> Unit>) {
                 row()
             }
         }
+    }
+}
+
+/**
+ * The "New profile" chooser. The "Find my season" row joins once the season flow (#35) ships.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddProfileSheet(
+    onDismiss: () -> Unit,
+    onImport: () -> Unit,
+    onCustom: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    fun dismissThen(action: () -> Unit) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion {
+            onDismiss()
+            action()
+        }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Text(
+            text = stringResource(R.string.profile_add_sheet_title),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+        )
+        SettingsRow(
+            icon = Icons.Filled.PhotoLibrary,
+            title = stringResource(R.string.profile_add_import_title),
+            summary = stringResource(R.string.profile_add_import_summary),
+            onClick = { dismissThen(onImport) }
+        )
+        SettingsRow(
+            icon = Icons.Filled.Edit,
+            title = stringResource(R.string.profile_add_custom_title),
+            summary = stringResource(R.string.profile_add_custom_summary),
+            onClick = { dismissThen(onCustom) }
+        )
+        Spacer(Modifier.height(16.dp))
     }
 }
 

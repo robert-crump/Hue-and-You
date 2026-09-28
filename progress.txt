@@ -1,5 +1,27 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-28 - Issue #39: Add profile chooser bottom sheet
+
+Settings -> Profiles "Add profile" now opens a `ModalBottomSheet` ("New profile") with two rows:
+"Import color palette" (opens `PaletteImport` in new-profile mode) and "Choose custom colors" (the
+old behavior: create a default-named profile and open its editor). The "Find my season" row is
+omitted until #35 ships. The sheet hides before running the chosen action.
+
+New-profile mode: the `PaletteImport` route is now `palette_import?profileId={profileId}` with a
+`-1` default meaning "no profile"; `PaletteImportViewModel` takes `profileId: Long?` plus the
+default profile name. With no profile, review uses the full 25 slots and `confirmImport` creates
+the profile only then (so backing out creates nothing). Confirm moves to a new `Saving` state first
+so a double tap can't create two profiles; `Done` now carries the target profile id. The NavHost
+pops back for an existing profile, or navigates to the new profile's editor with `popUpTo` the
+import screen (inclusive) so back returns to Settings. The review button reads "Create profile"
+in new-profile mode. The review-start logic was split into `@VisibleForTesting startReview` so
+tests can skip the Bitmap/marking steps.
+
+Test: new `PaletteImportViewModelTest` covers full slots, nothing created without confirm, confirm
+creating exactly one profile with the selected Best/Avoid colors, double confirm, and existing-profile
+import. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass; not
+tried on a device.
+
 ## 2026-09-27 - Issue #34: History rows - color summary line, long-press multiselect
 
 Each History row gets a bodySmall summary line between the name and the date. Clothing:
@@ -67,14 +89,3 @@ description under each option, from new `harmonyWheelDescription`/`harmonyBalanc
 the label helpers in `HarmonyOptionsControls.kt`. Rows use `Modifier.selectable` (RadioButton role)
 with `spacedBy(4.dp)` between them and no padding after the last one, which tightens the gap above
 Cancel. Verified by `assembleDebug test` only, not on a device.
-
-## 2026-09-25 - Issue #19: Material 3 theme and palette app icon
-
-`Color.kt` now holds the Material Theme Builder (default settings) light/dark palette, replacing the old
-hand-picked seed colors; `Theme.kt` uses full `LightColorScheme`/`DarkColorScheme`. Dynamic (wallpaper)
-color was later removed on request, so the generated scheme is always used. Medium/high-contrast variants were exported but not wired in, since nothing
-switches on the contrast setting. Typography stayed the default (the export has none). The `SuccessColors`
-for the Yes verdict are unchanged. Launcher icon uses the Material Symbols "palette" glyph (chosen over the
-issue's "Compare") as a white foreground scaled to 48dp inside the 66dp safe zone, on the theme's primary
-`#904B3F`; the existing monochrome layer reuses the foreground. Verified by `assembleDebug test` only, not
-on a device launcher.

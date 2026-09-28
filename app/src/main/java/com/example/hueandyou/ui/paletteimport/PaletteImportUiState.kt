@@ -57,5 +57,8 @@ sealed interface PaletteImportUiState {
         fun slots(kind: ColorKind): Int = if (kind == ColorKind.BEST) bestSlots else avoidSlots
     }
 
-    data object Done : PaletteImportUiState
+    data object Saving : PaletteImportUiState
+
+    /** The swatches were saved to [profileId] (newly created in new-profile mode). */
+    data class Done(val profileId: Long) : PaletteImportUiState
 }

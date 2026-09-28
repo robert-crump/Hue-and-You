@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -29,9 +30,14 @@ private const val MAX_PHOTO_DIMENSION_PX = 1024
 
 private fun remainingSlots(existing: Int): Int = (MAX_COLORS_PER_KIND - existing).coerceAtLeast(0)
 
+/**
+ * Imports swatches into profile [profileId], or - when it is null (new-profile mode) - into a new
+ * profile named [newProfileName] that is only created once the user confirms the review step.
+ */
 class PaletteImportViewModel(
     private val profileRepository: ProfileRepository,
-    private val profileId: Long,
+    private val profileId: Long?,
+    private val newProfileName: String = "",
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<PaletteImportUiState>(PaletteImportUiState.PickingPhoto)
     val uiState: StateFlow<PaletteImportUiState> = _uiState.asStateFlow()
@@ -68,13 +74,18 @@ class PaletteImportViewModel(
             _uiState.value = PaletteImportUiState.MarkingArea(state.bitmap, ColorKind.AVOID)
             return
         }
+        startReview(pendingBestSwatches, swatches)
+    }
+
+    @VisibleForTesting
+    internal fun startReview(bestSwatches: List<ImportSwatch>, avoidSwatches: List<ImportSwatch>) {
         viewModelScope.launch {
-            val profile = profileRepository.observeProfile(profileId).first()
+            val profile = profileId?.let { profileRepository.observeProfile(it).first() }
             val bestSlots = remainingSlots(profile?.bestColors?.size ?: 0)
             val avoidSlots = remainingSlots(profile?.avoidColors?.size ?: 0)
             _uiState.value = PaletteImportUiState.Reviewing(
-                bestSwatches = preselectWithinSlots(pendingBestSwatches, bestSlots),
-                avoidSwatches = preselectWithinSlots(swatches, avoidSlots),
+                bestSwatches = preselectWithinSlots(bestSwatches, bestSlots),
+                avoidSwatches = preselectWithinSlots(avoidSwatches, avoidSlots),
                 bestSlots = bestSlots,
                 avoidSlots = avoidSlots,
             )
@@ -112,14 +123,17 @@ class PaletteImportViewModel(
 
     fun confirmImport() {
         val state = _uiState.value as? PaletteImportUiState.Reviewing ?: return
+        // Leave Reviewing right away so a double tap can't create a second profile.
+        _uiState.value = PaletteImportUiState.Saving
         viewModelScope.launch {
+            val targetId = profileId ?: profileRepository.createProfile(newProfileName)
             state.bestSwatches.filter { it.selected }.forEach {
-                profileRepository.addColor(profileId, ColorKind.BEST, it.argb)
+                profileRepository.addColor(targetId, ColorKind.BEST, it.argb)
             }
             state.avoidSwatches.filter { it.selected }.forEach {
-                profileRepository.addColor(profileId, ColorKind.AVOID, it.argb)
+                profileRepository.addColor(targetId, ColorKind.AVOID, it.argb)
             }
-            _uiState.value = PaletteImportUiState.Done
+            _uiState.value = PaletteImportUiState.Done(targetId)
         }
     }
 
@@ -139,11 +153,11 @@ class PaletteImportViewModel(
     }
 
     companion object {
-        fun factory(context: Context, profileId: Long): ViewModelProvider.Factory = viewModelFactory {
+        fun factory(context: Context, profileId: Long?, newProfileName: String): ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val repository = (context.applicationContext as HueAndYouApplication)
                     .container.profileRepository
-                PaletteImportViewModel(repository, profileId)
+                PaletteImportViewModel(repository, profileId, newProfileName)
             }
         }
     }

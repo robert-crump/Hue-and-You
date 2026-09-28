@@ -71,10 +71,15 @@ import kotlin.math.roundToInt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PaletteImportScreen(
-    profileId: Long,
+    profileId: Long?,
     onNavigateBack: () -> Unit,
+    onImported: (profileId: Long) -> Unit,
     viewModel: PaletteImportViewModel = viewModel(
-        factory = PaletteImportViewModel.factory(LocalContext.current, profileId)
+        factory = PaletteImportViewModel.factory(
+            LocalContext.current,
+            profileId,
+            stringResource(R.string.profile_default_name),
+        )
     ),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -85,8 +90,8 @@ fun PaletteImportScreen(
         if (uri != null) viewModel.onPhotoPicked(context.contentResolver, uri)
     }
 
-    if (uiState is PaletteImportUiState.Done) {
-        LaunchedEffect(Unit) { onNavigateBack() }
+    (uiState as? PaletteImportUiState.Done)?.let { done ->
+        LaunchedEffect(done) { onImported(done.profileId) }
     }
 
     Scaffold(
@@ -131,9 +136,13 @@ fun PaletteImportScreen(
                     onToggle = viewModel::toggleSwatch,
                     onRemove = viewModel::removeSwatch,
                     onAddManual = viewModel::addManualSwatch,
+                    confirmLabel = stringResource(
+                        if (profileId == null) R.string.palette_import_confirm_new_profile
+                        else R.string.palette_import_confirm_import
+                    ),
                     onConfirm = viewModel::confirmImport,
                 )
-                is PaletteImportUiState.Done -> LoadingStep()
+                is PaletteImportUiState.Saving, is PaletteImportUiState.Done -> LoadingStep()
             }
         }
     }
@@ -346,6 +355,7 @@ private fun ReviewingStep(
     onToggle: (ColorKind, Int) -> Unit,
     onRemove: (ColorKind, Int) -> Unit,
     onAddManual: (ColorKind, Int) -> Unit,
+    confirmLabel: String,
     onConfirm: () -> Unit,
 ) {
     var addSwatchKind by remember { mutableStateOf<ColorKind?>(null) }
@@ -373,7 +383,7 @@ private fun ReviewingStep(
             onAddClick = { addSwatchKind = ColorKind.AVOID },
         )
         Button(onClick = onConfirm, modifier = Modifier.padding(top = 16.dp)) {
-            Text(stringResource(R.string.palette_import_confirm_import))
+            Text(confirmLabel)
         }
     }
 
