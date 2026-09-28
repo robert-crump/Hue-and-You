@@ -36,6 +36,8 @@
     <string name="profiles_section_title">Profiles</string>
     <string name="profile_add_content_description">Add profile</string>
     <string name="profile_add_sheet_title">New profile</string>
+    <string name="profile_add_season_title">Find my season</string>
+    <string name="profile_add_season_summary">Match your skin, hair and eyes to a seasonal palette</string>
     <string name="profile_add_import_title">Import color palette</string>
     <string name="profile_add_import_summary">Pick colors from a photo of a palette</string>
     <string name="profile_add_custom_title">Choose custom colors</string>
@@ -85,6 +87,34 @@
     <string name="palette_import_remove_color_content_description">Remove color</string>
     <string name="palette_import_confirm_import">Add to profile</string>
     <string name="palette_import_confirm_new_profile">Create profile</string>
+
+    <string name="season_analysis_title">Find my season</string>
+    <string name="season_analysis_camera_hint">Daylight, no makeup, hair in view</string>
+    <string name="season_analysis_photo_content_description">Your photo</string>
+    <string name="season_feature_skin">Skin</string>
+    <string name="season_feature_hair">Hair</string>
+    <string name="season_feature_eyes">Eyes</string>
+    <string name="season_analysis_prompt_skin">Tap your cheek</string>
+    <string name="season_analysis_prompt_hair">Tap your hair near the root</string>
+    <string name="season_analysis_prompt_eyes">Tap your iris</string>
+    <string name="season_analysis_prompt_done">All set. Tap a chip to re-pick it.</string>
+    <string name="season_analysis_next">Next</string>
+    <string name="season_analysis_match">%d%% match</string>
+    <string name="season_analysis_best_title">Best Colors</string>
+    <string name="season_analysis_avoid_title">Colors to Avoid</string>
+    <string name="season_analysis_create_profile">Create profile</string>
+    <string name="season_light_spring">Light Spring</string>
+    <string name="season_true_spring">True Spring</string>
+    <string name="season_bright_spring">Bright Spring</string>
+    <string name="season_light_summer">Light Summer</string>
+    <string name="season_true_summer">True Summer</string>
+    <string name="season_soft_summer">Soft Summer</string>
+    <string name="season_soft_autumn">Soft Autumn</string>
+    <string name="season_true_autumn">True Autumn</string>
+    <string name="season_deep_autumn">Deep Autumn</string>
+    <string name="season_deep_winter">Deep Winter</string>
+    <string name="season_true_winter">True Winter</string>
+    <string name="season_bright_winter">Bright Winter</string>
 
     <string name="add_color_dialog_title_best">Add a Best Color</string>
     <string name="add_color_dialog_title_avoid">Add a Color to Avoid</string>

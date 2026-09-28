@@ -60,6 +60,7 @@ import com.example.hueandyou.ui.matchcolors.MatchObjectScreen
 import com.example.hueandyou.ui.paletteimport.PaletteImportScreen
 import com.example.hueandyou.ui.profiles.ProfileEditorScreen
 import com.example.hueandyou.ui.rateclothing.RateClothingScreen
+import com.example.hueandyou.ui.seasonanalysis.SeasonAnalysisScreen
 import com.example.hueandyou.ui.settings.SettingsScreen
 
 private const val KEY_SCROLL_HISTORY_TO_TOP = "scrollHistoryToTop"
@@ -264,6 +265,9 @@ fun HueAndYouNavHost() {
                     },
                     onImportNewProfile = {
                         navController.navigate(Destination.PaletteImport.route())
+                    },
+                    onFindSeason = {
+                        navController.navigate(Destination.SeasonAnalysis.route)
                     }
                 )
             }
@@ -304,6 +308,16 @@ fun HueAndYouNavHost() {
                             navController.navigate(Destination.ProfileEditor.route(importedId)) {
                                 popUpTo(Destination.PaletteImport.route) { inclusive = true }
                             }
+                        }
+                    }
+                )
+            }
+            composable(Destination.SeasonAnalysis.route) {
+                SeasonAnalysisScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onProfileCreated = { profileId ->
+                        navController.navigate(Destination.ProfileEditor.route(profileId)) {
+                            popUpTo(Destination.SeasonAnalysis.route) { inclusive = true }
                         }
                     }
                 )

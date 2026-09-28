@@ -60,10 +60,16 @@ import java.io.File
 /**
  * Home screen for both photo flows: an in-app CameraX viewfinder with a shutter and a gallery
  * button, falling back to the system photo picker if camera permission is denied. Reports a
- * ready-to-decode [Uri] via [onPhotoUri] either way.
+ * ready-to-decode [Uri] via [onPhotoUri] either way. [hint] overlays the viewfinder; [showCenterBox]
+ * draws the box the main color is measured from, which only the item flows sample.
  */
 @Composable
-internal fun CameraCaptureStep(onPhotoUri: (Uri) -> Unit, modifier: Modifier = Modifier) {
+internal fun CameraCaptureStep(
+    onPhotoUri: (Uri) -> Unit,
+    modifier: Modifier = Modifier,
+    hint: String = stringResource(R.string.camera_viewfinder_hint),
+    showCenterBox: Boolean = true,
+) {
     val context = LocalContext.current
 
     val pickPhotoLauncher = rememberLauncherForActivityResult(
@@ -94,7 +100,13 @@ internal fun CameraCaptureStep(onPhotoUri: (Uri) -> Unit, modifier: Modifier = M
     }
 
     if (hasCameraPermission) {
-        CameraViewfinder(onPhotoUri = onPhotoUri, onGalleryClick = openGallery, modifier = modifier)
+        CameraViewfinder(
+            onPhotoUri = onPhotoUri,
+            onGalleryClick = openGallery,
+            hint = hint,
+            showCenterBox = showCenterBox,
+            modifier = modifier,
+        )
     } else {
         CameraPermissionFallback(
             showDeniedMessage = permissionWasDenied,
@@ -105,7 +117,13 @@ internal fun CameraCaptureStep(onPhotoUri: (Uri) -> Unit, modifier: Modifier = M
 }
 
 @Composable
-private fun CameraViewfinder(onPhotoUri: (Uri) -> Unit, onGalleryClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun CameraViewfinder(
+    onPhotoUri: (Uri) -> Unit,
+    onGalleryClick: () -> Unit,
+    hint: String,
+    showCenterBox: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageCapture = remember { ImageCapture.Builder().build() }
@@ -138,18 +156,20 @@ private fun CameraViewfinder(onPhotoUri: (Uri) -> Unit, onGalleryClick: () -> Un
             },
         )
 
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val fraction = CalibrationConfig.CENTER_BOX_FRACTION.toFloat()
-            val left = size.width * (1f - fraction) / 2f
-            val top = size.height * (1f - fraction) / 2f
-            drawMarkerRect(
-                topLeft = Offset(left, top),
-                boxSize = Size(size.width * fraction, size.height * fraction),
-            )
+        if (showCenterBox) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val fraction = CalibrationConfig.CENTER_BOX_FRACTION.toFloat()
+                val left = size.width * (1f - fraction) / 2f
+                val top = size.height * (1f - fraction) / 2f
+                drawMarkerRect(
+                    topLeft = Offset(left, top),
+                    boxSize = Size(size.width * fraction, size.height * fraction),
+                )
+            }
         }
 
         Text(
-            text = stringResource(R.string.camera_viewfinder_hint),
+            text = hint,
             color = Color.White,
             textAlign = TextAlign.Center,
             modifier = Modifier

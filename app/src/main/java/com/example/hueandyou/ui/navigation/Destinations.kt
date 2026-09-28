@@ -28,6 +28,8 @@ sealed class Destination(val route: String) {
         const val NO_PROFILE_ID = -1L
         fun route(profileId: Long? = null) = "palette_import?profileId=${profileId ?: NO_PROFILE_ID}"
     }
+    /** Find my season; creates a profile on confirm. */
+    data object SeasonAnalysis : Destination("season_analysis")
     data object RateClothing : Destination("rate_clothing")
     data object MatchObject : Destination("match_object")
 }
@@ -65,6 +67,7 @@ val topLevelDestinations = listOf(
             Destination.Settings,
             Destination.ProfileEditor,
             Destination.PaletteImport,
+            Destination.SeasonAnalysis,
         ),
     )
 )

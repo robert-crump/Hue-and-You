@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -94,6 +95,7 @@ fun SettingsScreen(
     scrollToProfiles: Boolean = false,
     onOpenProfile: (Long) -> Unit,
     onImportNewProfile: () -> Unit,
+    onFindSeason: () -> Unit,
     profilesViewModel: ProfilesViewModel = viewModel(factory = ProfilesViewModel.factory(LocalContext.current)),
     settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(LocalContext.current)),
 ) {
@@ -253,6 +255,7 @@ fun SettingsScreen(
     if (showAddProfileSheet) {
         AddProfileSheet(
             onDismiss = { showAddProfileSheet = false },
+            onFindSeason = onFindSeason,
             onImport = onImportNewProfile,
             onCustom = {
                 profilesViewModel.createProfile(defaultProfileName) { id -> onOpenProfile(id) }
@@ -372,13 +375,12 @@ private fun SettingsGroup(rows: List<@Composable () -> Unit>) {
     }
 }
 
-/**
- * The "New profile" chooser. The "Find my season" row joins once the season flow (#35) ships.
- */
+/** The "New profile" chooser. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddProfileSheet(
     onDismiss: () -> Unit,
+    onFindSeason: () -> Unit,
     onImport: () -> Unit,
     onCustom: () -> Unit,
 ) {
@@ -397,6 +399,12 @@ private fun AddProfileSheet(
             text = stringResource(R.string.profile_add_sheet_title),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+        )
+        SettingsRow(
+            icon = Icons.Filled.Face,
+            title = stringResource(R.string.profile_add_season_title),
+            summary = stringResource(R.string.profile_add_season_summary),
+            onClick = { dismissThen(onFindSeason) }
         )
         SettingsRow(
             icon = Icons.Filled.PhotoLibrary,
