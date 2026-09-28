@@ -101,6 +101,8 @@
     <string name="season_analysis_prompt_hair">Drag the marker onto your hair near the root</string>
     <string name="season_analysis_prompt_eyes">Drag the marker onto your iris. Pinch to zoom in.</string>
     <string name="season_analysis_next">Next</string>
+    <string name="season_analysis_retake">Retake</string>
+    <string name="season_analysis_choose_photo">Choose photo</string>
     <string name="season_analysis_see_result">See my season</string>
     <string name="season_analysis_match">%d%% match</string>
     <string name="season_analysis_best_title">Best Colors</string>

@@ -1,7 +1,11 @@
 package com.example.hueandyou.ui.seasonanalysis
 
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -31,13 +35,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -186,6 +194,8 @@ fun SeasonAnalysisScreen(
                         bitmap = bitmap,
                         state = state,
                         onMoveMarker = viewModel::moveMarker,
+                        onRetake = viewModel::retake,
+                        onPhotoPicked = { uri -> viewModel.onPhotoPicked(context.contentResolver, uri) },
                         onNext = viewModel::next,
                     )
                 }
@@ -214,8 +224,14 @@ private fun PlacingStep(
     bitmap: Bitmap,
     state: SeasonAnalysisUiState.Placing,
     onMoveMarker: (x: Int, y: Int) -> Unit,
+    onRetake: () -> Unit,
+    onPhotoPicked: (Uri) -> Unit,
     onNext: () -> Unit,
 ) {
+    val pickPhotoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> if (uri != null) onPhotoPicked(uri) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -225,6 +241,25 @@ private fun PlacingStep(
             text = stringResource(featurePromptRes(state.feature)),
             style = MaterialTheme.typography.bodyLarge
         )
+        Row(
+            modifier = Modifier.padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(onClick = onRetake) {
+                Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text(stringResource(R.string.season_analysis_retake))
+            }
+            OutlinedButton(
+                onClick = {
+                    pickPhotoLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            ) {
+                Icon(Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                Text(stringResource(R.string.season_analysis_choose_photo))
+            }
+        }
         ZoomablePickPhoto(
             bitmap = bitmap,
             marker = state.marker,
@@ -357,16 +392,18 @@ private fun ZoomablePickPhoto(
                                 transforming = event.changes.size > 1 ||
                                     travel.getDistance() > viewConfiguration.touchSlop
                             }
-                            if (transforming) {
+                            // The release event has no pressed pointers, so no centroid (NaN) -
+                            // applying it would blank the photo.
+                            val centroid = event.calculateCentroid()
+                            if (transforming && centroid != Offset.Unspecified && (zoom != 1f || pan != Offset.Zero)) {
                                 val center = Offset(size.width / 2f, size.height / 2f)
-                                val centroid = event.calculateCentroid()
                                 val newScale = (scale * zoom).coerceIn(1f, MAX_ZOOM)
                                 // Keep the point under the fingers in place while zooming.
                                 val newOffset = centroid - center - (centroid - center - offset) * (newScale / scale) + pan
                                 scale = newScale
                                 offset = clampOffset(newOffset, newScale, size)
-                                event.changes.forEach { it.consume() }
                             }
+                            if (transforming) event.changes.forEach { it.consume() }
                         } while (event.changes.any { it.pressed })
                         if (!transforming) moveMarkerTo(down.position)
                     }

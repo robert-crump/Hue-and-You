@@ -24,15 +24,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -58,6 +60,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.CalibrationConfig
 import java.io.File
+
+private val SHUTTER_BOTTOM_PADDING = 32.dp
+/** Centers the 48dp gallery and lens buttons on the 96dp shutter. */
+private val SIDE_BUTTON_BOTTOM_PADDING = SHUTTER_BOTTOM_PADDING + 24.dp
 
 /**
  * Home screen for both photo flows: an in-app CameraX viewfinder with a shutter and a gallery
@@ -186,7 +192,7 @@ private fun CameraViewfinder(
             onClick = onGalleryClick,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(24.dp),
+                .padding(start = 24.dp, end = 24.dp, bottom = SIDE_BUTTON_BOTTOM_PADDING),
         ) {
             Icon(
                 Icons.Filled.PhotoLibrary,
@@ -200,7 +206,7 @@ private fun CameraViewfinder(
                 onClick = { CameraLensSession.toggle() },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(24.dp),
+                    .padding(start = 24.dp, end = 24.dp, bottom = SIDE_BUTTON_BOTTOM_PADDING),
             ) {
                 Icon(
                     Icons.Filled.Cameraswitch,
@@ -210,9 +216,9 @@ private fun CameraViewfinder(
             }
         }
 
-        FloatingActionButton(
+        LargeFloatingActionButton(
             onClick = {
-                if (isCapturing) return@FloatingActionButton
+                if (isCapturing) return@LargeFloatingActionButton
                 isCapturing = true
                 val file = createCameraCaptureFile(context)
                 imageCapture.takePicture(
@@ -232,9 +238,13 @@ private fun CameraViewfinder(
             },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(32.dp),
+                .padding(bottom = SHUTTER_BOTTOM_PADDING),
         ) {
-            Icon(Icons.Filled.Camera, contentDescription = stringResource(R.string.camera_shutter_content_description))
+            Icon(
+                Icons.Filled.Camera,
+                contentDescription = stringResource(R.string.camera_shutter_content_description),
+                modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize),
+            )
         }
     }
 }

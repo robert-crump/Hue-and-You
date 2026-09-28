@@ -196,6 +196,29 @@ class SeasonAnalysisViewModelTest {
     }
 
     @Test
+    fun retake_fromMarker_returnsToThatStepsCameraKeepingEarlierPicks() {
+        completeStep(SKIN_TAP)
+        takePhoto()
+        moveMarker(EYES_TAP)
+
+        viewModel.retake()
+
+        assertEquals(SeasonFeature.HAIR, capturing().feature)
+        assertEquals(mapOf(SeasonFeature.SKIN to FeaturePick(SKIN, 50, 50)), capturing().picks)
+    }
+
+    @Test
+    fun retake_outsideThePlacingStep_isIgnored() {
+        viewModel.retake()
+        assertEquals(SeasonAnalysisUiState.Capturing(), viewModel.uiState.value)
+
+        pickAll()
+        val state = result()
+        viewModel.retake()
+        assertEquals(state, viewModel.uiState.value)
+    }
+
+    @Test
     fun backFromHairCamera_reopensTheSkinMarkerWhereItWas() {
         completeStep(SKIN_TAP)
 

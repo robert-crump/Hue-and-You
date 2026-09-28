@@ -80,18 +80,32 @@ class SeasonAnalysisViewModel(
     private val photos = mutableMapOf<SeasonFeature, Bitmap>()
     private val pixelSources = mutableMapOf<SeasonFeature, PixelSource>()
 
+    /** Loads [uri] as the current step's photo - from its camera, or replacing the photo on its marker step. */
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
-        val state = _uiState.value as? SeasonAnalysisUiState.Capturing ?: return
-        _uiState.value = SeasonAnalysisUiState.LoadingPhoto(state.feature, state.picks)
+        val (feature, picks) = when (val state = _uiState.value) {
+            is SeasonAnalysisUiState.Capturing -> state.feature to state.picks
+            is SeasonAnalysisUiState.Placing -> state.feature to state.picks
+            else -> return
+        }
+        _uiState.value = SeasonAnalysisUiState.LoadingPhoto(feature, picks)
         viewModelScope.launch {
             val (bitmap, source) = withContext(backgroundDispatcher) {
                 val bitmap = decodeBitmap(contentResolver, uri)
                 bitmap to bitmap.toPixelSource()
             }
-            photos[state.feature] = bitmap
+            photos[feature] = bitmap
             _photo.value = bitmap
-            startPlacing(state.feature, state.picks, source)
+            startPlacing(feature, picks, source)
         }
+    }
+
+    /** Drops the marker step's photo and reopens that step's camera. */
+    fun retake() {
+        val state = _uiState.value as? SeasonAnalysisUiState.Placing ?: return
+        photos.remove(state.feature)
+        pixelSources.remove(state.feature)
+        _photo.value = null
+        _uiState.value = SeasonAnalysisUiState.Capturing(state.feature, state.picks)
     }
 
     /** Opens [feature]'s marker step on [source] with the marker in the middle. */
@@ -160,12 +174,7 @@ class SeasonAnalysisViewModel(
     fun back(): Boolean {
         when (val state = _uiState.value) {
             is SeasonAnalysisUiState.ShowingResult -> reopenPlacing(SeasonFeature.EYES, state.picks)
-            is SeasonAnalysisUiState.Placing -> {
-                photos.remove(state.feature)
-                pixelSources.remove(state.feature)
-                _photo.value = null
-                _uiState.value = SeasonAnalysisUiState.Capturing(state.feature, state.picks)
-            }
+            is SeasonAnalysisUiState.Placing -> retake()
             is SeasonAnalysisUiState.Capturing -> {
                 val previous = state.feature.previous() ?: return false
                 reopenPlacing(previous, state.picks)
