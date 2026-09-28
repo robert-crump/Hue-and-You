@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,10 +51,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -71,6 +76,8 @@ private val GRID_GAP = 8.dp
 private val HORIZONTAL_PADDING = 16.dp
 private val MIN_CIRCLE_SIZE = 32.dp
 private val MAX_CIRCLE_SIZE = 56.dp
+private val NAME_AREA_HEIGHT = 72.dp
+private val ADD_ICON_SIZE = 32.dp
 
 /**
  * Everything on the screen that isn't a grid row: name field (72), import button (52), two
@@ -104,20 +111,18 @@ fun ProfileEditorScreen(
     val profile by viewModel.profile.collectAsState()
     val isEditing by viewModel.isEditing.collectAsState()
     val pendingRemovals by viewModel.pendingRemovals.collectAsState()
-    var name by rememberSaveable(profile?.id) { mutableStateOf(profile?.name.orEmpty()) }
+    val draftName by viewModel.draftName.collectAsState()
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     var addColorKind by remember { mutableStateOf<ColorKind?>(null) }
 
     BackHandler(enabled = isEditing) { viewModel.cancelEditing() }
 
     val currentProfile = profile
-    val hasColors = currentProfile != null &&
-        (currentProfile.bestColors.isNotEmpty() || currentProfile.avoidColors.isNotEmpty())
     Scaffold(
         topBar = {
             if (isEditing) {
                 TopAppBar(
-                    title = { Text(stringResource(R.string.profile_editor_edit_colors_title)) },
+                    title = { Text(stringResource(R.string.profile_editor_editing_title)) },
                     navigationIcon = {
                         IconButton(onClick = viewModel::cancelEditing) {
                             Icon(
@@ -129,7 +134,7 @@ fun ProfileEditorScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = viewModel::commitEditing) {
+                        IconButton(onClick = viewModel::commitEditing, enabled = draftName.isNotBlank()) {
                             Icon(
                                 Icons.Filled.Check,
                                 contentDescription = stringResource(
@@ -151,7 +156,7 @@ fun ProfileEditorScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = viewModel::startEditing, enabled = hasColors) {
+                        IconButton(onClick = viewModel::startEditing) {
                             Icon(
                                 Icons.Filled.Edit,
                                 contentDescription = stringResource(
@@ -187,15 +192,11 @@ fun ProfileEditorScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 16.dp)
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = {
-                        name = it
-                        viewModel.renameProfile(it)
-                    },
-                    label = { Text(stringResource(R.string.profile_editor_name_label)) },
-                    enabled = !isEditing,
-                    singleLine = true,
+                NameArea(
+                    name = currentProfile.name,
+                    draftName = draftName,
+                    isEditing = isEditing,
+                    onDraftNameChange = viewModel::updateDraftName,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(start = HORIZONTAL_PADDING, end = HORIZONTAL_PADDING, top = 8.dp)
@@ -282,6 +283,53 @@ fun ProfileEditorScreen(
     }
 }
 
+/**
+ * The profile name as a "Name" label over the name; in edit mode a text field takes its place in
+ * the same fixed-height slot so nothing below jumps.
+ */
+@Composable
+private fun NameArea(
+    name: String,
+    draftName: String,
+    isEditing: Boolean,
+    onDraftNameChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val focusManager = LocalFocusManager.current
+    Box(
+        modifier = modifier.heightIn(min = NAME_AREA_HEIGHT),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        if (isEditing) {
+            OutlinedTextField(
+                value = draftName,
+                onValueChange = onDraftNameChange,
+                label = { Text(stringResource(R.string.profile_editor_name_label)) },
+                isError = draftName.isBlank(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            Column {
+                Text(
+                    text = stringResource(R.string.profile_editor_name_label),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.headlineSmall
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ColorSection(
     title: String,
@@ -300,7 +348,7 @@ private fun ColorSection(
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.weight(1f)
             )
             Text(
@@ -316,7 +364,8 @@ private fun ColorSection(
                 IconButton(onClick = onAddClick, enabled = colors.size < MAX_COLORS_PER_KIND) {
                     Icon(
                         Icons.Filled.Add,
-                        contentDescription = stringResource(R.string.profile_editor_add_color_content_description)
+                        contentDescription = stringResource(R.string.profile_editor_add_color_content_description),
+                        modifier = Modifier.size(ADD_ICON_SIZE)
                     )
                 }
             }

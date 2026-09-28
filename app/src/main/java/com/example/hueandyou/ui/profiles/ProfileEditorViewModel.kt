@@ -26,13 +26,9 @@ class ProfileEditorViewModel(
     val profile: StateFlow<Profile?> = repository.observeProfile(profileId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    fun renameProfile(name: String) {
-        viewModelScope.launch { repository.renameProfile(profileId, name) }
-    }
-
     private val _isEditing = MutableStateFlow(false)
 
-    /** Whether the pencil's edit mode (staged color removal) is active. */
+    /** Whether the pencil's edit mode (rename and staged color removal) is active. */
     val isEditing: StateFlow<Boolean> = _isEditing.asStateFlow()
 
     private val _pendingRemovals = MutableStateFlow<Set<Long>>(emptySet())
@@ -40,32 +36,49 @@ class ProfileEditorViewModel(
     /** Ids of colors removed in edit mode but not yet committed with the tick. */
     val pendingRemovals: StateFlow<Set<Long>> = _pendingRemovals.asStateFlow()
 
+    private val _draftName = MutableStateFlow("")
+
+    /** The name being typed in edit mode; saved only with the tick. */
+    val draftName: StateFlow<String> = _draftName.asStateFlow()
+
     fun addColor(kind: ColorKind, argb: Int) {
         viewModelScope.launch { repository.addColor(profileId, kind, argb) }
     }
 
     fun startEditing() {
         _pendingRemovals.value = emptySet()
+        _draftName.value = profile.value?.name.orEmpty()
         _isEditing.value = true
+    }
+
+    fun updateDraftName(name: String) {
+        if (_isEditing.value) _draftName.value = name
     }
 
     fun stageRemoval(colorId: Long) {
         if (_isEditing.value) _pendingRemovals.update { it + colorId }
     }
 
-    /** Leaves edit mode, discarding every staged removal (X and system back). */
+    /** Leaves edit mode, discarding the draft name and every staged removal (X and system back). */
     fun cancelEditing() {
         _pendingRemovals.value = emptySet()
         _isEditing.value = false
     }
 
-    /** Leaves edit mode, removing every staged color in one batch (the tick). */
+    /**
+     * Leaves edit mode, saving the trimmed draft name and removing every staged color in one
+     * batch (the tick). A blank name is ignored so a profile never ends up nameless.
+     */
     fun commitEditing() {
         val removals = _pendingRemovals.value
+        val newName = _draftName.value.trim()
         _pendingRemovals.value = emptySet()
         _isEditing.value = false
-        if (removals.isNotEmpty()) {
-            viewModelScope.launch { repository.removeColors(removals) }
+        viewModelScope.launch {
+            if (newName.isNotEmpty() && newName != profile.value?.name) {
+                repository.renameProfile(profileId, newName)
+            }
+            if (removals.isNotEmpty()) repository.removeColors(removals)
         }
     }
 

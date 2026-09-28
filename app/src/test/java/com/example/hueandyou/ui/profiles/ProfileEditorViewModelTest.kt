@@ -8,8 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -100,6 +102,61 @@ class ProfileEditorViewModelTest {
     }
 
     @Test
+    fun startEditing_seedsDraftWithCurrentName() = runTest(UnconfinedTestDispatcher()) {
+        backgroundScope.launch { viewModel.profile.collect {} }
+
+        viewModel.startEditing()
+
+        assertEquals("Autumn", viewModel.draftName.value)
+    }
+
+    @Test
+    fun updateDraftName_doesNotPersistUntilCommit() = runTest(UnconfinedTestDispatcher()) {
+        backgroundScope.launch { viewModel.profile.collect {} }
+        viewModel.startEditing()
+
+        viewModel.updateDraftName("Winter")
+
+        assertEquals("Autumn", viewModel.profile.value?.name)
+        assertTrue(repository.renames.isEmpty())
+    }
+
+    @Test
+    fun commitEditing_savesTrimmedName() = runTest(UnconfinedTestDispatcher()) {
+        backgroundScope.launch { viewModel.profile.collect {} }
+        viewModel.startEditing()
+        viewModel.updateDraftName("  Winter ")
+
+        viewModel.commitEditing()
+
+        assertEquals(listOf("Winter"), repository.renames)
+    }
+
+    @Test
+    fun commitEditing_withBlankOrUnchangedName_doesNotRename() = runTest(UnconfinedTestDispatcher()) {
+        backgroundScope.launch { viewModel.profile.collect {} }
+        viewModel.startEditing()
+        viewModel.commitEditing()
+        viewModel.startEditing()
+        viewModel.updateDraftName("   ")
+        viewModel.commitEditing()
+
+        assertTrue(repository.renames.isEmpty())
+    }
+
+    @Test
+    fun cancelEditing_discardsDraftName() = runTest(UnconfinedTestDispatcher()) {
+        backgroundScope.launch { viewModel.profile.collect {} }
+        viewModel.startEditing()
+        viewModel.updateDraftName("Winter")
+
+        viewModel.cancelEditing()
+
+        assertTrue(repository.renames.isEmpty())
+        assertEquals("Autumn", viewModel.profile.value?.name)
+    }
+
+    @Test
     fun deleteProfile_removesFromRepositoryAndInvokesCallback() {
         var deletedCalled = false
 
@@ -113,6 +170,7 @@ class ProfileEditorViewModelTest {
 private class FakeProfileRepository : ProfileRepository {
     val addedColors = mutableListOf<Pair<Long, ColorKind>>()
     val removedBatches = mutableListOf<Set<Long>>()
+    val renames = mutableListOf<String>()
     var deletedProfileId: Long? = null
     private val profiles = MutableStateFlow<Profile?>(
         Profile(
@@ -134,6 +192,7 @@ private class FakeProfileRepository : ProfileRepository {
         throw UnsupportedOperationException("not used by this test")
 
     override suspend fun renameProfile(profileId: Long, name: String) {
+        renames += name
         profiles.value = profiles.value?.copy(name = name)
     }
 

@@ -53,8 +53,8 @@
     <string name="profile_editor_no_colors">No colors yet</string>
     <string name="profile_editor_add_color_content_description">Add color</string>
     <string name="profile_editor_remove_color_content_description">Remove %1$s</string>
-    <string name="profile_editor_edit_colors_title">Edit colors</string>
-    <string name="profile_editor_edit_content_description">Edit colors</string>
+    <string name="profile_editor_editing_title">Editing profile</string>
+    <string name="profile_editor_edit_content_description">Edit name and colors</string>
     <string name="profile_editor_confirm_edit_content_description">Apply changes</string>
     <string name="profile_editor_cancel_edit_content_description">Discard changes</string>
     <string name="profile_editor_color_count">%1$d/%2$d</string>

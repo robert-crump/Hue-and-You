@@ -53,11 +53,17 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
@@ -181,7 +187,8 @@ fun HistoryScreen(
 @Composable
 private fun HistoryEntryRow(entry: HistoryEntry, isSelected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     val hapticFeedback = LocalHapticFeedback.current
-    Row(
+    ThumbnailRow(
+        gap = 16.dp,
         modifier = Modifier
             .fillMaxWidth()
             .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
@@ -192,12 +199,11 @@ private fun HistoryEntryRow(entry: HistoryEntry, isSelected: Boolean, onClick: (
                     onLongClick()
                 }
             )
-            .padding(start = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box {
-            HistoryThumbnail(entry.thumbnailPath)
-            if (isSelected) {
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        thumbnail = {
+            Box(Modifier.fillMaxSize()) {
+                HistoryThumbnail(entry.thumbnailPath)
+                if (isSelected) {
                 Icon(
                     Icons.Filled.CheckCircle,
                     contentDescription = stringResource(R.string.history_entry_selected_content_description),
@@ -207,20 +213,56 @@ private fun HistoryEntryRow(entry: HistoryEntry, isSelected: Boolean, onClick: (
                         .padding(2.dp)
                         .size(18.dp)
                         .background(MaterialTheme.colorScheme.surface, CircleShape)
-                )
+                    )
+                }
             }
         }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(16.dp)
-        ) {
-            Text(text = entry.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = entry.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             when (entry.type) {
                 HistoryEntryType.CLOTHING -> ClothingSummaryLine(entry)
                 HistoryEntryType.OBJECT -> ObjectSummaryLine(entry)
             }
-            Text(text = formatHistoryTimestamp(entry.createdAt), style = MaterialTheme.typography.bodySmall)
+            Text(
+                text = formatHistoryTimestamp(entry.createdAt),
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * [content] on the right, and on the left a square [thumbnail] exactly as tall as [content].
+ * Every line of [content] is single-line, so its height doesn't depend on its width and can be
+ * read up front to size the square.
+ */
+@Composable
+private fun ThumbnailRow(
+    gap: Dp,
+    modifier: Modifier = Modifier,
+    thumbnail: @Composable () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Layout(contents = listOf(thumbnail, content), modifier = modifier) { (thumbnails, contents), constraints ->
+        val gapPx = gap.roundToPx()
+        val body = contents.single()
+        val side = body.minIntrinsicHeight(constraints.maxWidth)
+        val bodyPlaceable = body.measure(
+            Constraints(maxWidth = (constraints.maxWidth - side - gapPx).coerceAtLeast(0))
+        )
+        val height = bodyPlaceable.height
+        val thumbnailPlaceables = thumbnails.map { it.measure(Constraints.fixed(height, height)) }
+        layout(constraints.maxWidth, height) {
+            thumbnailPlaceables.forEach { it.place(0, 0) }
+            bodyPlaceable.place(height + gapPx, 0)
         }
     }
 }
@@ -238,7 +280,7 @@ private fun ClothingSummaryLine(entry: HistoryEntry) {
     val description = stringResource(R.string.history_clothing_summary_content_description, verdictText)
     SummaryLine(modifier = Modifier.clearAndSetSemantics { contentDescription = description }) {
         SummaryCircle(entry.calibratedArgb)
-        SummarySeparator()
+        Spacer(Modifier.width(SUMMARY_TEXT_GAP))
         Text(text = verdictText, style = MaterialTheme.typography.bodySmall, color = verdictColor)
     }
 }
@@ -265,9 +307,9 @@ private fun ObjectSummaryLine(entry: HistoryEntry) {
     SummaryLine(modifier = Modifier.clearAndSetSemantics { contentDescription = description }) {
         SummaryCircle(entry.calibratedArgb)
         groups.forEach { colors ->
-            SummarySeparator()
+            Spacer(Modifier.width(SUMMARY_GROUP_GAP))
             colors.forEachIndexed { index, argb ->
-                if (index > 0) Spacer(Modifier.width(3.dp))
+                if (index > 0) Spacer(Modifier.width(SUMMARY_CIRCLE_GAP))
                 SummaryCircle(argb)
             }
         }
@@ -279,24 +321,20 @@ private fun SummaryLine(modifier: Modifier = Modifier, content: @Composable () -
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) { content() }
 }
 
-/** Display-only swatch sized to sit inside a bodySmall line; the ring keeps white/black picks visible. */
+private val SUMMARY_CIRCLE_GAP = 4.dp
+private val SUMMARY_GROUP_GAP = 14.dp
+private val SUMMARY_TEXT_GAP = 8.dp
+
+/** Display-only swatch as tall as the entry name's text; the ring keeps white/black picks visible. */
 @Composable
 private fun SummaryCircle(argb: Int) {
+    val size = with(LocalDensity.current) { MaterialTheme.typography.titleMedium.fontSize.toDp() }
     Box(
         Modifier
-            .size(12.dp)
+            .size(size)
             .clip(CircleShape)
             .background(Color(argb))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-    )
-}
-
-@Composable
-private fun SummarySeparator() {
-    Text(
-        text = " | ",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
@@ -309,8 +347,9 @@ private fun HistoryThumbnail(path: String) {
         Image(
             bitmap = bitmap,
             contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(56.dp)
+                .fillMaxSize()
                 .clip(RoundedCornerShape(8.dp))
         )
     }
