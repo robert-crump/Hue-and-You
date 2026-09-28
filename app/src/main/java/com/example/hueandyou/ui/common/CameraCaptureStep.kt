@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
@@ -37,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -127,34 +129,33 @@ private fun CameraViewfinder(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val imageCapture = remember { ImageCapture.Builder().build() }
+    val previewView = remember { PreviewView(context) }
+    val preview = remember { Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider } }
     var isCapturing by remember { mutableStateOf(false) }
     var camera by remember { mutableStateOf<Camera?>(null) }
+    var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
+    val lensFacing = CameraLensSession.lensFacing
+
+    LaunchedEffect(Unit) {
+        val future = ProcessCameraProvider.getInstance(context)
+        future.addListener({ cameraProvider = future.get() }, ContextCompat.getMainExecutor(context))
+    }
+    val canSwitchLens = remember(cameraProvider) {
+        cameraProvider?.let {
+            it.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) && it.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+        } ?: false
+    }
+    LaunchedEffect(cameraProvider, lensFacing) {
+        val provider = cameraProvider ?: return@LaunchedEffect
+        val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        // A lens remembered from another screen may be missing here; fall back to whatever exists.
+        val usable = if (provider.hasCamera(selector)) selector else CameraSelector.DEFAULT_BACK_CAMERA
+        provider.unbindAll()
+        camera = provider.bindToLifecycle(lifecycleOwner, usable, preview, imageCapture)
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { viewContext ->
-                val previewView = PreviewView(viewContext)
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(viewContext)
-                cameraProviderFuture.addListener(
-                    {
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
-                            it.surfaceProvider = previewView.surfaceProvider
-                        }
-                        cameraProvider.unbindAll()
-                        camera = cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            imageCapture,
-                        )
-                    },
-                    ContextCompat.getMainExecutor(viewContext),
-                )
-                previewView
-            },
-        )
+        AndroidView(modifier = Modifier.fillMaxSize(), factory = { previewView })
 
         if (showCenterBox) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -194,6 +195,21 @@ private fun CameraViewfinder(
             )
         }
 
+        if (canSwitchLens) {
+            IconButton(
+                onClick = { CameraLensSession.toggle() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(24.dp),
+            ) {
+                Icon(
+                    Icons.Filled.Cameraswitch,
+                    contentDescription = stringResource(R.string.camera_switch_content_description),
+                    tint = Color.White,
+                )
+            }
+        }
+
         FloatingActionButton(
             onClick = {
                 if (isCapturing) return@FloatingActionButton
@@ -219,6 +235,20 @@ private fun CameraViewfinder(
                 .padding(32.dp),
         ) {
             Icon(Icons.Filled.Camera, contentDescription = stringResource(R.string.camera_shutter_content_description))
+        }
+    }
+}
+
+/** The lens every viewfinder opens with: back until switched, then kept until the process ends. */
+internal object CameraLensSession {
+    var lensFacing by mutableIntStateOf(CameraSelector.LENS_FACING_BACK)
+        private set
+
+    fun toggle() {
+        lensFacing = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+            CameraSelector.LENS_FACING_FRONT
+        } else {
+            CameraSelector.LENS_FACING_BACK
         }
     }
 }

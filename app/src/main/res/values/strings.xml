@@ -89,16 +89,19 @@
     <string name="palette_import_confirm_new_profile">Create profile</string>
 
     <string name="season_analysis_title">Find my season</string>
-    <string name="season_analysis_camera_hint">Daylight, no makeup, hair in view</string>
+    <string name="season_analysis_step_title">%1$s (%2$d/%3$d)</string>
+    <string name="season_analysis_camera_hint_skin">Photo of your cheek in daylight, no makeup</string>
+    <string name="season_analysis_camera_hint_hair">Photo of your hair in daylight, close to the roots</string>
+    <string name="season_analysis_camera_hint_eyes">Close-up of your eye in daylight</string>
     <string name="season_analysis_photo_content_description">Your photo</string>
     <string name="season_feature_skin">Skin</string>
     <string name="season_feature_hair">Hair</string>
     <string name="season_feature_eyes">Eyes</string>
-    <string name="season_analysis_prompt_skin">Tap your cheek</string>
-    <string name="season_analysis_prompt_hair">Tap your hair near the root</string>
-    <string name="season_analysis_prompt_eyes">Tap your iris</string>
-    <string name="season_analysis_prompt_done">All set. Tap a chip to re-pick it.</string>
+    <string name="season_analysis_prompt_skin">Drag the marker onto your cheek</string>
+    <string name="season_analysis_prompt_hair">Drag the marker onto your hair near the root</string>
+    <string name="season_analysis_prompt_eyes">Drag the marker onto your iris. Pinch to zoom in.</string>
     <string name="season_analysis_next">Next</string>
+    <string name="season_analysis_see_result">See my season</string>
     <string name="season_analysis_match">%d%% match</string>
     <string name="season_analysis_best_title">Best Colors</string>
     <string name="season_analysis_avoid_title">Colors to Avoid</string>
@@ -196,6 +199,7 @@
     <string name="camera_white_balance_twilight">Twilight</string>
     <string name="camera_white_balance_shade">Shade</string>
     <string name="camera_shutter_content_description">Take photo</string>
+    <string name="camera_switch_content_description">Switch camera</string>
     <string name="camera_permission_denied_message">Camera access was denied. You can still pick a photo from your gallery, or turn on Camera access in Settings to use the viewfinder.</string>
     <string name="camera_open_settings">Open Settings</string>
 </resources>

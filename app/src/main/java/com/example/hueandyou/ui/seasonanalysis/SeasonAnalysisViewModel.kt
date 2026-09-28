@@ -59,63 +59,83 @@ private fun SeasonFeature.sampleRadiusFraction(): Double = when (this) {
 }
 
 /**
- * Find my season: photo -> skin/hair/eye taps -> ranked seasons -> a new profile with the chosen
- * season's palette, named by [seasonName]. Nothing is saved until [createProfile].
+ * Find my season: for skin, hair and eyes in turn, a photo and a marker placed on it -> ranked
+ * seasons -> a new profile with the chosen season's palette, named by [seasonName]. Nothing is
+ * saved until [createProfile].
  */
 class SeasonAnalysisViewModel(
     private val profileRepository: ProfileRepository,
     private val seasonName: (Season) -> String,
     private val backgroundDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow<SeasonAnalysisUiState>(SeasonAnalysisUiState.PickingPhoto)
+    private val _uiState = MutableStateFlow<SeasonAnalysisUiState>(SeasonAnalysisUiState.Capturing())
     val uiState: StateFlow<SeasonAnalysisUiState> = _uiState.asStateFlow()
 
     private val _photo = MutableStateFlow<Bitmap?>(null)
 
-    /** The photo being picked from; kept out of [uiState] so the picking logic is testable without a Bitmap. */
+    /** The current step's photo; kept out of [uiState] so the picking logic is testable without a Bitmap. */
     val photo: StateFlow<Bitmap?> = _photo.asStateFlow()
 
-    private var pixels: PixelSource? = null
+    /** Each finished or current step's photo, kept so Back can return to an earlier marker. */
+    private val photos = mutableMapOf<SeasonFeature, Bitmap>()
+    private val pixelSources = mutableMapOf<SeasonFeature, PixelSource>()
 
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
-        _uiState.value = SeasonAnalysisUiState.LoadingPhoto
+        val state = _uiState.value as? SeasonAnalysisUiState.Capturing ?: return
+        _uiState.value = SeasonAnalysisUiState.LoadingPhoto(state.feature, state.picks)
         viewModelScope.launch {
             val (bitmap, source) = withContext(backgroundDispatcher) {
                 val bitmap = decodeBitmap(contentResolver, uri)
                 bitmap to bitmap.toPixelSource()
             }
+            photos[state.feature] = bitmap
             _photo.value = bitmap
-            startPicking(source)
+            startPlacing(state.feature, state.picks, source)
         }
     }
 
+    /** Opens [feature]'s marker step on [source] with the marker in the middle. */
     @VisibleForTesting
-    internal fun startPicking(source: PixelSource) {
-        pixels = source
-        _uiState.value = SeasonAnalysisUiState.PickingColors()
+    internal fun startPlacing(
+        feature: SeasonFeature,
+        picks: Map<SeasonFeature, FeaturePick>,
+        source: PixelSource,
+    ) {
+        pixelSources[feature] = source
+        val x = source.width / 2
+        val y = source.height / 2
+        _uiState.value = SeasonAnalysisUiState.Placing(feature, picks, sample(feature, source, x, y))
     }
 
-    /** Makes [feature] the one the next tap picks, whether or not it's set already. */
-    fun selectFeature(feature: SeasonFeature) {
-        val state = _uiState.value as? SeasonAnalysisUiState.PickingColors ?: return
-        _uiState.value = state.copy(active = feature)
+    /** Moves the marker to ([x], [y]) in photo pixels, clamped to the photo, and samples its color there. */
+    fun moveMarker(x: Int, y: Int) {
+        val state = _uiState.value as? SeasonAnalysisUiState.Placing ?: return
+        val source = pixelSources[state.feature] ?: return
+        val clampedX = x.coerceIn(0, source.width - 1)
+        val clampedY = y.coerceIn(0, source.height - 1)
+        if (clampedX == state.marker.x && clampedY == state.marker.y) return
+        _uiState.value = state.copy(marker = sample(state.feature, source, clampedX, clampedY))
     }
 
-    /** Samples the active feature's color at ([x], [y]) in bitmap pixels, then moves on to the next missing one. */
-    fun onPhotoTap(x: Int, y: Int) {
-        val state = _uiState.value as? SeasonAnalysisUiState.PickingColors ?: return
-        val feature = state.active ?: return
-        val source = pixels ?: return
-        if (x !in 0 until source.width || y !in 0 until source.height) return
+    /** Keeps the marker's color and moves on to the next photo, or to the result after the eyes. */
+    fun next() {
+        val state = _uiState.value as? SeasonAnalysisUiState.Placing ?: return
+        val picks = state.picks + (state.feature to state.marker)
+        val nextFeature = state.feature.next()
+        if (nextFeature != null) {
+            _photo.value = null
+            _uiState.value = SeasonAnalysisUiState.Capturing(nextFeature, picks)
+        } else {
+            showResult(picks)
+        }
+    }
+
+    private fun sample(feature: SeasonFeature, source: PixelSource, x: Int, y: Int): FeaturePick {
         val argb = ColorExtractor.extractColorAtPoint(source, x, y, radiusFraction = feature.sampleRadiusFraction())
-        val picks = state.picks + (feature to FeaturePick(argb, x, y))
-        _uiState.value = state.copy(picks = picks, active = nextMissingFeature(picks, after = feature))
+        return FeaturePick(argb, x, y)
     }
 
-    fun showResult() {
-        val state = _uiState.value as? SeasonAnalysisUiState.PickingColors ?: return
-        if (!state.canContinue) return
-        val picks = state.picks
+    private fun showResult(picks: Map<SeasonFeature, FeaturePick>) {
         val topMatches = SeasonClassifier.classify(
             skin = picks.getValue(SeasonFeature.SKIN).argb,
             hair = picks.getValue(SeasonFeature.HAIR).argb,
@@ -124,23 +144,31 @@ class SeasonAnalysisViewModel(
         _uiState.value = SeasonAnalysisUiState.ShowingResult(picks, topMatches, topMatches.first().season)
     }
 
+    /** Reopens [feature]'s marker step on its kept photo with the marker where it was left. */
+    private fun reopenPlacing(feature: SeasonFeature, picks: Map<SeasonFeature, FeaturePick>) {
+        _photo.value = photos[feature]
+        _uiState.value = SeasonAnalysisUiState.Placing(feature, picks - feature, picks.getValue(feature))
+    }
+
     fun selectSeason(season: Season) {
         val state = _uiState.value as? SeasonAnalysisUiState.ShowingResult ?: return
         if (state.topMatches.none { it.season == season }) return
         _uiState.value = state.copy(selected = season)
     }
 
-    /** Steps back within the flow. Returns false on the photo step, where back leaves the flow. */
+    /** Steps back one screen. Returns false on the skin camera, where back leaves the flow. */
     fun back(): Boolean {
         when (val state = _uiState.value) {
-            is SeasonAnalysisUiState.ShowingResult -> _uiState.value = SeasonAnalysisUiState.PickingColors(
-                picks = state.picks,
-                active = null,
-            )
-            is SeasonAnalysisUiState.PickingColors -> {
-                pixels = null
+            is SeasonAnalysisUiState.ShowingResult -> reopenPlacing(SeasonFeature.EYES, state.picks)
+            is SeasonAnalysisUiState.Placing -> {
+                photos.remove(state.feature)
+                pixelSources.remove(state.feature)
                 _photo.value = null
-                _uiState.value = SeasonAnalysisUiState.PickingPhoto
+                _uiState.value = SeasonAnalysisUiState.Capturing(state.feature, state.picks)
+            }
+            is SeasonAnalysisUiState.Capturing -> {
+                val previous = state.feature.previous() ?: return false
+                reopenPlacing(previous, state.picks)
             }
             else -> return false
         }

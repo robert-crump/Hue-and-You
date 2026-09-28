@@ -7,8 +7,12 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -30,7 +34,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -43,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -81,6 +85,8 @@ private const val GRID_COLUMNS = 5
 private val GRID_GAP = 8.dp
 private val MAX_CIRCLE_SIZE = 48.dp
 private val MARKER_RADIUS = 10.dp
+/** How close to the marker a touch must land to drag it rather than pan the photo. */
+private val MARKER_GRAB_RADIUS = 32.dp
 
 private fun featureLabelRes(feature: SeasonFeature): Int = when (feature) {
     SeasonFeature.SKIN -> R.string.season_feature_skin
@@ -88,12 +94,26 @@ private fun featureLabelRes(feature: SeasonFeature): Int = when (feature) {
     SeasonFeature.EYES -> R.string.season_feature_eyes
 }
 
-private fun featurePromptRes(feature: SeasonFeature?): Int = when (feature) {
+private fun featurePromptRes(feature: SeasonFeature): Int = when (feature) {
     SeasonFeature.SKIN -> R.string.season_analysis_prompt_skin
     SeasonFeature.HAIR -> R.string.season_analysis_prompt_hair
     SeasonFeature.EYES -> R.string.season_analysis_prompt_eyes
-    null -> R.string.season_analysis_prompt_done
 }
+
+private fun featureCameraHintRes(feature: SeasonFeature): Int = when (feature) {
+    SeasonFeature.SKIN -> R.string.season_analysis_camera_hint_skin
+    SeasonFeature.HAIR -> R.string.season_analysis_camera_hint_hair
+    SeasonFeature.EYES -> R.string.season_analysis_camera_hint_eyes
+}
+
+/** The step the flow is on, or null outside the three photo steps. */
+private val SeasonAnalysisUiState.stepFeature: SeasonFeature?
+    get() = when (this) {
+        is SeasonAnalysisUiState.Capturing -> feature
+        is SeasonAnalysisUiState.LoadingPhoto -> feature
+        is SeasonAnalysisUiState.Placing -> feature
+        else -> null
+    }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,15 +131,31 @@ fun SeasonAnalysisScreen(
     }
 
     BackHandler(
-        enabled = uiState is SeasonAnalysisUiState.PickingColors || uiState is SeasonAnalysisUiState.ShowingResult
+        enabled = when (val state = uiState) {
+            is SeasonAnalysisUiState.Capturing -> state.feature != SeasonFeature.SKIN
+            is SeasonAnalysisUiState.Placing, is SeasonAnalysisUiState.ShowingResult -> true
+            else -> false
+        }
     ) {
         viewModel.back()
+    }
+
+    val stepFeature = uiState.stepFeature
+    val title = if (stepFeature != null) {
+        stringResource(
+            R.string.season_analysis_step_title,
+            stringResource(featureLabelRes(stepFeature)),
+            stepFeature.ordinal + 1,
+            SeasonFeature.entries.size,
+        )
+    } else {
+        stringResource(R.string.season_analysis_title)
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.season_analysis_title)) },
+                title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = { if (!viewModel.back()) onNavigateBack() }) {
                         Icon(
@@ -137,18 +173,20 @@ fun SeasonAnalysisScreen(
                 .padding(innerPadding)
         ) {
             when (val state = uiState) {
-                is SeasonAnalysisUiState.PickingPhoto -> CameraCaptureStep(
-                    onPhotoUri = { uri -> viewModel.onPhotoPicked(context.contentResolver, uri) },
-                    hint = stringResource(R.string.season_analysis_camera_hint),
-                    showCenterBox = false,
-                )
-                is SeasonAnalysisUiState.PickingColors -> photo?.let { bitmap ->
-                    PickingColorsStep(
+                // Keyed so each step gets a fresh viewfinder (and fresh WB/exposure sliders).
+                is SeasonAnalysisUiState.Capturing -> key(state.feature) {
+                    CameraCaptureStep(
+                        onPhotoUri = { uri -> viewModel.onPhotoPicked(context.contentResolver, uri) },
+                        hint = stringResource(featureCameraHintRes(state.feature)),
+                        showCenterBox = false,
+                    )
+                }
+                is SeasonAnalysisUiState.Placing -> photo?.let { bitmap ->
+                    PlacingStep(
                         bitmap = bitmap,
                         state = state,
-                        onSelectFeature = viewModel::selectFeature,
-                        onTap = viewModel::onPhotoTap,
-                        onNext = viewModel::showResult,
+                        onMoveMarker = viewModel::moveMarker,
+                        onNext = viewModel::next,
                     )
                 }
                 is SeasonAnalysisUiState.ShowingResult -> ResultStep(
@@ -172,11 +210,10 @@ private fun LoadingStep() {
 }
 
 @Composable
-private fun PickingColorsStep(
+private fun PlacingStep(
     bitmap: Bitmap,
-    state: SeasonAnalysisUiState.PickingColors,
-    onSelectFeature: (SeasonFeature) -> Unit,
-    onTap: (x: Int, y: Int) -> Unit,
+    state: SeasonAnalysisUiState.Placing,
+    onMoveMarker: (x: Int, y: Int) -> Unit,
     onNext: () -> Unit,
 ) {
     Column(
@@ -185,46 +222,71 @@ private fun PickingColorsStep(
             .padding(16.dp)
     ) {
         Text(
-            text = stringResource(featurePromptRes(state.active)),
+            text = stringResource(featurePromptRes(state.feature)),
             style = MaterialTheme.typography.bodyLarge
         )
         ZoomablePickPhoto(
             bitmap = bitmap,
-            picks = state.picks,
-            onTap = onTap,
+            marker = state.marker,
+            markerLabel = stringResource(featureLabelRes(state.feature)),
+            onMoveMarker = onMoveMarker,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(vertical = 16.dp)
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SeasonFeature.entries.forEach { feature ->
-                val pick = state.picks[feature]
-                FilterChip(
-                    selected = state.active == feature,
-                    onClick = { onSelectFeature(feature) },
-                    label = { Text(stringResource(featureLabelRes(feature))) },
-                    leadingIcon = { FeatureSwatch(argb = pick?.argb) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            StepProgress(
+                current = state.feature,
+                colors = state.picks.mapValues { it.value.argb } + (state.feature to state.marker.argb),
+                modifier = Modifier.weight(1f)
+            )
+            Button(onClick = onNext) {
+                Text(
+                    stringResource(
+                        if (state.feature.next() == null) R.string.season_analysis_see_result
+                        else R.string.season_analysis_next
+                    )
                 )
             }
-        }
-        Button(
-            onClick = onNext,
-            enabled = state.canContinue,
-            modifier = Modifier
-                .align(Alignment.End)
-                .padding(top = 8.dp)
-        ) {
-            Text(stringResource(R.string.season_analysis_next))
         }
     }
 }
 
-/** A chip's color dot: the picked color, or an empty ring until there is one. */
+/**
+ * One labeled swatch per step: finished steps show their color, the [current] one is larger and
+ * shows the marker's live color, later ones are an empty ring.
+ */
 @Composable
-private fun FeatureSwatch(argb: Int?) {
+private fun StepProgress(current: SeasonFeature, colors: Map<SeasonFeature, Int>, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        SeasonFeature.entries.forEach { feature ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                FeatureSwatch(argb = colors[feature], size = if (feature == current) 40.dp else 24.dp)
+                Text(
+                    text = stringResource(featureLabelRes(feature)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (feature == current) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+/** A color dot: the picked color, or an empty ring until there is one. */
+@Composable
+private fun FeatureSwatch(argb: Int?, size: Dp) {
     val modifier = Modifier
-        .size(18.dp)
+        .size(size)
         .clip(CircleShape)
     if (argb != null) {
         Box(modifier.background(Color(argb)).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape))
@@ -234,22 +296,23 @@ private fun FeatureSwatch(argb: Int?) {
 }
 
 /**
- * The photo, pinch-zoomable and pannable, with a labeled marker per pick. Taps are reported in
- * bitmap pixels whatever the zoom: zooming only helps aim.
+ * The photo, pinch-zoomable and pannable, with a labeled [marker]. Dragging the marker or tapping
+ * the photo moves it; positions are reported in bitmap pixels whatever the zoom, which only helps aim.
  */
 @Composable
 private fun ZoomablePickPhoto(
     bitmap: Bitmap,
-    picks: Map<SeasonFeature, FeaturePick>,
-    onTap: (x: Int, y: Int) -> Unit,
+    marker: FeaturePick,
+    markerLabel: String,
+    onMoveMarker: (x: Int, y: Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val imageBitmap = remember(bitmap) { bitmap.asImageBitmap() }
     var scale by remember(bitmap) { mutableFloatStateOf(1f) }
     var offset by remember(bitmap) { mutableStateOf(Offset.Zero) }
-    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnMoveMarker by rememberUpdatedState(onMoveMarker)
+    val currentMarker by rememberUpdatedState(marker)
     val textMeasurer = rememberTextMeasurer()
-    val labels = SeasonFeature.entries.associateWith { stringResource(featureLabelRes(it)) }
     val labelStyle = TextStyle(
         color = Color.White,
         fontSize = 12.sp,
@@ -266,23 +329,46 @@ private fun ZoomablePickPhoto(
                 .size(displayWidth, displayHeight)
                 .clipToBounds()
                 .pointerInput(bitmap) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        val newScale = (scale * zoom).coerceIn(1f, MAX_ZOOM)
-                        // Keep the point under the fingers in place while zooming.
-                        val newOffset = centroid - center - (centroid - center - offset) * (newScale / scale) + pan
-                        scale = newScale
-                        offset = clampOffset(newOffset, newScale, size)
+                    val grabRadius = MARKER_GRAB_RADIUS.toPx()
+                    val moveMarkerTo = { position: Offset ->
+                        val (x, y) = screenToBitmap(position, scale, offset, size, bitmap)
+                        currentOnMoveMarker(x, y)
                     }
-                }
-                .pointerInput(bitmap) {
-                    detectTapGestures { tap ->
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        val local = (tap - center - offset) / scale + center
-                        currentOnTap(
-                            (local.x * bitmap.width / size.width).toInt(),
-                            (local.y * bitmap.height / size.height).toInt(),
-                        )
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        val markerPosition = bitmapToScreen(currentMarker.x, currentMarker.y, scale, offset, size, bitmap)
+                        if ((down.position - markerPosition).getDistance() <= grabRadius) {
+                            // Grabbed the marker: it follows the finger until release.
+                            drag(down.id) { change ->
+                                moveMarkerTo(change.position)
+                                change.consume()
+                            }
+                            return@awaitEachGesture
+                        }
+                        // Otherwise pinch-zoom/pan, or a tap if the fingers never moved past touch slop.
+                        var transforming = false
+                        var travel = Offset.Zero
+                        do {
+                            val event = awaitPointerEvent()
+                            val pan = event.calculatePan()
+                            val zoom = event.calculateZoom()
+                            if (!transforming) {
+                                travel += pan
+                                transforming = event.changes.size > 1 ||
+                                    travel.getDistance() > viewConfiguration.touchSlop
+                            }
+                            if (transforming) {
+                                val center = Offset(size.width / 2f, size.height / 2f)
+                                val centroid = event.calculateCentroid()
+                                val newScale = (scale * zoom).coerceIn(1f, MAX_ZOOM)
+                                // Keep the point under the fingers in place while zooming.
+                                val newOffset = centroid - center - (centroid - center - offset) * (newScale / scale) + pan
+                                scale = newScale
+                                offset = clampOffset(newOffset, newScale, size)
+                                event.changes.forEach { it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
+                        if (!transforming) moveMarkerTo(down.position)
                     }
                 }
         ) {
@@ -300,22 +386,33 @@ private fun ZoomablePickPhoto(
             )
             // Drawn outside the zoomed layer so markers and labels keep their size.
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val center = Offset(size.width / 2f, size.height / 2f)
                 val radius = MARKER_RADIUS.toPx()
-                picks.forEach { (feature, pick) ->
-                    val local = Offset(pick.x * size.width / bitmap.width, pick.y * size.height / bitmap.height)
-                    val position = center + offset + (local - center) * scale
-                    drawCircle(Color.Black.copy(alpha = 0.6f), radius, position, style = Stroke(width = 6f))
-                    drawCircle(Color.White, radius, position, style = Stroke(width = 3f))
-                    val label = textMeasurer.measure(labels.getValue(feature), labelStyle)
-                    drawText(
-                        label,
-                        topLeft = Offset(position.x + radius + 4f, position.y - label.size.height / 2f)
-                    )
-                }
+                val canvasSize = IntSize(size.width.toInt(), size.height.toInt())
+                val position = bitmapToScreen(marker.x, marker.y, scale, offset, canvasSize, bitmap)
+                drawCircle(Color.Black.copy(alpha = 0.6f), radius, position, style = Stroke(width = 6f))
+                drawCircle(Color.White, radius, position, style = Stroke(width = 3f))
+                val label = textMeasurer.measure(markerLabel, labelStyle)
+                drawText(
+                    label,
+                    topLeft = Offset(position.x + radius + 4f, position.y - label.size.height / 2f)
+                )
             }
         }
     }
+}
+
+/** Where bitmap pixel ([x], [y]) appears in a [size] box showing [bitmap] zoomed by [scale] and panned by [offset]. */
+private fun bitmapToScreen(x: Int, y: Int, scale: Float, offset: Offset, size: IntSize, bitmap: Bitmap): Offset {
+    val center = Offset(size.width / 2f, size.height / 2f)
+    val local = Offset(x * size.width.toFloat() / bitmap.width, y * size.height.toFloat() / bitmap.height)
+    return center + offset + (local - center) * scale
+}
+
+/** The inverse of [bitmapToScreen]: the bitmap pixel under [position]. */
+private fun screenToBitmap(position: Offset, scale: Float, offset: Offset, size: IntSize, bitmap: Bitmap): Pair<Int, Int> {
+    val center = Offset(size.width / 2f, size.height / 2f)
+    val local = (position - center - offset) / scale + center
+    return (local.x * bitmap.width / size.width).toInt() to (local.y * bitmap.height / size.height).toInt()
 }
 
 /** Keeps the zoomed photo covering its box: it may pan by at most the overflow on each side. */
