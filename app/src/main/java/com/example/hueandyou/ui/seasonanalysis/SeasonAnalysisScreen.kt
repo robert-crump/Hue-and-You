@@ -184,20 +184,15 @@ fun SeasonAnalysisScreen(
                             contentDescription = stringResource(R.string.navigate_back)
                         )
                     }
+                },
+                actions = {
+                    if (uiState is SeasonAnalysisUiState.ShowingResult) {
+                        TextButton(onClick = viewModel::openNameDialog) {
+                            Text(stringResource(R.string.season_analysis_create_profile))
+                        }
+                    }
                 }
             )
-        },
-        bottomBar = {
-            if (uiState is SeasonAnalysisUiState.ShowingResult) {
-                Button(
-                    onClick = viewModel::openNameDialog,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Text(stringResource(R.string.season_analysis_create_profile))
-                }
-            }
         }
     ) { innerPadding ->
         Box(
@@ -606,7 +601,7 @@ private fun ProfileNameDialog(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
+                    capitalization = KeyboardCapitalization.Words,
                     imeAction = ImeAction.Done
                 ),
                 keyboardActions = KeyboardActions(onDone = { if (dialog.canCreate) onCreate() }),
