@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -61,7 +60,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
@@ -70,12 +68,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.ClothingVerdict
-import com.example.hueandyou.colorspace.HarmonyEngine
-import com.example.hueandyou.colorspace.HarmonyRelationship
-import com.example.hueandyou.colorspace.argbToHct
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
-import com.example.hueandyou.ui.common.VerdictBadge
+import com.example.hueandyou.ui.common.verdictAccentColor
+import com.example.hueandyou.ui.common.verdictIcon
 import com.example.hueandyou.ui.common.verdictLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -220,7 +216,7 @@ private fun HistoryEntryRow(entry: HistoryEntry, isSelected: Boolean, onClick: (
             }
         },
         trailing = if (entry.type == HistoryEntryType.CLOTHING) {
-            { ClothingVerdictBadge(entry) }
+            { ClothingVerdictIcon(entry) }
         } else {
             null
         }
@@ -232,12 +228,10 @@ private fun HistoryEntryRow(entry: HistoryEntry, isSelected: Boolean, onClick: (
                 Text(
                     text = entry.name,
                     style = NameStyle,
-                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            if (entry.type == HistoryEntryType.OBJECT) ObjectSummaryLine(entry)
             Text(
                 text = formatHistoryTimestamp(entry.createdAt),
                 style = MaterialTheme.typography.bodySmall,
@@ -283,80 +277,30 @@ private fun ThumbnailRow(
     }
 }
 
-/** The clothing verdict, as in the Settings legend; TalkBack reads the verdict's name. */
+/**
+ * The clothing verdict as a bare icon in its accent color - same glyph as the Settings legend, but
+ * quiet enough not to outweigh the name. TalkBack reads the verdict's name.
+ */
 @Composable
-private fun ClothingVerdictBadge(entry: HistoryEntry) {
+private fun ClothingVerdictIcon(entry: HistoryEntry) {
     val verdict = remember(entry.score) { ClothingVerdict.forScore(entry.score) }
     val description = stringResource(
         R.string.history_clothing_verdict_content_description,
         stringResource(verdictLabel(verdict))
     )
-    VerdictBadge(
-        verdict,
-        Modifier
-            .fillMaxSize()
-            .clearAndSetSemantics { contentDescription = description }
-    )
-}
-
-/**
- * The complementary, analogous and tonal suggestions for the entry's color - recomputed from its
- * own wheel/balance, and Tonal only for a neutral color, same as History detail. Circles are as
- * big as the name's, shrunk evenly when the line would not fit.
- */
-@Composable
-private fun ObjectSummaryLine(entry: HistoryEntry) {
-    val groups = remember(entry.calibratedArgb, entry.wheel, entry.balance) {
-        val wheel = entry.wheel
-        val balance = entry.balance
-        if (wheel == null || balance == null) return@remember emptyList()
-        val suggestions = HarmonyEngine.generate(entry.calibratedArgb, wheel, balance)
-        val shown = if (HarmonyEngine.isNeutral(argbToHct(entry.calibratedArgb).chroma)) {
-            listOf(HarmonyRelationship.TONAL)
-        } else {
-            listOf(HarmonyRelationship.COMPLEMENTARY, HarmonyRelationship.ANALOGOUS, HarmonyRelationship.TONAL)
-        }
-        shown.map { relationship -> suggestions.single { it.relationship == relationship }.colors }
-    }
-    if (groups.isEmpty()) return
-    // Gap before each circle: none for the first, a group gap where a new group starts.
-    val gaps = groups.flatMapIndexed { groupIndex, colors ->
-        colors.indices.map { index ->
-            when {
-                index > 0 -> SUMMARY_CIRCLE_GAP
-                groupIndex > 0 -> SUMMARY_GROUP_GAP
-                else -> 0.dp
-            }
-        }
-    }
-    val colors = groups.flatten()
-    val maxCircleSize = nameCircleSize()
-    val description = stringResource(R.string.history_object_summary_content_description)
-    Layout(
-        content = { colors.forEach { SummaryCircle(it) } },
-        // A fixed height answers the row's intrinsic-height query without measuring the circles.
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(maxCircleSize)
-            .clearAndSetSemantics { contentDescription = description }
-    ) { measurables, constraints ->
-        val gapPx = gaps.map { it.roundToPx() }
-        val fitting = (constraints.maxWidth - gapPx.sum()) / measurables.size
-        val circlePx = minOf(maxCircleSize.roundToPx(), fitting).coerceAtLeast(0)
-        val placeables = measurables.map { it.measure(Constraints.fixed(circlePx, circlePx)) }
-        layout(constraints.maxWidth, constraints.maxHeight) {
-            var x = 0
-            placeables.forEachIndexed { index, placeable ->
-                x += gapPx[index]
-                placeable.place(x, (constraints.maxHeight - circlePx) / 2)
-                x += circlePx
-            }
-        }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Icon(
+            verdictIcon(verdict),
+            contentDescription = null,
+            tint = verdictAccentColor(verdict),
+            modifier = Modifier
+                .size(VERDICT_ICON_SIZE)
+                .clearAndSetSemantics { contentDescription = description }
+        )
     }
 }
 
-private val SUMMARY_CIRCLE_GAP = 4.dp
-private val SUMMARY_GROUP_GAP = 14.dp
+private val VERDICT_ICON_SIZE = 24.dp
 private val NAME_CIRCLE_GAP = 8.dp
 
 private val NameStyle: TextStyle

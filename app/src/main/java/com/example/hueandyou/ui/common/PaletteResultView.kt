@@ -66,7 +66,7 @@ internal fun verdictLabel(verdict: ClothingVerdict): Int = when (verdict) {
     ClothingVerdict.NEITHER -> R.string.rate_clothing_verdict_neither
 }
 
-private fun verdictIcon(verdict: ClothingVerdict): ImageVector = when (verdict) {
+internal fun verdictIcon(verdict: ClothingVerdict): ImageVector = when (verdict) {
     ClothingVerdict.YES -> Icons.Filled.ThumbUpAlt
     ClothingVerdict.AVOID -> Icons.Filled.ThumbDownAlt
     ClothingVerdict.NEITHER -> Icons.Filled.HorizontalRule
@@ -81,6 +81,14 @@ internal fun verdictColors(verdict: ClothingVerdict): Pair<Color, Color> {
         ClothingVerdict.AVOID -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
         ClothingVerdict.NEITHER -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
+}
+
+/** The verdict's accent color, for its icon drawn bare on a surface (e.g. a History row). */
+@Composable
+internal fun verdictAccentColor(verdict: ClothingVerdict): Color = when (verdict) {
+    ClothingVerdict.YES -> LocalSuccessColors.current.content
+    ClothingVerdict.AVOID -> MaterialTheme.colorScheme.error
+    ClothingVerdict.NEITHER -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 
 /** The verdict icon in a circle of its container color, filling whatever size [modifier] gives it. */
