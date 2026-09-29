@@ -246,46 +246,104 @@ class SeasonAnalysisViewModelTest {
     }
 
     @Test
-    fun createProfile_savesSelectedSeasonsPaletteInOrder() {
+    fun openNameDialog_suggestsTheSelectedSeasonsName() {
         pickAll()
         val selected = result().topMatches[1].season
         viewModel.selectSeason(selected)
 
+        viewModel.openNameDialog()
+
+        assertEquals(NameDialog(selected.name, isTaken = false), result().nameDialog)
+        assertTrue(repository.profiles.value.isEmpty())
+    }
+
+    @Test
+    fun openNameDialog_dedupesTheSuggestedName() {
+        pickAll()
+        val name = result().selected.name
+        repository.createProfileBlocking(name)
+        repository.createProfileBlocking("$name 2")
+
+        viewModel.openNameDialog()
+
+        assertEquals("$name 3", result().nameDialog?.name)
+    }
+
+    @Test
+    fun updateProfileName_flagsTakenNamesIgnoringCaseAndSpaces() {
+        repository.createProfileBlocking("My Winter")
+        pickAll()
+        viewModel.openNameDialog()
+
+        viewModel.updateProfileName("  my winter ")
+        assertEquals(true, result().nameDialog?.isTaken)
+        assertFalse(result().nameDialog!!.canCreate)
+
+        viewModel.updateProfileName("My Winter 2")
+        assertEquals(false, result().nameDialog?.isTaken)
+        assertTrue(result().nameDialog!!.canCreate)
+    }
+
+    @Test
+    fun blankOrTakenName_cannotBeCreated() {
+        repository.createProfileBlocking("Taken")
+        pickAll()
+        viewModel.openNameDialog()
+
+        viewModel.updateProfileName("   ")
+        viewModel.createProfile()
+        viewModel.updateProfileName("taken")
+        viewModel.createProfile()
+
+        assertEquals(listOf("Taken"), repository.profiles.value.map { it.name })
+        assertTrue(viewModel.uiState.value is SeasonAnalysisUiState.ShowingResult)
+    }
+
+    @Test
+    fun createProfile_withoutTheDialog_isIgnored() {
+        pickAll()
+
+        viewModel.createProfile()
+
+        assertTrue(repository.profiles.value.isEmpty())
+    }
+
+    @Test
+    fun dismissNameDialog_closesItWithoutCreating() {
+        pickAll()
+        viewModel.openNameDialog()
+
+        viewModel.dismissNameDialog()
+
+        assertEquals(null, result().nameDialog)
+        assertTrue(repository.profiles.value.isEmpty())
+    }
+
+    @Test
+    fun createProfile_savesTheTrimmedNameAndSelectedSeasonsPaletteInOrder() {
+        pickAll()
+        val selected = result().topMatches[1].season
+        viewModel.selectSeason(selected)
+        viewModel.openNameDialog()
+        viewModel.updateProfileName("  My palette ")
+
         viewModel.createProfile()
 
         val profile = repository.profiles.value.single()
-        assertEquals(selected.name, profile.name)
+        assertEquals("My palette", profile.name)
         assertEquals(SeasonPalettes.best(selected), profile.bestColors.map { it.argb })
         assertEquals(SeasonPalettes.avoid(selected), profile.avoidColors.map { it.argb })
         assertEquals(SeasonAnalysisUiState.Done(profile.id), viewModel.uiState.value)
     }
 
     @Test
-    fun createProfile_dedupesTheName() {
-        pickAll()
-        val name = result().selected.name
-        repository.createProfileBlocking(name)
-        repository.createProfileBlocking("$name 2")
-
-        viewModel.createProfile()
-
-        assertEquals("$name 3", repository.profiles.value.last().name)
-    }
-
-    @Test
     fun createProfileTwice_createsOneProfile() {
         pickAll()
+        viewModel.openNameDialog()
 
         viewModel.createProfile()
         viewModel.createProfile()
 
         assertEquals(1, repository.profiles.value.size)
-    }
-
-    @Test
-    fun uniqueProfileName_countsUpFromTwo() {
-        assertEquals("Soft Autumn", uniqueProfileName("Soft Autumn", listOf("Deep Winter")))
-        assertEquals("Soft Autumn 2", uniqueProfileName("Soft Autumn", listOf("Soft Autumn")))
-        assertEquals("Soft Autumn 2", uniqueProfileName("Soft Autumn", listOf("Soft Autumn", "Soft Autumn 3")))
     }
 }

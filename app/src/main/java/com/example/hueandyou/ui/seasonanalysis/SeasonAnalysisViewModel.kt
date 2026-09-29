@@ -19,6 +19,8 @@ import com.example.hueandyou.colorspace.Season
 import com.example.hueandyou.colorspace.SeasonClassifier
 import com.example.hueandyou.data.profile.ColorKind
 import com.example.hueandyou.data.profile.ProfileRepository
+import com.example.hueandyou.data.profile.isProfileNameTaken
+import com.example.hueandyou.data.profile.uniqueProfileName
 import com.example.hueandyou.ui.common.toPixelSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -47,12 +49,6 @@ private fun decodeBitmap(contentResolver: ContentResolver, uri: Uri): Bitmap {
     }
 }
 
-/** [base] if no profile has that name yet, otherwise "[base] 2", "[base] 3", ... */
-internal fun uniqueProfileName(base: String, existingNames: Collection<String>): String {
-    if (base !in existingNames) return base
-    return generateSequence(2) { it + 1 }.map { "$base $it" }.first { it !in existingNames }
-}
-
 private fun SeasonFeature.sampleRadiusFraction(): Double = when (this) {
     SeasonFeature.EYES -> CalibrationConfig.EYE_TAP_SAMPLE_RADIUS_FRACTION
     SeasonFeature.SKIN, SeasonFeature.HAIR -> CalibrationConfig.TAP_SAMPLE_RADIUS_FRACTION
@@ -60,8 +56,8 @@ private fun SeasonFeature.sampleRadiusFraction(): Double = when (this) {
 
 /**
  * Find my season: for skin, hair and eyes in turn, a photo and a marker placed on it -> ranked
- * seasons -> a new profile with the chosen season's palette, named by [seasonName]. Nothing is
- * saved until [createProfile].
+ * seasons -> a new profile with the chosen season's palette. [openNameDialog] suggests a name from
+ * [seasonName]; nothing is saved until [createProfile].
  */
 class SeasonAnalysisViewModel(
     private val profileRepository: ProfileRepository,
@@ -184,13 +180,39 @@ class SeasonAnalysisViewModel(
         return true
     }
 
+    /** Profile names that exist, loaded when the name dialog opens. */
+    private var existingNames: List<String> = emptyList()
+
+    /** Opens the name dialog, pre-filled with the selected season's name made unique. */
+    fun openNameDialog() {
+        if (_uiState.value !is SeasonAnalysisUiState.ShowingResult) return
+        viewModelScope.launch {
+            existingNames = profileRepository.observeProfiles().first().map { it.name }
+            val state = _uiState.value as? SeasonAnalysisUiState.ShowingResult ?: return@launch
+            val name = uniqueProfileName(seasonName(state.selected), existingNames)
+            _uiState.value = state.copy(nameDialog = NameDialog(name, isTaken = false))
+        }
+    }
+
+    fun updateProfileName(name: String) {
+        val state = _uiState.value as? SeasonAnalysisUiState.ShowingResult ?: return
+        if (state.nameDialog == null) return
+        _uiState.value = state.copy(nameDialog = NameDialog(name, isProfileNameTaken(name, existingNames)))
+    }
+
+    fun dismissNameDialog() {
+        val state = _uiState.value as? SeasonAnalysisUiState.ShowingResult ?: return
+        _uiState.value = state.copy(nameDialog = null)
+    }
+
+    /** Creates the profile under the dialog's trimmed name; ignored while that name can't be used. */
     fun createProfile() {
         val state = _uiState.value as? SeasonAnalysisUiState.ShowingResult ?: return
+        val dialog = state.nameDialog?.takeIf { it.canCreate } ?: return
         // Leave ShowingResult right away so a double tap can't create a second profile.
         _uiState.value = SeasonAnalysisUiState.Saving
         viewModelScope.launch {
-            val existingNames = profileRepository.observeProfiles().first().map { it.name }
-            val profileId = profileRepository.createProfile(uniqueProfileName(seasonName(state.selected), existingNames))
+            val profileId = profileRepository.createProfile(dialog.name.trim())
             state.bestColors.forEach { profileRepository.addColor(profileId, ColorKind.BEST, it) }
             state.avoidColors.forEach { profileRepository.addColor(profileId, ColorKind.AVOID, it) }
             _uiState.value = SeasonAnalysisUiState.Done(profileId)

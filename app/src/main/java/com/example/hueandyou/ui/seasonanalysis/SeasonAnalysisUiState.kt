@@ -18,6 +18,11 @@ enum class SeasonFeature {
 /** A picked color and where the marker sat, in pixels of that feature's photo. */
 data class FeaturePick(val argb: Int, val x: Int, val y: Int)
 
+/** The profile name being typed before Create; [isTaken] means another profile already has it. */
+data class NameDialog(val name: String, val isTaken: Boolean) {
+    val canCreate: Boolean get() = name.isNotBlank() && !isTaken
+}
+
 /** How many seasons the result screen lists. */
 const val SEASON_RESULT_COUNT = 3
 
@@ -40,11 +45,15 @@ sealed interface SeasonAnalysisUiState {
         val marker: FeaturePick,
     ) : SeasonAnalysisUiState
 
-    /** [topMatches] are the best [SEASON_RESULT_COUNT] seasons, best first; [picks] allow going back. */
+    /**
+     * [topMatches] are the best [SEASON_RESULT_COUNT] seasons, best first; [picks] allow going back.
+     * [nameDialog] is non-null while the Create profile dialog is open.
+     */
     data class ShowingResult(
         val picks: Map<SeasonFeature, FeaturePick>,
         val topMatches: List<SeasonMatch>,
         val selected: Season,
+        val nameDialog: NameDialog? = null,
     ) : SeasonAnalysisUiState {
         val bestColors: List<Int> get() = SeasonPalettes.best(selected)
         val avoidColors: List<Int> get() = SeasonPalettes.avoid(selected)

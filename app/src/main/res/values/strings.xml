@@ -108,6 +108,10 @@
     <string name="season_analysis_best_title">Best Colors</string>
     <string name="season_analysis_avoid_title">Colors to Avoid</string>
     <string name="season_analysis_create_profile">Create profile</string>
+    <string name="season_analysis_top_matches_title">Top three matches</string>
+    <string name="season_analysis_name_dialog_title">Name your profile</string>
+    <string name="season_analysis_name_dialog_create">Create</string>
+    <string name="profile_name_taken">A profile with this name already exists</string>
     <string name="season_light_spring">Light Spring</string>
     <string name="season_true_spring">True Spring</string>
     <string name="season_bright_spring">Bright Spring</string>

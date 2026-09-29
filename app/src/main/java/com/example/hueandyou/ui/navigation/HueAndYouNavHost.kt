@@ -315,11 +315,8 @@ fun HueAndYouNavHost() {
             composable(Destination.SeasonAnalysis.route) {
                 SeasonAnalysisScreen(
                     onNavigateBack = { navController.popBackStack() },
-                    onProfileCreated = { profileId ->
-                        navController.navigate(Destination.ProfileEditor.route(profileId)) {
-                            popUpTo(Destination.SeasonAnalysis.route) { inclusive = true }
-                        }
-                    }
+                    // Back to Settings, where the new profile shows up in the list.
+                    onProfileCreated = { navController.popBackStack() }
                 )
             }
             composable(Destination.RateClothing.route) {

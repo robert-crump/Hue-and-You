@@ -33,6 +33,19 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -173,6 +186,18 @@ fun SeasonAnalysisScreen(
                     }
                 }
             )
+        },
+        bottomBar = {
+            if (uiState is SeasonAnalysisUiState.ShowingResult) {
+                Button(
+                    onClick = viewModel::openNameDialog,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(stringResource(R.string.season_analysis_create_profile))
+                }
+            }
         }
     ) { innerPadding ->
         Box(
@@ -199,11 +224,17 @@ fun SeasonAnalysisScreen(
                         onNext = viewModel::next,
                     )
                 }
-                is SeasonAnalysisUiState.ShowingResult -> ResultStep(
-                    state = state,
-                    onSelectSeason = viewModel::selectSeason,
-                    onCreateProfile = viewModel::createProfile,
-                )
+                is SeasonAnalysisUiState.ShowingResult -> {
+                    ResultStep(state = state, onSelectSeason = viewModel::selectSeason)
+                    state.nameDialog?.let { dialog ->
+                        ProfileNameDialog(
+                            dialog = dialog,
+                            onNameChange = viewModel::updateProfileName,
+                            onCreate = viewModel::createProfile,
+                            onDismiss = viewModel::dismissNameDialog,
+                        )
+                    }
+                }
                 is SeasonAnalysisUiState.LoadingPhoto,
                 is SeasonAnalysisUiState.Saving,
                 is SeasonAnalysisUiState.Done -> LoadingStep()
@@ -459,40 +490,29 @@ private fun clampOffset(offset: Offset, scale: Float, size: IntSize): Offset {
     return Offset(offset.x.coerceIn(-maxX, maxX), offset.y.coerceIn(-maxY, maxY))
 }
 
+/** The circle size of a [GRID_COLUMNS]-column grid [width] wide, shared by the swatches and palettes. */
+private fun gridCircleSize(width: Dp): Dp = minOf(width / GRID_COLUMNS - GRID_GAP, MAX_CIRCLE_SIZE)
+
 @Composable
 private fun ResultStep(
     state: SeasonAnalysisUiState.ShowingResult,
     onSelectSeason: (Season) -> Unit,
-    onCreateProfile: () -> Unit,
 ) {
+    // Not saved: the result always opens on Best.
+    var showAvoid by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            SeasonFeature.entries.forEach { feature ->
-                state.picks[feature]?.let { pick ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        ColorCircle(
-                            argb = pick.argb,
-                            size = 32.dp,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-                        )
-                        Text(
-                            text = stringResource(featureLabelRes(feature)),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-            }
-        }
-        Column(
-            modifier = Modifier.padding(top = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
+        FeatureSwatchRow(state.picks)
+        Text(
+            text = stringResource(R.string.season_analysis_top_matches_title),
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             state.topMatches.forEach { match ->
                 SeasonMatchRow(
                     match = match,
@@ -501,13 +521,111 @@ private fun ResultStep(
                 )
             }
         }
-        PaletteSection(title = stringResource(R.string.season_analysis_best_title), colors = state.bestColors)
-        PaletteSection(title = stringResource(R.string.season_analysis_avoid_title), colors = state.avoidColors)
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = onCreateProfile, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.season_analysis_create_profile))
+        PrimaryTabRow(
+            selectedTabIndex = if (showAvoid) 1 else 0,
+            containerColor = Color.Transparent,
+            modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
+        ) {
+            Tab(
+                selected = !showAvoid,
+                onClick = { showAvoid = false },
+                text = { Text(stringResource(R.string.season_analysis_best_title)) }
+            )
+            Tab(
+                selected = showAvoid,
+                onClick = { showAvoid = true },
+                text = { Text(stringResource(R.string.season_analysis_avoid_title)) }
+            )
+        }
+        PaletteGrid(colors = if (showAvoid) state.avoidColors else state.bestColors)
+    }
+}
+
+/** Skin, hair and eyes in the first columns of the palette grid, at the palette's circle size. */
+@Composable
+private fun FeatureSwatchRow(picks: Map<SeasonFeature, FeaturePick>) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val circleSize = gridCircleSize(maxWidth)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            SeasonFeature.entries.forEach { feature ->
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    picks[feature]?.let { pick ->
+                        ColorCircle(
+                            argb = pick.argb,
+                            size = circleSize,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                        )
+                    }
+                    Text(
+                        text = stringResource(featureLabelRes(feature)),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+            repeat(GRID_COLUMNS - SeasonFeature.entries.size) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
         }
     }
+}
+
+/** Names the new profile; Create stays disabled while the name is blank or already taken. */
+@Composable
+private fun ProfileNameDialog(
+    dialog: NameDialog,
+    onNameChange: (String) -> Unit,
+    onCreate: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // Starts with the suggested name selected, so typing replaces it.
+    var field by remember {
+        mutableStateOf(TextFieldValue(dialog.name, selection = TextRange(0, dialog.name.length)))
+    }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.season_analysis_name_dialog_title)) },
+        text = {
+            OutlinedTextField(
+                value = field,
+                onValueChange = {
+                    field = it
+                    onNameChange(it.text)
+                },
+                label = { Text(stringResource(R.string.profile_editor_name_label)) },
+                isError = !dialog.canCreate,
+                supportingText = if (dialog.isTaken) {
+                    { Text(stringResource(R.string.profile_name_taken)) }
+                } else {
+                    null
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Sentences,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { if (dialog.canCreate) onCreate() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onCreate, enabled = dialog.canCreate) {
+                Text(stringResource(R.string.season_analysis_name_dialog_create))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.dialog_cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -552,16 +670,11 @@ private fun SeasonMatchRow(match: SeasonMatch, selected: Boolean, onClick: () ->
     }
 }
 
-/** A titled 5-column circle grid, laid out like the Profile editor's. */
+/** A 5-column circle grid, laid out like the Profile editor's. */
 @Composable
-private fun PaletteSection(title: String, colors: List<Int>) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleLarge,
-        modifier = Modifier.padding(top = 24.dp, bottom = 12.dp)
-    )
+private fun PaletteGrid(colors: List<Int>) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val circleSize: Dp = minOf(maxWidth / GRID_COLUMNS - GRID_GAP, MAX_CIRCLE_SIZE)
+        val circleSize = gridCircleSize(maxWidth)
         Column(verticalArrangement = Arrangement.spacedBy(GRID_GAP)) {
             colors.chunked(GRID_COLUMNS).forEach { row ->
                 Row(modifier = Modifier.fillMaxWidth()) {
