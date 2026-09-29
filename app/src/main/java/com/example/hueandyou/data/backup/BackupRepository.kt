@@ -68,6 +68,7 @@ class DefaultBackupRepository(
                 balance = entry.balance,
                 sampleX = entry.sampleX,
                 sampleY = entry.sampleY,
+                chipColorsArgb = entry.chipColorsArgb,
             )
         }
         return serializer.serialize(
@@ -140,6 +141,7 @@ class DefaultBackupRepository(
                     balance = entry.balance,
                     sampleX = entry.sampleX,
                     sampleY = entry.sampleY,
+                    chipColorsArgb = entry.chipColorsArgb,
                 )
             }
             if (historyEntities.isNotEmpty()) historyDao.insertAll(historyEntities)

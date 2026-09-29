@@ -43,6 +43,8 @@ internal data class BackupHistoryDto(
     /** Where the calibrated color was sampled from, normalized to the photo's size; null/absent = center box. */
     val sampleX: Double? = null,
     val sampleY: Double? = null,
+    /** The chip row saved with the entry; absent in older backups, whose chips are then re-extracted. */
+    val chipColors: List<String> = emptyList(),
     /** Present only for a clothing entry. */
     val clothing: BackupClothingDto? = null,
     /** Present only for an object entry. `object` is reserved in Kotlin, hence the [SerialName]. */

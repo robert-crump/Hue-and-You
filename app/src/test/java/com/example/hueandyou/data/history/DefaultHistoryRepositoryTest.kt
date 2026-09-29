@@ -50,6 +50,7 @@ class DefaultHistoryRepositoryTest {
             calibratedArgb = 0xFF778899.toInt(),
             profile = autumnProfile(),
             score = sampleScore(),
+            chipColorsArgb = emptyList(),
         )
 
         assertEquals(defaultHistoryEntryName(HistoryEntryType.CLOTHING), entry.name)
@@ -67,6 +68,7 @@ class DefaultHistoryRepositoryTest {
             calibratedArgb = 0xFF778899.toInt(),
             profile = profile,
             score = score,
+            chipColorsArgb = emptyList(),
         )
 
         assertEquals(profile.id, entry.profileId)
@@ -85,6 +87,7 @@ class DefaultHistoryRepositoryTest {
             calibratedArgb = 0xFF778899.toInt(),
             profile = null,
             score = score,
+            chipColorsArgb = emptyList(),
         )
 
         assertNull(entry.profileId)
@@ -96,9 +99,9 @@ class DefaultHistoryRepositoryTest {
 
     @Test
     fun observeEntries_returnsNewestFirst() = runBlocking {
-        repository.saveClothingResult("a.jpg", 0xFF111111.toInt(), null, PaletteScore(null, null, false))
+        repository.saveClothingResult("a.jpg", 0xFF111111.toInt(), null, PaletteScore(null, null, false), chipColorsArgb = emptyList())
         clock = 2_000L
-        repository.saveClothingResult("b.jpg", 0xFF222222.toInt(), null, PaletteScore(null, null, false))
+        repository.saveClothingResult("b.jpg", 0xFF222222.toInt(), null, PaletteScore(null, null, false), chipColorsArgb = emptyList())
 
         val entries = repository.observeEntries().first()
 
@@ -108,7 +111,8 @@ class DefaultHistoryRepositoryTest {
     @Test
     fun renameEntry_updatesNamePersistently() = runBlocking {
         val entry = repository.saveClothingResult(
-            "a.jpg", 0xFF111111.toInt(), null, PaletteScore(null, null, false)
+            "a.jpg", 0xFF111111.toInt(), null, PaletteScore(null, null, false),
+            chipColorsArgb = emptyList(),
         )
 
         repository.renameEntry(entry.id, "My favorite outfit")
@@ -122,7 +126,8 @@ class DefaultHistoryRepositoryTest {
         val profile = autumnProfile()
 
         val entry = repository.saveClothingResult(
-            "a.jpg", 0xFF778899.toInt(), profile, sampleScore()
+            "a.jpg", 0xFF778899.toInt(), profile, sampleScore(),
+            chipColorsArgb = emptyList(),
         )
 
         // Simulate the profile being renamed/recolored elsewhere after the snapshot was saved.
@@ -138,7 +143,8 @@ class DefaultHistoryRepositoryTest {
     @Test
     fun deleteEntry_removesRowAndThumbnailFile() = runBlocking {
         val entry = repository.saveClothingResult(
-            "a.jpg", 0xFF111111.toInt(), null, PaletteScore(null, null, false)
+            "a.jpg", 0xFF111111.toInt(), null, PaletteScore(null, null, false),
+            chipColorsArgb = emptyList(),
         )
 
         repository.deleteEntry(entry.id)
@@ -163,6 +169,7 @@ class DefaultHistoryRepositoryTest {
             inputColorsArgb = colors,
             wheel = HarmonyWheel.PERCEPTUAL,
             balance = HarmonyBalance.FAITHFUL,
+            chipColorsArgb = emptyList(),
         )
 
         assertEquals(defaultHistoryEntryName(HistoryEntryType.OBJECT), entry.name)
@@ -181,6 +188,7 @@ class DefaultHistoryRepositoryTest {
             inputColorsArgb = colors,
             wheel = HarmonyWheel.PERCEPTUAL,
             balance = HarmonyBalance.FAITHFUL,
+            chipColorsArgb = emptyList(),
         )
 
         val stored = repository.observeEntry(entry.id).first()!!
@@ -196,6 +204,7 @@ class DefaultHistoryRepositoryTest {
             inputColorsArgb = listOf(0xFF112233.toInt()),
             wheel = HarmonyWheel.PERCEPTUAL,
             balance = HarmonyBalance.FAITHFUL,
+            chipColorsArgb = emptyList(),
         )
 
         repository.updateObjectPick(entry.id, 0xFF445566.toInt(), sampleX = 0.25, sampleY = 0.75)
@@ -216,6 +225,7 @@ class DefaultHistoryRepositoryTest {
             calibratedArgb = 0xFF778899.toInt(),
             profile = autumnProfile(),
             score = sampleScore(),
+            chipColorsArgb = emptyList(),
         )
         val newScore = PaletteScore(
             nearestBest = ColorMatch(0xFF445566.toInt(), 1.0),
@@ -241,6 +251,7 @@ class DefaultHistoryRepositoryTest {
             calibratedArgb = 0xFF778899.toInt(),
             profile = autumnProfile(),
             score = sampleScore(),
+            chipColorsArgb = emptyList(),
         )
         val winterProfile = Profile(
             id = 99L,

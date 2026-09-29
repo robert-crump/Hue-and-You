@@ -108,17 +108,19 @@ class RateClothingViewModel(
             val argb = candidates.first()
             val profile = selectedProfile
             val score = scoreFor(argb, profile)
+            val chipColors = ColorExtractor.selectTopColors(candidates)
             val thumbnailPath = thumbnailStore.save(bitmap)
             val entry = historyRepository.saveClothingResult(
                 thumbnailPath = thumbnailPath,
                 calibratedArgb = argb,
                 profile = profile,
                 score = score,
+                chipColorsArgb = chipColors,
             )
             _uiState.value = RateClothingUiState.ShowingResult(
                 photo = bitmap,
                 argb = argb,
-                chipColorsArgb = ColorExtractor.selectTopColors(candidates),
+                chipColorsArgb = chipColors,
                 score = score,
                 historyEntryId = entry.id,
                 profiles = profiles,

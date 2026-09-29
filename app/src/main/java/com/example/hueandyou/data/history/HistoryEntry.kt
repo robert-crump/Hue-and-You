@@ -26,6 +26,11 @@ data class HistoryEntry(
     /** Where [calibratedArgb] was sampled from, normalized to the photo's size; null = center box. */
     val sampleX: Double? = null,
     val sampleY: Double? = null,
+    /**
+     * The photo's top chip colors as shown when the entry was saved, so History highlights the same
+     * chip; empty for an entry saved before these were kept, until History detail backfills it.
+     */
+    val chipColorsArgb: List<Int> = emptyList(),
 )
 
 internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
@@ -48,6 +53,7 @@ internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
         balance = balance,
         sampleX = sampleX,
         sampleY = sampleY,
+        chipColorsArgb = chipColorsArgb,
     )
 }
 
@@ -72,6 +78,7 @@ internal fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
     balance = balance,
     sampleX = sampleX,
     sampleY = sampleY,
+    chipColorsArgb = chipColorsArgb,
 )
 
 /** Default name a newly-saved entry gets, before the user edits it: just its type. */

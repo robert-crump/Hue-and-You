@@ -9,7 +9,7 @@ import com.example.hueandyou.data.history.HistoryEntryEntity
 
 @Database(
     entities = [ProfileEntity::class, PaletteColorEntity::class, HistoryEntryEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class, HistoryConverters::class)

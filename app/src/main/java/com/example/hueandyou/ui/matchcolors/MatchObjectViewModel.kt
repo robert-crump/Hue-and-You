@@ -73,17 +73,19 @@ class MatchObjectViewModel(
             candidates = extractedCandidates.map { it.argb }
             val mainColorArgb = candidates.first()
             val defaults = settingsRepository.observeDefaults().first()
+            val chipColors = ColorExtractor.selectTopColors(candidates)
             val thumbnailPath = thumbnailStore.save(bitmap)
             val entry = historyRepository.saveObjectResult(
                 thumbnailPath = thumbnailPath,
                 inputColorsArgb = listOf(mainColorArgb),
                 wheel = defaults.wheel,
                 balance = defaults.balance,
+                chipColorsArgb = chipColors,
             )
             _uiState.value = MatchObjectUiState.ShowingResult(
                 photo = bitmap,
                 inputColorArgb = entry.inputColorsArgb.first(),
-                chipColorsArgb = ColorExtractor.selectTopColors(candidates),
+                chipColorsArgb = chipColors,
                 wheel = entry.wheel ?: defaults.wheel,
                 balance = entry.balance ?: defaults.balance,
                 historyEntryId = entry.id,

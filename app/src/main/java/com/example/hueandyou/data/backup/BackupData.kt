@@ -41,6 +41,8 @@ data class BackupHistoryEntry(
     /** Where [calibratedArgb] was sampled from, normalized to the photo's size; null = center box. */
     val sampleX: Double? = null,
     val sampleY: Double? = null,
+    /** The chip row saved with the entry; empty if it predates them (History detail backfills it). */
+    val chipColorsArgb: List<Int> = emptyList(),
 ) {
     // ByteArray breaks data-class equals/hashCode (identity, not content) - compare content instead.
     override fun equals(other: Any?): Boolean {
@@ -61,7 +63,8 @@ data class BackupHistoryEntry(
             wheel == other.wheel &&
             balance == other.balance &&
             sampleX == other.sampleX &&
-            sampleY == other.sampleY
+            sampleY == other.sampleY &&
+            chipColorsArgb == other.chipColorsArgb
     }
 
     override fun hashCode(): Int {
@@ -81,6 +84,7 @@ data class BackupHistoryEntry(
         result = 31 * result + (balance?.hashCode() ?: 0)
         result = 31 * result + (sampleX?.hashCode() ?: 0)
         result = 31 * result + (sampleY?.hashCode() ?: 0)
+        result = 31 * result + chipColorsArgb.hashCode()
         return result
     }
 }

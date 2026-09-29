@@ -69,6 +69,7 @@ class MatchObjectViewModelTest {
         state as MatchObjectUiState.ShowingResult
         assertEquals(mainColor, state.inputColorArgb)
         assertEquals(listOf(mainColor), historyRepository.savedInputColors)
+        assertEquals(state.chipColorsArgb, historyRepository.savedChipColors)
     }
 
     @Test
@@ -155,6 +156,7 @@ class MatchObjectViewModelTest {
 
     private class FakeHistoryRepository : HistoryRepository {
         var savedInputColors: List<Int>? = null
+        var savedChipColors: List<Int>? = null
         var lastObjectPick: Triple<Long, Int, Pair<Double?, Double?>>? = null
 
         override fun observeEntries() = throw UnsupportedOperationException("not used by this test")
@@ -165,6 +167,7 @@ class MatchObjectViewModelTest {
             calibratedArgb: Int,
             profile: Profile?,
             score: PaletteScore,
+            chipColorsArgb: List<Int>,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun saveObjectResult(
@@ -172,8 +175,10 @@ class MatchObjectViewModelTest {
             inputColorsArgb: List<Int>,
             wheel: HarmonyWheel,
             balance: HarmonyBalance,
+            chipColorsArgb: List<Int>,
         ): HistoryEntry {
             savedInputColors = inputColorsArgb
+            savedChipColors = chipColorsArgb
             return HistoryEntry(
                 id = 1L,
                 type = HistoryEntryType.OBJECT,
@@ -211,6 +216,10 @@ class MatchObjectViewModelTest {
         }
 
         override suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore) {
+            throw UnsupportedOperationException("not used by this test")
+        }
+
+        override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
             throw UnsupportedOperationException("not used by this test")
         }
 

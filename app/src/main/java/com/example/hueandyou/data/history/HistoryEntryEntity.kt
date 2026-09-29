@@ -1,5 +1,6 @@
 package com.example.hueandyou.data.history
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.hueandyou.colorspace.HarmonyBalance
@@ -31,4 +32,10 @@ data class HistoryEntryEntity(
     /** Where [calibratedArgb] was sampled from, normalized to the photo's size; null = center box. */
     val sampleX: Double? = null,
     val sampleY: Double? = null,
+    /**
+     * The photo's top chip colors as shown when the entry was saved, so History highlights the same
+     * chip; empty for an entry saved before these were kept, until History detail backfills it.
+     */
+    @ColumnInfo(defaultValue = "")
+    val chipColorsArgb: List<Int> = emptyList(),
 )

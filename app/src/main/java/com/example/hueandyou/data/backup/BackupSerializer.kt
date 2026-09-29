@@ -100,6 +100,7 @@ private fun BackupHistoryEntry.toDto(): BackupHistoryDto = BackupHistoryDto(
     inputColors = inputColorsArgb.map(::formatHexColor),
     sampleX = sampleX,
     sampleY = sampleY,
+    chipColors = chipColorsArgb.map(::formatHexColor),
     clothing = if (type == HistoryEntryType.CLOTHING) {
         BackupClothingDto(
             calibratedArgb = formatHexColor(calibratedArgb),
@@ -150,6 +151,7 @@ private fun BackupHistoryDto.toDomain(): BackupHistoryEntry {
     } catch (e: IllegalArgumentException) {
         throw BackupImportException("A history entry's thumbnail is corrupted.")
     }
+    val chipColorsArgb = chipColors.map { it.toArgbOrThrow() }
     return when (entryType) {
         HistoryEntryType.CLOTHING -> {
             val clothing = clothing
@@ -175,6 +177,7 @@ private fun BackupHistoryDto.toDomain(): BackupHistoryEntry {
                 balance = null,
                 sampleX = sampleX,
                 sampleY = sampleY,
+                chipColorsArgb = chipColorsArgb,
             )
         }
         HistoryEntryType.OBJECT -> {
@@ -201,6 +204,7 @@ private fun BackupHistoryDto.toDomain(): BackupHistoryEntry {
                 balance = objectResult.balance.toEnumOrThrow(),
                 sampleX = sampleX,
                 sampleY = sampleY,
+                chipColorsArgb = chipColorsArgb,
             )
         }
     }

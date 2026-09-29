@@ -83,6 +83,7 @@ class RateClothingViewModelTest {
         val state = model.uiState.value as RateClothingUiState.ShowingResult
         assertEquals(profileB, state.selectedProfile)
         assertEquals(profileB, historyRepository.savedProfile)
+        assertEquals(state.chipColorsArgb, historyRepository.savedChipColors)
     }
 
     @Test
@@ -266,6 +267,7 @@ class RateClothingViewModelTest {
 
     private class FakeHistoryRepository : HistoryRepository {
         var savedProfile: Profile? = null
+        var savedChipColors: List<Int>? = null
         var lastProfileUpdate: Triple<Long, Profile, PaletteScore>? = null
 
         override fun observeEntries() = throw UnsupportedOperationException("not used by this test")
@@ -276,8 +278,10 @@ class RateClothingViewModelTest {
             calibratedArgb: Int,
             profile: Profile?,
             score: PaletteScore,
+            chipColorsArgb: List<Int>,
         ): HistoryEntry {
             savedProfile = profile
+            savedChipColors = chipColorsArgb
             return HistoryEntry(
                 id = 1L,
                 type = HistoryEntryType.CLOTHING,
@@ -298,6 +302,7 @@ class RateClothingViewModelTest {
             inputColorsArgb: List<Int>,
             wheel: HarmonyWheel,
             balance: HarmonyBalance,
+            chipColorsArgb: List<Int>,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun renameEntry(entryId: Long, name: String) {
@@ -320,6 +325,10 @@ class RateClothingViewModelTest {
 
         override suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore) {
             lastProfileUpdate = Triple(entryId, profile, score)
+        }
+
+        override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
+            throw UnsupportedOperationException("not used by this test")
         }
 
         override suspend fun deleteEntry(entryId: Long) {

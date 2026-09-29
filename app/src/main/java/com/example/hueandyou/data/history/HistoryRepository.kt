@@ -16,7 +16,8 @@ interface HistoryRepository {
         thumbnailPath: String,
         calibratedArgb: Int,
         profile: Profile?,
-        score: PaletteScore
+        score: PaletteScore,
+        chipColorsArgb: List<Int>,
     ): HistoryEntry
 
     /** Saves a Match Colors for an Object result as a new history entry and returns it. */
@@ -25,6 +26,7 @@ interface HistoryRepository {
         inputColorsArgb: List<Int>,
         wheel: HarmonyWheel,
         balance: HarmonyBalance,
+        chipColorsArgb: List<Int>,
     ): HistoryEntry
 
     suspend fun renameEntry(entryId: Long, name: String)
@@ -37,6 +39,9 @@ interface HistoryRepository {
 
     /** Updates a CLOTHING entry in place after switching profiles: the new profile snapshot and recomputed score. */
     suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore)
+
+    /** Stores the chip colors of an entry saved before they were kept. */
+    suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>)
 
     /** Deletes an entry and its thumbnail file. */
     suspend fun deleteEntry(entryId: Long)
@@ -58,7 +63,8 @@ class DefaultHistoryRepository(
         thumbnailPath: String,
         calibratedArgb: Int,
         profile: Profile?,
-        score: PaletteScore
+        score: PaletteScore,
+        chipColorsArgb: List<Int>,
     ): HistoryEntry {
         val now = currentTimeMillis()
         val entry = HistoryEntry(
@@ -72,7 +78,8 @@ class DefaultHistoryRepository(
             profileName = profile?.name,
             bestColorsArgb = profile?.bestColors.orEmpty().map { it.argb },
             avoidColorsArgb = profile?.avoidColors.orEmpty().map { it.argb },
-            score = score
+            score = score,
+            chipColorsArgb = chipColorsArgb,
         )
         val id = dao.insert(entry.toEntity())
         return entry.copy(id = id)
@@ -83,6 +90,7 @@ class DefaultHistoryRepository(
         inputColorsArgb: List<Int>,
         wheel: HarmonyWheel,
         balance: HarmonyBalance,
+        chipColorsArgb: List<Int>,
     ): HistoryEntry {
         require(inputColorsArgb.isNotEmpty()) { "At least one input color is required" }
         val now = currentTimeMillis()
@@ -101,6 +109,7 @@ class DefaultHistoryRepository(
             inputColorsArgb = inputColorsArgb,
             wheel = wheel,
             balance = balance,
+            chipColorsArgb = chipColorsArgb,
         )
         val id = dao.insert(entry.toEntity())
         return entry.copy(id = id)
@@ -141,6 +150,10 @@ class DefaultHistoryRepository(
             nearestAvoidDeltaE = score.nearestAvoid?.deltaE,
             closerToAvoid = score.closerToAvoid,
         )
+    }
+
+    override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
+        dao.updateChipColors(entryId, chipColorsArgb)
     }
 
     override suspend fun deleteEntry(entryId: Long) {

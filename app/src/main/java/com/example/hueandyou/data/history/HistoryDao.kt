@@ -83,6 +83,9 @@ interface HistoryDao {
         closerToAvoid: Boolean,
     )
 
+    @Query("UPDATE history_entries SET chipColorsArgb = :chipColorsArgb WHERE id = :entryId")
+    suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>)
+
     @Query("DELETE FROM history_entries WHERE id = :entryId")
     suspend fun delete(entryId: Long)
 }

@@ -67,6 +67,7 @@ class HistoryDetailViewModelTest {
         calibratedArgb: Int = red,
         sampleX: Double? = null,
         sampleY: Double? = null,
+        chipColorsArgb: List<Int> = emptyList(),
     ) = HistoryEntry(
         id = id,
         type = HistoryEntryType.OBJECT,
@@ -84,6 +85,7 @@ class HistoryDetailViewModelTest {
         balance = HarmonyBalance.FAITHFUL,
         sampleX = sampleX,
         sampleY = sampleY,
+        chipColorsArgb = chipColorsArgb,
     )
 
     /** A photo whose center-box quantizes to mostly [red] with a [blue] region, like [MatchObjectViewModelTest]'s. */
@@ -139,6 +141,46 @@ class HistoryDetailViewModelTest {
         assertEquals(bitmap, state.photo)
         assertEquals(red, state.entry.calibratedArgb)
         assertEquals(listOf(red, blue), state.chipColorsArgb)
+    }
+
+    @Test
+    fun opensEntryWithStoredChips_showsThemWithoutExtracting() {
+        val green = 0xFF00FF00.toInt()
+        val repository = FakeHistoryRepository(objectEntry(chipColorsArgb = listOf(red, green)))
+        val extractThreads = mutableListOf<String>()
+        val model = viewModel(repository, extractThreadNames = extractThreads)
+
+        mainDispatcher.scheduler.runCurrent()
+
+        assertTrue(extractThreads.isEmpty())
+        assertTrue(repository.chipUpdates.isEmpty())
+        assertEquals(listOf(red, green), (model.uiState.value as HistoryDetailUiState.Loaded).chipColorsArgb)
+    }
+
+    @Test
+    fun opensEntryWithoutStoredChips_backfillsThemOnce() {
+        val repository = FakeHistoryRepository(objectEntry())
+        val extractThreads = mutableListOf<String>()
+        val model = viewModel(repository, extractThreadNames = extractThreads)
+
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(1, extractThreads.size)
+        assertEquals(listOf(listOf(red, blue)), repository.chipUpdates)
+        assertEquals(listOf(red, blue), (model.uiState.value as HistoryDetailUiState.Loaded).chipColorsArgb)
+    }
+
+    @Test
+    fun backfill_snapsTheNearestChipToTheSavedColor() {
+        // As if the saved color came from the full photo and differs slightly from the thumbnail's.
+        val nearlyRed = 0xFFFC0301.toInt()
+        val repository = FakeHistoryRepository(objectEntry(calibratedArgb = nearlyRed))
+        val model = viewModel(repository)
+
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(listOf(listOf(nearlyRed, blue)), repository.chipUpdates)
+        assertEquals(listOf(nearlyRed, blue), (model.uiState.value as HistoryDetailUiState.Loaded).chipColorsArgb)
     }
 
     @Test
@@ -294,6 +336,7 @@ class HistoryDetailViewModelTest {
         val renamedNames = mutableListOf<Pair<Long, String>>()
         var lastObjectPick: Triple<Long, Int, Pair<Double?, Double?>>? = null
         var lastClothingPick: ClothingPickCall? = null
+        val chipUpdates = mutableListOf<List<Int>>()
 
         override fun observeEntries() = throw UnsupportedOperationException("not used by this test")
         override fun observeEntry(entryId: Long): Flow<HistoryEntry?> = entryFlow
@@ -303,6 +346,7 @@ class HistoryDetailViewModelTest {
             calibratedArgb: Int,
             profile: Profile?,
             score: PaletteScore,
+            chipColorsArgb: List<Int>,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun saveObjectResult(
@@ -310,6 +354,7 @@ class HistoryDetailViewModelTest {
             inputColorsArgb: List<Int>,
             wheel: HarmonyWheel,
             balance: HarmonyBalance,
+            chipColorsArgb: List<Int>,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun renameEntry(entryId: Long, name: String) {
@@ -345,6 +390,11 @@ class HistoryDetailViewModelTest {
 
         override suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore) {
             throw UnsupportedOperationException("not used by this test")
+        }
+
+        override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
+            chipUpdates += chipColorsArgb
+            entryFlow.value = entryFlow.value?.copy(chipColorsArgb = chipColorsArgb)
         }
 
         override suspend fun deleteEntry(entryId: Long) {

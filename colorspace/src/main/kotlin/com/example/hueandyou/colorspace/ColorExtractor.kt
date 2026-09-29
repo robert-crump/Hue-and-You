@@ -101,6 +101,25 @@ object ColorExtractor {
         return listOf(top) + selectAlternatives(candidates, top)
     }
 
+    /**
+     * [chips] with the one nearest to [argb] replaced by [argb] itself, if it is within [maxDeltaE] -
+     * so a chip row re-extracted from a History thumbnail matches the entry's saved color exactly.
+     * Unchanged when [argb] is already a chip or no chip is that close (e.g. a tap-sampled color).
+     */
+    fun snapChipsTo(
+        chips: List<Int>,
+        argb: Int,
+        maxDeltaE: Double = CalibrationConfig.CHIP_SNAP_MAX_DELTA_E,
+    ): List<Int> {
+        if (argb in chips) return chips
+        val lab = argbToLab(argb)
+        val (nearestIndex, deltaE) = chips.indices
+            .map { index -> index to ciede2000(lab, argbToLab(chips[index])) }
+            .minByOrNull { it.second } ?: return chips
+        if (deltaE > maxDeltaE) return chips
+        return chips.toMutableList().also { it[nearestIndex] = argb }
+    }
+
     private fun collectPixels(pixels: PixelSource, bounds: RectRegion): IntArray {
         val buffer = IntArray(maxOf(0, bounds.right - bounds.left) * maxOf(0, bounds.bottom - bounds.top))
         var count = 0

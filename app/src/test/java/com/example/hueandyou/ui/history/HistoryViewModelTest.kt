@@ -245,7 +245,8 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         thumbnailPath: String,
         calibratedArgb: Int,
         profile: Profile?,
-        score: PaletteScore
+        score: PaletteScore,
+        chipColorsArgb: List<Int>,
     ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
     override suspend fun saveObjectResult(
@@ -253,6 +254,7 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         inputColorsArgb: List<Int>,
         wheel: HarmonyWheel,
         balance: HarmonyBalance,
+        chipColorsArgb: List<Int>,
     ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
     override suspend fun renameEntry(entryId: Long, name: String) {
@@ -274,6 +276,10 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
     }
 
     override suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore) {
+        throw UnsupportedOperationException("not used by this test")
+    }
+
+    override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
         throw UnsupportedOperationException("not used by this test")
     }
 

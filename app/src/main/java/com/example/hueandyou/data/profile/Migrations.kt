@@ -10,3 +10,10 @@ val MIGRATION_3_4: Migration = object : Migration(3, 4) {
         db.execSQL("ALTER TABLE history_entries ADD COLUMN sampleY REAL")
     }
 }
+
+/** Adds the history entries' saved chip colors; existing rows start empty and are backfilled on open. */
+val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE history_entries ADD COLUMN chipColorsArgb TEXT NOT NULL DEFAULT ''")
+    }
+}

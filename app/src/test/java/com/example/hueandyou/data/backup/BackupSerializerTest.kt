@@ -56,6 +56,7 @@ class BackupSerializerTest {
                 inputColorsArgb = emptyList(),
                 wheel = null,
                 balance = null,
+                chipColorsArgb = listOf(0xFF223344.toInt(), 0xFFAABBCC.toInt()),
             ),
             BackupHistoryEntry(
                 id = 11L,
@@ -74,6 +75,7 @@ class BackupSerializerTest {
                 balance = HarmonyBalance.FAITHFUL,
                 sampleX = 0.25,
                 sampleY = 0.75,
+                chipColorsArgb = listOf(0xFF001122.toInt(), 0xFF334455.toInt(), 0xFFDDEEFF.toInt()),
             ),
         ),
     )
@@ -167,6 +169,21 @@ class BackupSerializerTest {
             assertNull(entry.sampleX)
             assertNull(entry.sampleY)
         }
+    }
+
+    @Test
+    fun deserialize_withoutChipColors_defaultsToEmptyForOldBackups() {
+        val json = serializer.serialize(sampleData())
+        val withoutChipColors = mutated(json) { obj ->
+            val history = obj.getValue("history").jsonArray.map { entry ->
+                JsonObject(entry.jsonObject.filterKeys { it != "chipColors" })
+            }
+            obj["history"] = JsonArray(history)
+        }
+
+        val restored = serializer.deserialize(withoutChipColors)
+
+        restored.history.forEach { entry -> assertTrue(entry.chipColorsArgb.isEmpty()) }
     }
 
     @Test

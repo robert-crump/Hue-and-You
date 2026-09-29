@@ -33,7 +33,7 @@ sealed interface HistoryDetailUiState {
     data class Loaded(
         val entry: HistoryEntry,
         val photo: Bitmap,
-        /** The fixed top-3 chip row, computed once from the photo; only the highlight moves on a pick. */
+        /** The fixed top-3 chip row as saved with the entry; only the highlight moves on a pick. */
         val chipColorsArgb: List<Int>,
     ) : HistoryDetailUiState
 }
@@ -54,8 +54,6 @@ class HistoryDetailViewModel(
 
     private var photo: Bitmap? = null
 
-    /** The thumbnail's candidate colors, extracted once (off-main-thread) when the entry first opens. */
-    private var candidates: List<Int>? = null
 
     init {
         viewModelScope.launch {
@@ -70,10 +68,15 @@ class HistoryDetailViewModel(
         }
         val bitmap = photo ?: withContext(backgroundDispatcher) { bitmapDecoder(entry.thumbnailPath) }
             .also { photo = it }
-        val extractedCandidates = candidates ?: withContext(backgroundDispatcher) {
-            ColorExtractor.extractCandidates(pixelSourceOf(bitmap)).map { it.argb }
-        }.also { candidates = it }
-        _uiState.value = HistoryDetailUiState.Loaded(entry, bitmap, ColorExtractor.selectTopColors(extractedCandidates))
+        val chips = entry.chipColorsArgb.ifEmpty {
+            // Saved before chips were kept: re-extract them from the thumbnail once and store them,
+            // snapped so the saved color is one of them exactly.
+            withContext(backgroundDispatcher) {
+                val candidates = ColorExtractor.extractCandidates(pixelSourceOf(bitmap)).map { it.argb }
+                ColorExtractor.snapChipsTo(ColorExtractor.selectTopColors(candidates), entry.calibratedArgb)
+            }.also { if (it.isNotEmpty()) repository.updateChipColors(entryId, it) }
+        }
+        _uiState.value = HistoryDetailUiState.Loaded(entry, bitmap, chips)
     }
 
     /** Saves [name] trimmed; a blank name is ignored so an entry never ends up nameless. */

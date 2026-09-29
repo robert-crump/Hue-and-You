@@ -118,6 +118,11 @@ class FakeHistoryDao : HistoryDao {
         emit()
     }
 
+    override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
+        entries[entryId]?.let { entries[entryId] = it.copy(chipColorsArgb = chipColorsArgb) }
+        emit()
+    }
+
     override suspend fun delete(entryId: Long) {
         entries.remove(entryId)
         emit()

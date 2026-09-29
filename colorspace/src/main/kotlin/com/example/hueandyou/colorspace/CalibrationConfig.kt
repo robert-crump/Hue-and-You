@@ -24,6 +24,12 @@ object CalibrationConfig {
     const val ALTERNATIVE_MIN_DELTA_E = 5.0
 
     /**
+     * A saved color within this ΔE00 of a chip re-extracted from its (downscaled, JPEG) History
+     * thumbnail counts as that chip; see [ColorExtractor.snapChipsTo].
+     */
+    const val CHIP_SNAP_MAX_DELTA_E = 8.0
+
+    /**
      * Candidate swatch colors below this share of the marked region are dropped. Low enough to
      * keep swatches the marked rectangle only partly covers.
      */
