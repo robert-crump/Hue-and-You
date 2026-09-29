@@ -24,6 +24,11 @@ class ProfilesViewModel(
     val profiles: StateFlow<List<Profile>> = repository.observeProfiles()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** A just-created profile for Settings to point out once; see [ProfileRepository.newProfileId]. */
+    val newProfileId: StateFlow<Long?> = repository.newProfileId
+
+    fun onNewProfileShown(profileId: Long) = repository.consumeNewProfile(profileId)
+
     fun createProfile(defaultName: String, onCreated: (Long) -> Unit) {
         viewModelScope.launch {
             val id = repository.createProfile(defaultName)

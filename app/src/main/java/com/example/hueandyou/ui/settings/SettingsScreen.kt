@@ -86,9 +86,18 @@ import com.example.hueandyou.ui.common.harmonyWheelLabel
 import com.example.hueandyou.ui.common.verdictLabel
 import com.example.hueandyou.ui.profiles.ProfilesViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.graphics.lerp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.flow.first
 
 /** Position of the Profiles header in the lazy list, for the "go to Settings" jump from Rate Clothing. */
 private const val PROFILES_HEADER_INDEX = 3
+private const val PROFILES_GROUP_KEY = "profiles_group"
 
 @Composable
 fun SettingsScreen(
@@ -149,6 +158,23 @@ fun SettingsScreen(
         }
     }
 
+    // Points out a just-created profile once, after the screen is back in front - not while it is
+    // still visible under the transition to that profile's editor.
+    val newProfileId by profilesViewModel.newProfileId.collectAsState()
+    var pulsingProfileId by remember { mutableStateOf<Long?>(null) }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(newProfileId, profiles) {
+        val id = newProfileId ?: return@LaunchedEffect
+        if (profiles.none { it.id == id }) return@LaunchedEffect
+        lifecycle.currentStateFlow.first { it.isAtLeast(Lifecycle.State.RESUMED) }
+        if (listState.layoutInfo.visibleItemsInfo.none { it.key == PROFILES_GROUP_KEY }) {
+            listState.animateScrollToItem(PROFILES_HEADER_INDEX)
+        }
+        pulsingProfileId = id
+        // Last: clearing the id restarts this effect.
+        profilesViewModel.onNewProfileShown(id)
+    }
+
     LaunchedEffect(scrollToProfiles) {
         if (scrollToProfiles) {
             listState.animateScrollToItem(PROFILES_HEADER_INDEX)
@@ -197,11 +223,13 @@ fun SettingsScreen(
             item(key = "profiles_header") {
                 SectionHeader(stringResource(R.string.profiles_section_title))
             }
-            item(key = "profiles_group") {
+            item(key = PROFILES_GROUP_KEY) {
                 val profileRows = profiles.map { profile ->
                     @Composable {
                         ProfileRow(
                             profile = profile,
+                            pulse = profile.id == pulsingProfileId,
+                            onPulseFinished = { pulsingProfileId = null },
                             onClick = { onOpenProfile(profile.id) },
                             onShare = {
                                 profilesViewModel.shareCard(profile) { uri -> shareCardUri = uri }
@@ -439,11 +467,32 @@ private fun SettingsRow(
 }
 
 @Composable
-private fun ProfileRow(profile: Profile, onClick: () -> Unit, onShare: () -> Unit) {
+private fun ProfileRow(
+    profile: Profile,
+    pulse: Boolean,
+    onPulseFinished: () -> Unit,
+    onClick: () -> Unit,
+    onShare: () -> Unit,
+) {
     val dotColors = remember(profile.bestColors) {
         previewColors(profile.bestColors.map { it.argb }, MAX_PROFILE_DOTS)
     }
-    val surface = MaterialTheme.colorScheme.surfaceContainer
+    val pulseFraction = remember { Animatable(0f) }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    LaunchedEffect(pulse) {
+        if (!pulse) return@LaunchedEffect
+        bringIntoViewRequester.bringIntoView()
+        repeat(PULSE_COUNT) {
+            pulseFraction.animateTo(1f, tween(PULSE_HALF_CYCLE_MILLIS))
+            pulseFraction.animateTo(0f, tween(PULSE_HALF_CYCLE_MILLIS))
+        }
+        onPulseFinished()
+    }
+    val surface = lerp(
+        MaterialTheme.colorScheme.surfaceContainer,
+        MaterialTheme.colorScheme.primaryContainer,
+        pulseFraction.value
+    )
     ListItem(
         headlineContent = { Text(profile.name) },
         supportingContent = {
@@ -482,10 +531,16 @@ private fun ProfileRow(profile: Profile, onClick: () -> Unit, onShare: () -> Uni
                 )
             }
         },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = Modifier.clickable(onClick = onClick)
+        colors = ListItemDefaults.colors(containerColor = surface),
+        modifier = Modifier
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .clickable(onClick = onClick)
     )
 }
+
+/** A just-created profile's row fades to primaryContainer and back this many times. */
+private const val PULSE_COUNT = 3
+private const val PULSE_HALF_CYCLE_MILLIS = 300
 
 private const val MAX_PROFILE_DOTS = 4
 private val DOT_SIZE = 24.dp

@@ -27,7 +27,14 @@ class FakeProfileRepository : ProfileRepository {
     override fun observeProfile(profileId: Long): Flow<Profile?> =
         profiles.map { list -> list.find { it.id == profileId } }
 
-    override suspend fun createProfile(name: String): Long = createProfileBlocking(name)
+    override suspend fun createProfile(name: String): Long =
+        createProfileBlocking(name).also { newProfileId.value = it }
+
+    override val newProfileId = MutableStateFlow<Long?>(null)
+
+    override fun consumeNewProfile(profileId: Long) {
+        if (newProfileId.value == profileId) newProfileId.value = null
+    }
 
     override suspend fun renameProfile(profileId: Long, name: String) {
         throw UnsupportedOperationException("not used by these tests")

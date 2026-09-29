@@ -107,4 +107,24 @@ class RoomProfileRepositoryTest {
         assertTrue(repository.observeProfiles().first().isEmpty())
         assertEquals(0, dao.colorCount())
     }
+
+    @Test
+    fun createProfile_marksItAsNew() = runBlocking {
+        repository.createProfile("Autumn")
+        val second = repository.createProfile("Winter")
+
+        assertEquals(second, repository.newProfileId.value)
+    }
+
+    @Test
+    fun consumeNewProfile_clearsOnlyTheCurrentNewProfile() = runBlocking {
+        val first = repository.createProfile("Autumn")
+        val second = repository.createProfile("Winter")
+
+        repository.consumeNewProfile(first)
+        assertEquals(second, repository.newProfileId.value)
+
+        repository.consumeNewProfile(second)
+        assertNull(repository.newProfileId.value)
+    }
 }

@@ -217,6 +217,8 @@ class RateClothingViewModelTest {
     }
 
     private class FakeProfileRepository(private val profiles: List<Profile>) : ProfileRepository {
+        override val newProfileId = MutableStateFlow<Long?>(null)
+        override fun consumeNewProfile(profileId: Long) = Unit
         override fun observeProfiles(): Flow<List<Profile>> = flowOf(profiles)
         override fun observeProfile(profileId: Long): Flow<Profile?> =
             throw UnsupportedOperationException("not used by this test")

@@ -196,6 +196,8 @@ class ProfileEditorViewModelTest {
 }
 
 private class FakeProfileRepository : ProfileRepository {
+    override val newProfileId = MutableStateFlow<Long?>(null)
+    override fun consumeNewProfile(profileId: Long) = Unit
     val addedColors = mutableListOf<Pair<Long, ColorKind>>()
     val removedBatches = mutableListOf<Set<Long>>()
     val renames = mutableListOf<String>()

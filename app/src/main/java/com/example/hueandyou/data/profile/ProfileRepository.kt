@@ -1,12 +1,26 @@
 package com.example.hueandyou.data.profile
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 
 interface ProfileRepository {
     fun observeProfiles(): Flow<List<Profile>>
     fun observeProfile(profileId: Long): Flow<Profile?>
     suspend fun createProfile(name: String): Long
+
+    /**
+     * The profile [createProfile] made most recently, until [consumeNewProfile] - so the Settings
+     * list can point it out once, whichever flow created it. In memory only.
+     */
+    val newProfileId: StateFlow<Long?>
+
+    /** Clears [newProfileId] if it is still [profileId]. */
+    fun consumeNewProfile(profileId: Long)
+
     suspend fun renameProfile(profileId: Long, name: String)
     suspend fun deleteProfile(profileId: Long)
 
@@ -31,9 +45,17 @@ class RoomProfileRepository(
     override fun observeProfile(profileId: Long): Flow<Profile?> =
         dao.observeProfileWithColors(profileId).map { it?.toDomain() }
 
+    private val _newProfileId = MutableStateFlow<Long?>(null)
+    override val newProfileId: StateFlow<Long?> = _newProfileId.asStateFlow()
+
     override suspend fun createProfile(name: String): Long {
         val now = currentTimeMillis()
         return dao.insertProfile(ProfileEntity(name = name, createdAt = now, updatedAt = now))
+            .also { _newProfileId.value = it }
+    }
+
+    override fun consumeNewProfile(profileId: Long) {
+        _newProfileId.update { if (it == profileId) null else it }
     }
 
     override suspend fun renameProfile(profileId: Long, name: String) {
