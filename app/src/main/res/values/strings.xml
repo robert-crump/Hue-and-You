@@ -23,8 +23,8 @@
         <item quantity="other">Deleted %d entries</item>
     </plurals>
     <string name="history_entry_selected_content_description">Selected</string>
-    <string name="history_clothing_summary_content_description">Chosen color: %1$s</string>
-    <string name="history_object_summary_content_description">Chosen color with suggested harmonies</string>
+    <string name="history_clothing_verdict_content_description">Verdict: %1$s</string>
+    <string name="history_object_summary_content_description">Suggested harmonies</string>
     <string name="history_entry_deleted_message">Deleted \"%1$s\"</string>
     <string name="history_entry_deleted_undo_action">Undo</string>
 

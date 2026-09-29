@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -59,6 +60,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,8 +75,8 @@ import com.example.hueandyou.colorspace.HarmonyRelationship
 import com.example.hueandyou.colorspace.argbToHct
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
+import com.example.hueandyou.ui.common.VerdictBadge
 import com.example.hueandyou.ui.common.verdictLabel
-import com.example.hueandyou.ui.theme.LocalSuccessColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -216,20 +218,26 @@ private fun HistoryEntryRow(entry: HistoryEntry, isSelected: Boolean, onClick: (
                     )
                 }
             }
+        },
+        trailing = if (entry.type == HistoryEntryType.CLOTHING) {
+            { ClothingVerdictBadge(entry) }
+        } else {
+            null
         }
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(
-                text = entry.name,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            when (entry.type) {
-                HistoryEntryType.CLOTHING -> ClothingSummaryLine(entry)
-                HistoryEntryType.OBJECT -> ObjectSummaryLine(entry)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SummaryCircle(entry.calibratedArgb, nameCircleSize())
+                Spacer(Modifier.width(NAME_CIRCLE_GAP))
+                Text(
+                    text = entry.name,
+                    style = NameStyle,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
+            if (entry.type == HistoryEntryType.OBJECT) ObjectSummaryLine(entry)
             Text(
                 text = formatHistoryTimestamp(entry.createdAt),
                 style = MaterialTheme.typography.bodySmall,
@@ -240,54 +248,61 @@ private fun HistoryEntryRow(entry: HistoryEntry, isSelected: Boolean, onClick: (
 }
 
 /**
- * [content] on the right, and on the left a square [thumbnail] exactly as tall as [content].
- * Every line of [content] is single-line, so its height doesn't depend on its width and can be
- * read up front to size the square.
+ * [content] in the middle, on the left a square [thumbnail] exactly as tall as [content], and on
+ * the right an optional square [trailing] of the same size. Every line of [content] is
+ * single-line, so its height doesn't depend on its width and can be read up front to size the
+ * squares.
  */
 @Composable
 private fun ThumbnailRow(
     gap: Dp,
     modifier: Modifier = Modifier,
     thumbnail: @Composable () -> Unit,
+    trailing: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
-    Layout(contents = listOf(thumbnail, content), modifier = modifier) { (thumbnails, contents), constraints ->
+    Layout(
+        contents = listOf(thumbnail, trailing ?: {}, content),
+        modifier = modifier
+    ) { (thumbnails, trailings, contents), constraints ->
         val gapPx = gap.roundToPx()
         val body = contents.single()
         val side = body.minIntrinsicHeight(constraints.maxWidth)
+        val squares = if (trailings.isEmpty()) 1 else 2
         val bodyPlaceable = body.measure(
-            Constraints(maxWidth = (constraints.maxWidth - side - gapPx).coerceAtLeast(0))
+            Constraints(maxWidth = (constraints.maxWidth - squares * (side + gapPx)).coerceAtLeast(0))
         )
         val height = bodyPlaceable.height
         val thumbnailPlaceables = thumbnails.map { it.measure(Constraints.fixed(height, height)) }
+        val trailingPlaceables = trailings.map { it.measure(Constraints.fixed(height, height)) }
         layout(constraints.maxWidth, height) {
             thumbnailPlaceables.forEach { it.place(0, 0) }
             bodyPlaceable.place(height + gapPx, 0)
+            trailingPlaceables.forEach { it.place(constraints.maxWidth - height, 0) }
         }
     }
 }
 
-/** Chosen color circle, separator, then the verdict text in its verdict color. */
+/** The clothing verdict, as in the Settings legend; TalkBack reads the verdict's name. */
 @Composable
-private fun ClothingSummaryLine(entry: HistoryEntry) {
+private fun ClothingVerdictBadge(entry: HistoryEntry) {
     val verdict = remember(entry.score) { ClothingVerdict.forScore(entry.score) }
-    val verdictText = stringResource(verdictLabel(verdict))
-    val verdictColor = when (verdict) {
-        ClothingVerdict.YES -> LocalSuccessColors.current.content
-        ClothingVerdict.AVOID -> MaterialTheme.colorScheme.error
-        ClothingVerdict.NEITHER -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
-    val description = stringResource(R.string.history_clothing_summary_content_description, verdictText)
-    SummaryLine(modifier = Modifier.clearAndSetSemantics { contentDescription = description }) {
-        SummaryCircle(entry.calibratedArgb)
-        Spacer(Modifier.width(SUMMARY_TEXT_GAP))
-        Text(text = verdictText, style = MaterialTheme.typography.bodySmall, color = verdictColor)
-    }
+    val description = stringResource(
+        R.string.history_clothing_verdict_content_description,
+        stringResource(verdictLabel(verdict))
+    )
+    VerdictBadge(
+        verdict,
+        Modifier
+            .fillMaxSize()
+            .clearAndSetSemantics { contentDescription = description }
+    )
 }
 
 /**
- * Chosen color, then the complementary, analogous and tonal suggestions for it - recomputed from
- * the entry's own wheel/balance, and Tonal only for a neutral color, same as History detail.
+ * The complementary, analogous and tonal suggestions for the entry's color - recomputed from its
+ * own wheel/balance, and Tonal only for a neutral color, same as History detail. Circles are as
+ * big as the name's, shrunk evenly when the line would not fit.
  */
 @Composable
 private fun ObjectSummaryLine(entry: HistoryEntry) {
@@ -303,35 +318,62 @@ private fun ObjectSummaryLine(entry: HistoryEntry) {
         }
         shown.map { relationship -> suggestions.single { it.relationship == relationship }.colors }
     }
+    if (groups.isEmpty()) return
+    // Gap before each circle: none for the first, a group gap where a new group starts.
+    val gaps = groups.flatMapIndexed { groupIndex, colors ->
+        colors.indices.map { index ->
+            when {
+                index > 0 -> SUMMARY_CIRCLE_GAP
+                groupIndex > 0 -> SUMMARY_GROUP_GAP
+                else -> 0.dp
+            }
+        }
+    }
+    val colors = groups.flatten()
+    val maxCircleSize = nameCircleSize()
     val description = stringResource(R.string.history_object_summary_content_description)
-    SummaryLine(modifier = Modifier.clearAndSetSemantics { contentDescription = description }) {
-        SummaryCircle(entry.calibratedArgb)
-        groups.forEach { colors ->
-            Spacer(Modifier.width(SUMMARY_GROUP_GAP))
-            colors.forEachIndexed { index, argb ->
-                if (index > 0) Spacer(Modifier.width(SUMMARY_CIRCLE_GAP))
-                SummaryCircle(argb)
+    Layout(
+        content = { colors.forEach { SummaryCircle(it) } },
+        // A fixed height answers the row's intrinsic-height query without measuring the circles.
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(maxCircleSize)
+            .clearAndSetSemantics { contentDescription = description }
+    ) { measurables, constraints ->
+        val gapPx = gaps.map { it.roundToPx() }
+        val fitting = (constraints.maxWidth - gapPx.sum()) / measurables.size
+        val circlePx = minOf(maxCircleSize.roundToPx(), fitting).coerceAtLeast(0)
+        val placeables = measurables.map { it.measure(Constraints.fixed(circlePx, circlePx)) }
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            var x = 0
+            placeables.forEachIndexed { index, placeable ->
+                x += gapPx[index]
+                placeable.place(x, (constraints.maxHeight - circlePx) / 2)
+                x += circlePx
             }
         }
     }
 }
 
-@Composable
-private fun SummaryLine(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) { content() }
-}
-
 private val SUMMARY_CIRCLE_GAP = 4.dp
 private val SUMMARY_GROUP_GAP = 14.dp
-private val SUMMARY_TEXT_GAP = 8.dp
+private val NAME_CIRCLE_GAP = 8.dp
 
-/** Display-only swatch as tall as the entry name's text; the ring keeps white/black picks visible. */
+private val NameStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.headlineSmall
+
+/** As tall as the entry name's text, so the circle scales with the system font size. */
 @Composable
-private fun SummaryCircle(argb: Int) {
-    val size = with(LocalDensity.current) { MaterialTheme.typography.titleMedium.fontSize.toDp() }
+private fun nameCircleSize(): Dp = with(LocalDensity.current) { NameStyle.fontSize.toDp() }
+
+/**
+ * Display-only swatch; the ring keeps white/black picks visible. [size] null fills the parent's
+ * constraints instead.
+ */
+@Composable
+private fun SummaryCircle(argb: Int, size: Dp? = null) {
     Box(
-        Modifier
-            .size(size)
+        (if (size != null) Modifier.size(size) else Modifier.fillMaxSize())
             .clip(CircleShape)
             .background(Color(argb))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
