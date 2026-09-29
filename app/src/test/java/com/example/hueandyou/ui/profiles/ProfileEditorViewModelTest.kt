@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -157,6 +158,33 @@ class ProfileEditorViewModelTest {
     }
 
     @Test
+    fun draftName_matchingAnotherProfileIgnoringCase_isTakenAndNotSaved() = runTest(UnconfinedTestDispatcher()) {
+        repository.otherProfiles.value = listOf(profileNamed(2L, "Winter"))
+        backgroundScope.launch { viewModel.profile.collect {} }
+        backgroundScope.launch { viewModel.isDraftNameTaken.collect {} }
+        viewModel.startEditing()
+
+        viewModel.updateDraftName(" winter ")
+        assertTrue(viewModel.isDraftNameTaken.value)
+        viewModel.commitEditing()
+
+        assertTrue(repository.renames.isEmpty())
+    }
+
+    @Test
+    fun draftName_ownNameInAnotherCase_isNotTaken() = runTest(UnconfinedTestDispatcher()) {
+        backgroundScope.launch { viewModel.profile.collect {} }
+        backgroundScope.launch { viewModel.isDraftNameTaken.collect {} }
+        viewModel.startEditing()
+
+        viewModel.updateDraftName("AUTUMN")
+        assertFalse(viewModel.isDraftNameTaken.value)
+        viewModel.commitEditing()
+
+        assertEquals(listOf("AUTUMN"), repository.renames)
+    }
+
+    @Test
     fun deleteProfile_removesFromRepositoryAndInvokesCallback() {
         var deletedCalled = false
 
@@ -183,8 +211,11 @@ private class FakeProfileRepository : ProfileRepository {
         )
     )
 
+    /** Profiles besides the edited one, for the duplicate-name check. */
+    val otherProfiles = MutableStateFlow<List<Profile>>(emptyList())
+
     override fun observeProfiles(): Flow<List<Profile>> =
-        throw UnsupportedOperationException("not used by this test")
+        combine(profiles, otherProfiles) { profile, others -> listOfNotNull(profile) + others }
 
     override fun observeProfile(profileId: Long): Flow<Profile?> = profiles
 
@@ -216,3 +247,12 @@ private class FakeProfileRepository : ProfileRepository {
         removedBatches += colorIds.toSet()
     }
 }
+
+private fun profileNamed(id: Long, name: String) = Profile(
+    id = id,
+    name = name,
+    createdAt = 0L,
+    updatedAt = 0L,
+    bestColors = emptyList(),
+    avoidColors = emptyList()
+)

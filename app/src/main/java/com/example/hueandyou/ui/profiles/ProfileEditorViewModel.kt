@@ -10,10 +10,13 @@ import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.data.profile.ColorKind
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.data.profile.ProfileRepository
+import com.example.hueandyou.data.profile.isProfileNameTaken
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -41,6 +44,13 @@ class ProfileEditorViewModel(
     /** The name being typed in edit mode; saved only with the tick. */
     val draftName: StateFlow<String> = _draftName.asStateFlow()
 
+    /** Whether another profile already has [draftName] (trimmed, ignoring case); blocks the tick. */
+    val isDraftNameTaken: StateFlow<Boolean> = combine(
+        _draftName,
+        repository.observeProfiles().map { profiles -> profiles.filter { it.id != profileId }.map { it.name } }
+    ) { name, otherNames -> isProfileNameTaken(name, otherNames) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     fun addColor(kind: ColorKind, argb: Int) {
         viewModelScope.launch { repository.addColor(profileId, kind, argb) }
     }
@@ -67,11 +77,12 @@ class ProfileEditorViewModel(
 
     /**
      * Leaves edit mode, saving the trimmed draft name and removing every staged color in one
-     * batch (the tick). A blank name is ignored so a profile never ends up nameless.
+     * batch (the tick). A blank name is ignored so a profile never ends up nameless; a name another
+     * profile already has is ignored too, as a backstop to the disabled tick.
      */
     fun commitEditing() {
         val removals = _pendingRemovals.value
-        val newName = _draftName.value.trim()
+        val newName = _draftName.value.trim().takeUnless { isDraftNameTaken.value }.orEmpty()
         _pendingRemovals.value = emptySet()
         _isEditing.value = false
         viewModelScope.launch {

@@ -112,6 +112,7 @@ fun ProfileEditorScreen(
     val isEditing by viewModel.isEditing.collectAsState()
     val pendingRemovals by viewModel.pendingRemovals.collectAsState()
     val draftName by viewModel.draftName.collectAsState()
+    val isDraftNameTaken by viewModel.isDraftNameTaken.collectAsState()
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     var addColorKind by remember { mutableStateOf<ColorKind?>(null) }
 
@@ -134,7 +135,10 @@ fun ProfileEditorScreen(
                         }
                     },
                     actions = {
-                        IconButton(onClick = viewModel::commitEditing, enabled = draftName.isNotBlank()) {
+                        IconButton(
+                            onClick = viewModel::commitEditing,
+                            enabled = draftName.isNotBlank() && !isDraftNameTaken
+                        ) {
                             Icon(
                                 Icons.Filled.Check,
                                 contentDescription = stringResource(
@@ -195,6 +199,7 @@ fun ProfileEditorScreen(
                 NameArea(
                     name = currentProfile.name,
                     draftName = draftName,
+                    isDraftNameTaken = isDraftNameTaken,
                     isEditing = isEditing,
                     onDraftNameChange = viewModel::updateDraftName,
                     modifier = Modifier
@@ -291,6 +296,7 @@ fun ProfileEditorScreen(
 private fun NameArea(
     name: String,
     draftName: String,
+    isDraftNameTaken: Boolean,
     isEditing: Boolean,
     onDraftNameChange: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -305,7 +311,12 @@ private fun NameArea(
                 value = draftName,
                 onValueChange = onDraftNameChange,
                 label = { Text(stringResource(R.string.profile_editor_name_label)) },
-                isError = draftName.isBlank(),
+                isError = draftName.isBlank() || isDraftNameTaken,
+                supportingText = if (isDraftNameTaken) {
+                    { Text(stringResource(R.string.profile_name_taken)) }
+                } else {
+                    null
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
