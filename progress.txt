@@ -146,3 +146,28 @@ trims and ignores blank names (it no longer runs per keystroke). The body uses t
 layout (photo `weight(1f)`, `maxHeightFraction = 1f`, no `verticalScroll`). Landscape/short screens
 are split out to #36. Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`,
 not on a device.
+
+## 2026-09-29 - Polish batch: History rows, chip highlight, Find my season, new-profile pulse
+
+Grilled and agreed with the user, one commit each:
+- History rows: names no longer bold; the Object harmony-suggestion row is gone, so both types are
+  name + timestamp at the same height; the clothing verdict is a bare 24dp icon tinted
+  `verdictAccentColor` (success content / error / onSurfaceVariant) instead of the filled badge.
+- History detail chip highlight: the chips were re-extracted from the downscaled JPEG thumbnail,
+  so they never exactly equalled `calibratedArgb`. Entries now store `chipColorsArgb` at save time
+  (Room v4->v5, `MIGRATION_4_5`, column default `''`; optional `chipColors` in the backup JSON,
+  schema version unchanged). Older entries backfill once on open: re-extract, then
+  `ColorExtractor.snapChipsTo` replaces the nearest chip within `CHIP_SNAP_MAX_DELTA_E` (8) with
+  the saved color, and the result is persisted.
+- Find my season result: "CREATE" is a `TextButton` in the app bar; scroll stays as a fallback.
+- Profile names (season dialog, Profile editor) and the History rename bar use
+  `KeyboardCapitalization.Words` (keyboard hint only, not enforced).
+- New profiles pulse in Settings: `ProfileRepository.newProfileId` is a one-shot set by
+  `createProfile` (all three creation flows). Settings waits for RESUMED (so it doesn't fire under
+  the transition to the editor), scrolls the row into view, fades it surfaceContainer ->
+  primaryContainer 3x (300ms each way), then consumes the id.
+- Dropped: skipping the photo picker's "1 / Preview / Done" bar. That bar is the system picker's
+  own single-select UI (`PickVisualMedia` already sends a plain single-select `ACTION_PICK_IMAGES`),
+  and the alternatives (DocumentsUI, in-app gallery with READ_MEDIA_IMAGES) were judged worse.
+
+Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`, not on a device.
