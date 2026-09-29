@@ -78,6 +78,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
+import com.example.hueandyou.colorspace.previewColors
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.ui.common.harmonyBalanceDescription
 import com.example.hueandyou.ui.common.harmonyBalanceLabel
@@ -440,7 +441,9 @@ private fun SettingsRow(
 
 @Composable
 private fun ProfileRow(profile: Profile, onClick: () -> Unit, onShare: () -> Unit) {
-    val dotColors = profile.bestColors.take(MAX_PROFILE_DOTS)
+    val dotColors = remember(profile.bestColors) {
+        previewColors(profile.bestColors.map { it.argb }, MAX_PROFILE_DOTS)
+    }
     val surface = MaterialTheme.colorScheme.surfaceContainer
     ListItem(
         headlineContent = { Text(profile.name) },
@@ -466,7 +469,7 @@ private fun ProfileRow(profile: Profile, onClick: () -> Unit, onShare: () -> Uni
                             .offset(x = DOT_STEP * index)
                             .size(DOT_SIZE)
                             .clip(CircleShape)
-                            .background(Color(color.argb))
+                            .background(Color(color))
                             .border(2.dp, surface, CircleShape)
                     )
                 }
