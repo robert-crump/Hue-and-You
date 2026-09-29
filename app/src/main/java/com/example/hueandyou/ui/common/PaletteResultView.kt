@@ -1,10 +1,14 @@
 package com.example.hueandyou.ui.common
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.ThumbDownAlt
@@ -18,6 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,13 +41,7 @@ import com.example.hueandyou.ui.theme.LocalSuccessColors
 @Composable
 internal fun PaletteResultBody(score: PaletteScore, modifier: Modifier = Modifier) {
     val verdict = remember(score) { ClothingVerdict.forScore(score) }
-    val successColors = LocalSuccessColors.current
-
-    val (containerColor, contentColor) = when (verdict) {
-        ClothingVerdict.YES -> successColors.container to successColors.onContainer
-        ClothingVerdict.AVOID -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
-        ClothingVerdict.NEITHER -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val (containerColor, contentColor) = verdictColors(verdict)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -71,3 +71,36 @@ private fun verdictIcon(verdict: ClothingVerdict): ImageVector = when (verdict) 
     ClothingVerdict.AVOID -> Icons.Filled.ThumbDownAlt
     ClothingVerdict.NEITHER -> Icons.Filled.HorizontalRule
 }
+
+/** The verdict's (container, content) colors, shared by the card, the badge and the Settings legend. */
+@Composable
+internal fun verdictColors(verdict: ClothingVerdict): Pair<Color, Color> {
+    val successColors = LocalSuccessColors.current
+    return when (verdict) {
+        ClothingVerdict.YES -> successColors.container to successColors.onContainer
+        ClothingVerdict.AVOID -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        ClothingVerdict.NEITHER -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+}
+
+/** The verdict icon in a circle of its container color, filling whatever size [modifier] gives it. */
+@Composable
+internal fun VerdictBadge(verdict: ClothingVerdict, modifier: Modifier = Modifier) {
+    val (containerColor, contentColor) = verdictColors(verdict)
+    Box(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(containerColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            verdictIcon(verdict),
+            contentDescription = null,
+            tint = contentColor,
+            modifier = Modifier.fillMaxSize(VERDICT_BADGE_ICON_FRACTION)
+        )
+    }
+}
+
+/** Icon share of the badge: 20dp in a 36dp circle. */
+private const val VERDICT_BADGE_ICON_FRACTION = 20f / 36f

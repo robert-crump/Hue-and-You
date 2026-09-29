@@ -30,12 +30,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.HorizontalRule
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.ThumbDownAlt
-import androidx.compose.material.icons.filled.ThumbUpAlt
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
@@ -76,16 +73,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
+import com.example.hueandyou.colorspace.ClothingVerdict
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.previewColors
 import com.example.hueandyou.data.profile.Profile
+import com.example.hueandyou.ui.common.VerdictBadge
 import com.example.hueandyou.ui.common.harmonyBalanceDescription
 import com.example.hueandyou.ui.common.harmonyBalanceLabel
 import com.example.hueandyou.ui.common.harmonyWheelDescription
 import com.example.hueandyou.ui.common.harmonyWheelLabel
+import com.example.hueandyou.ui.common.verdictLabel
 import com.example.hueandyou.ui.profiles.ProfilesViewModel
-import com.example.hueandyou.ui.theme.LocalSuccessColors
 import kotlinx.coroutines.launch
 
 /** Position of the Profiles header in the lazy list, for the "go to Settings" jump from Rate Clothing. */
@@ -552,26 +551,8 @@ private fun AboutSection(modifier: Modifier = Modifier) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            val successColors = LocalSuccessColors.current
             Text(stringResource(R.string.settings_about_intro), style = MaterialTheme.typography.bodyLarge)
-            VerdictLine(
-                icon = Icons.Filled.ThumbUpAlt,
-                name = stringResource(R.string.rate_clothing_verdict_yes),
-                containerColor = successColors.container,
-                contentColor = successColors.onContainer
-            )
-            VerdictLine(
-                icon = Icons.Filled.ThumbDownAlt,
-                name = stringResource(R.string.rate_clothing_verdict_avoid),
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer
-            )
-            VerdictLine(
-                icon = Icons.Filled.HorizontalRule,
-                name = stringResource(R.string.rate_clothing_verdict_neither),
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            ClothingVerdict.entries.forEach { VerdictLine(it) }
             Text(
                 stringResource(R.string.settings_about_disclaimer),
                 style = MaterialTheme.typography.bodyMedium,
@@ -583,20 +564,10 @@ private fun AboutSection(modifier: Modifier = Modifier) {
 
 /** Same icon and colors as the verdict card on the result screens, so the legend matches what kids see there. */
 @Composable
-private fun VerdictLine(
-    icon: ImageVector,
-    name: String,
-    containerColor: Color,
-    contentColor: Color,
-) {
+private fun VerdictLine(verdict: ClothingVerdict) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(
-            modifier = Modifier.size(36.dp).clip(CircleShape).background(containerColor),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
-        }
-        Text(name, style = MaterialTheme.typography.titleSmall)
+        VerdictBadge(verdict, Modifier.size(36.dp))
+        Text(stringResource(verdictLabel(verdict)), style = MaterialTheme.typography.titleSmall)
     }
 }
 
