@@ -17,11 +17,16 @@ data class HarmonySuggestion(val relationship: HarmonyRelationship, val colors: 
  */
 interface ColorWheelStrategy {
     fun rotate(hue: Double, degrees: Double): Double
+
+    /** Where HCT [hue] sits on this wheel, in degrees; distances between these match [rotate]'s steps. */
+    fun wheelHue(hue: Double): Double
 }
 
 /** Rotates directly in HCT hue space, so equal-degree steps look equally different perceptually. */
 object PerceptualWheel : ColorWheelStrategy {
     override fun rotate(hue: Double, degrees: Double): Double = wrapDegrees(hue + degrees)
+
+    override fun wheelHue(hue: Double): Double = wrapDegrees(hue)
 }
 
 /**
@@ -97,6 +102,8 @@ object TraditionalWheel : ColorWheelStrategy {
         val rybHue = wrapDegrees(map.forward(hue) + degrees)
         return map.inverse(rybHue)
     }
+
+    override fun wheelHue(hue: Double): Double = map.forward(hue)
 }
 
 /**
@@ -110,6 +117,8 @@ object ScreenWheel : ColorWheelStrategy {
         val hsvHue = wrapDegrees(map.forward(hue) + degrees)
         return map.inverse(hsvHue)
     }
+
+    override fun wheelHue(hue: Double): Double = map.forward(hue)
 }
 
 /** Decides how a suggestion's tone and chroma relate to the reference color's. */
