@@ -1,5 +1,29 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-30 - Issue #47: Complete this outfit (suggest wardrobe items)
+
+Logic (pure, `ui/outfits/OutfitSuggestion.kt`): `nextOutfitSlot(categories)` -> required Top + Bottom
+or One-piece first (a Top needs a Bottom, anything else starts with the Top), then Outerwear, Shoes,
+Belt; uncategorized fills nothing; null when all filled. `suggestOutfitItems(outfit, clothes, profile,
+wheel, includeNotOwned)` -> `OutfitSuggestion`: NeedsAnchor (empty outfit), Complete (all slots or 8
+items), or Candidates(slot, items <= 3, includesNotOwned). Candidates = Clothes of the slot's category
+not in the outfit, Wardrobe only unless the toggle; Avoid verdict vs the profile dropped (no profile =
+no filter); `OutfitHarmony.classify(outfit + candidate)` Clashes dropped; Works before Borderline,
+then nearest Best ΔE; ties keep list order (newest first).
+
+UI: "Suggest" button next to "Items: n/8" in the outfit editor. `OutfitEditorViewModel.suggest()` sets
+a flag, and `uiState.suggestion` is then recomputed live from the items/profile/wheel, so a tapped
+candidate (`addItem`) moves on to the next slot and the verdicts update. Card "Suggested: Bottom" with
+3 thumbnails (Not owned ones labelled), ✕ closes (`dismissSuggestions`). Empty: "No wardrobe item fits"
++ "Include Not owned items" switch (stays visible while on; "No item fits" when on and still none).
+Empty outfit: "Pick an item first...". Complete: "Every slot is filled."
+
+Test: `OutfitSuggestionTest` (slots, anchor/complete/full, category/owned/in-outfit filter, not-owned
+toggle, clash drop + Works before Borderline, ΔE tiebreak, no-profile order, Avoid drop, top 3, whole
+outfit counts), `OutfitEditorViewModelTest` suggest flow. `./gradlew :colorspace:test
+:app:testDebugUnitTest assembleDebug lintDebug` all pass (lint 15, all pre-existing); not tried on a
+device.
+
 ## 2026-09-30 - Issue #46: Outfits (build, save and rate)
 
 Data: new `data/outfit` package. Tables `outfits` (id, name, createdAt) + `outfit_items` (outfitId,
@@ -115,21 +139,3 @@ category, repository defaults/update, Rate Clothing save passes both, History de
 object-ignored, History list filter/empty-filter/selection exit.
 `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint: same
 15 warnings); not tried on a device.
-
-## 2026-09-30 - Issue #41: Camera pinch to zoom
-
-Grilled with the user, spec written into the issue. The shared `CameraViewfinder` (so Rate
-Clothing, Match Object and Find my season) zooms with `cameraControl.setZoomRatio`, so the capture
-and its center box match the preview. New `ui/common/CameraZoom.kt`: pure `nextZoomRatio(current,
-scale, max)` (clamped to 1x..`maxZoomRatio`, uncapped, never below 1x even with an ultra-wide) and
-`Modifier.pinchToZoom`, which watches the Initial pass on the viewfinder Box: once a second finger
-lands the gesture is consumed before the WB/exposure sliders see it (and stays consumed after one
-finger lifts), while one-finger drags pass through. Zoom resets to 1x on every bind (lens switch,
-new screen, retake). No reset gesture. A "2.3×" chip in the hint's style (`viewfinderLabel`) sits
-above the shutter while pinching and fades 1s after release (`zoomActivity` counter re-triggers
-it); it is a polite live region. TalkBack: the preview is a "Camera preview" node with custom
-actions Zoom in / Zoom out (×1.5 / ÷1.5, same clamps).
-
-Test: `CameraZoomTest` (multiply, 1x floor, device max, max below 1x, action round trip).
-`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint: same
-15 warnings); gesture, chip and slider handoff not tried on a device.

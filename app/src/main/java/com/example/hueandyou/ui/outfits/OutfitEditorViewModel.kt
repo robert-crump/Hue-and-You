@@ -49,6 +49,8 @@ data class OutfitEditorUiState(
     /** Null while there are too few (or too many) items to rate. */
     val rating: OutfitRating? = null,
     val picker: OutfitPickerState = OutfitPickerState(),
+    /** "Complete this outfit", live while shown; null until Suggest is tapped or once it's closed. */
+    val suggestion: OutfitSuggestion? = null,
     /** Whether the items differ from what was loaded, so leaving would lose something. */
     val hasChanges: Boolean = false,
     /** Set once the outfit is saved or deleted: the screen closes. */
@@ -85,6 +87,8 @@ class OutfitEditorViewModel(
     private val pickerWardrobeOnly = MutableStateFlow(true)
     private val pickerCategory = MutableStateFlow<ClothingCategory?>(null)
     private val isFinished = MutableStateFlow(false)
+    private val showSuggestions = MutableStateFlow(false)
+    private val suggestIncludeNotOwned = MutableStateFlow(false)
 
     /** Set while a save or delete is being written, so a second tap does nothing. */
     private var isWriting = false
@@ -106,9 +110,18 @@ class OutfitEditorViewModel(
 
     private val scoring = combine(profileRepository.observeProfiles(), selectedProfileId, wheel, ::Scoring)
 
+    private data class Extras(
+        val picker: OutfitPickerState,
+        val isFinished: Boolean,
+        val showSuggestions: Boolean,
+        val suggestIncludeNotOwned: Boolean,
+    )
+
+    private val extras = combine(picker, isFinished, showSuggestions, suggestIncludeNotOwned, ::Extras)
+
     val uiState: StateFlow<OutfitEditorUiState> = combine(
-        loaded, clothes, entryIds, scoring, combine(picker, isFinished, ::Pair)
-    ) { loaded, clothes, ids, scoring, (picker, finished) ->
+        loaded, clothes, entryIds, scoring, extras
+    ) { loaded, clothes, ids, scoring, extras ->
         if (loaded == null) return@combine OutfitEditorUiState()
         val byId = clothes.associateBy { it.id }
         val items = ids.mapNotNull { byId[it] }
@@ -123,9 +136,14 @@ class OutfitEditorViewModel(
             profiles = scoring.profiles,
             selectedProfile = profile,
             rating = rateOutfit(items.map { it.calibratedArgb }, profile, scoring.wheel),
-            picker = picker,
+            picker = extras.picker,
+            suggestion = if (extras.showSuggestions) {
+                suggestOutfitItems(items, clothes, profile, scoring.wheel, extras.suggestIncludeNotOwned)
+            } else {
+                null
+            },
             hasChanges = ids != loaded.initialEntryIds,
-            isFinished = finished,
+            isFinished = extras.isFinished,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, OutfitEditorUiState())
 
@@ -182,6 +200,20 @@ class OutfitEditorViewModel(
     /** Null shows every category. */
     fun setPickerCategory(category: ClothingCategory?) {
         pickerCategory.value = category
+    }
+
+    /** Shows "Complete this outfit"; it then follows every change to the items. */
+    fun suggest() {
+        showSuggestions.value = true
+    }
+
+    fun dismissSuggestions() {
+        showSuggestions.value = false
+    }
+
+    /** Whether suggestions may include Not owned items, as a shopping hint. */
+    fun setSuggestIncludeNotOwned(include: Boolean) {
+        suggestIncludeNotOwned.value = include
     }
 
     /** The naming dialog's Save: writes the outfit (new or edited), then finishes. Needs 2-8 items. */

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -46,8 +48,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -183,10 +187,26 @@ fun OutfitEditorScreen(
                     selectedItemId = selectedItemId,
                     onMove = viewModel::moveItem,
                 )
-                Text(
-                    text = stringResource(R.string.outfit_editor_item_count, uiState.items.size, OUTFIT_MAX_ITEMS),
-                    style = MaterialTheme.typography.labelLarge,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(R.string.outfit_editor_item_count, uiState.items.size, OUTFIT_MAX_ITEMS),
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedButton(onClick = viewModel::suggest) {
+                        Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.outfit_suggest))
+                    }
+                }
+                uiState.suggestion?.let { suggestion ->
+                    SuggestionCard(
+                        suggestion = suggestion,
+                        onAdd = viewModel::addItem,
+                        onIncludeNotOwnedChange = viewModel::setSuggestIncludeNotOwned,
+                        onDismiss = viewModel::dismissSuggestions,
+                    )
+                }
                 val selectedProfile = uiState.selectedProfile
                 if (uiState.profiles.size >= 2 && selectedProfile != null) {
                     ProfileDropdown(
@@ -402,6 +422,115 @@ private fun MoveControls(items: List<HistoryEntry>, selectedItemId: Long?, onMov
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = stringResource(R.string.outfit_editor_move_later_content_description, item.name),
+            )
+        }
+    }
+}
+
+/** "Complete this outfit": up to three items for the next slot, each added with a tap. */
+@Composable
+private fun SuggestionCard(
+    suggestion: OutfitSuggestion,
+    onAdd: (Long) -> Unit,
+    onIncludeNotOwnedChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(start = 16.dp, bottom = 16.dp, end = 4.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = when (suggestion) {
+                        is OutfitSuggestion.Candidates -> stringResource(
+                            R.string.outfit_suggest_slot_title,
+                            stringResource(clothingCategoryLabel(suggestion.slot)),
+                        )
+                        else -> stringResource(R.string.outfit_suggest_title)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.outfit_suggest_close_content_description))
+                }
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(end = 12.dp),
+            ) {
+                when (suggestion) {
+                    OutfitSuggestion.NeedsAnchor -> SuggestionMessage(stringResource(R.string.outfit_suggest_needs_anchor))
+                    OutfitSuggestion.Complete -> SuggestionMessage(stringResource(R.string.outfit_suggest_complete))
+                    is OutfitSuggestion.Candidates -> {
+                        if (suggestion.items.isEmpty()) {
+                            SuggestionMessage(
+                                stringResource(
+                                    if (suggestion.includesNotOwned) R.string.outfit_suggest_none_at_all else R.string.outfit_suggest_none
+                                )
+                            )
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                suggestion.items.forEach { item ->
+                                    SuggestionItem(item, onClick = { onAdd(item.id) }, modifier = Modifier.weight(1f))
+                                }
+                                // Keeps each thumbnail a third of the row when there are fewer.
+                                repeat(OUTFIT_SUGGESTION_COUNT - suggestion.items.size) { Spacer(Modifier.weight(1f)) }
+                            }
+                        }
+                        if (suggestion.items.isEmpty() || suggestion.includesNotOwned) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    stringResource(R.string.outfit_suggest_include_not_owned),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Switch(checked = suggestion.includesNotOwned, onCheckedChange = onIncludeNotOwnedChange)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SuggestionMessage(text: String) {
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun SuggestionItem(item: HistoryEntry, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.clickable(
+            onClickLabel = stringResource(R.string.outfit_suggest_add_content_description, item.name),
+            onClick = onClick,
+        ),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+        ) {
+            HistoryThumbnail(item.thumbnailPath)
+            ColorCircle(
+                argb = item.calibratedArgb,
+                size = 20.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp),
+            )
+        }
+        Text(item.name, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (!item.inWardrobe) {
+            Text(
+                stringResource(R.string.clothes_filter_not_owned),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

@@ -296,6 +296,16 @@
     <string name="outfit_picker_wardrobe">Wardrobe</string>
     <string name="outfit_picker_empty">No items match these filters.</string>
     <string name="outfit_picker_done">Done</string>
+    <string name="outfit_suggest">Suggest</string>
+    <string name="outfit_suggest_title">Complete this outfit</string>
+    <string name="outfit_suggest_slot_title">Suggested: %1$s</string>
+    <string name="outfit_suggest_close_content_description">Close suggestions</string>
+    <string name="outfit_suggest_add_content_description">Add %1$s</string>
+    <string name="outfit_suggest_needs_anchor">Pick an item first, then Suggest completes the outfit around it.</string>
+    <string name="outfit_suggest_complete">Every slot is filled.</string>
+    <string name="outfit_suggest_none">No wardrobe item fits</string>
+    <string name="outfit_suggest_none_at_all">No item fits</string>
+    <string name="outfit_suggest_include_not_owned">Include Not owned items</string>
     <string name="scan_wardrobe_menu_item">Scan wardrobe</string>
     <string name="scan_wardrobe_sheet_title">What are you scanning?</string>
     <string name="scan_wardrobe_start">Start scanning</string>

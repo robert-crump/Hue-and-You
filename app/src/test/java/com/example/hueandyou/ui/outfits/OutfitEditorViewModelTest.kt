@@ -1,7 +1,10 @@
 package com.example.hueandyou.ui.outfits
 
 import com.example.hueandyou.colorspace.HarmonyWheel
+import com.example.hueandyou.colorspace.Hct
 import com.example.hueandyou.colorspace.OutfitHarmony
+import com.example.hueandyou.colorspace.OutfitHarmonyLevel
+import com.example.hueandyou.colorspace.hctToArgb
 import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.outfit.FakeOutfitRepository
@@ -278,5 +281,32 @@ class OutfitEditorViewModelTest {
         dispatcher.scheduler.runCurrent()
 
         assertEquals(listOf(1L, 3L), model.state.itemIds)
+    }
+
+    @Test
+    fun suggest_followsTheOutfit_andATappedCandidateIsAddedAndRated() {
+        val top = clothing(31L, hctToArgb(Hct(200.0, 36.0, 60.0)), "Teal top", category = ClothingCategory.TOP)
+        val bottom = clothing(32L, hctToArgb(Hct(205.0, 36.0, 60.0)), "Teal skirt", category = ClothingCategory.BOTTOM)
+        val boughtLater = clothing(33L, hctToArgb(Hct(210.0, 36.0, 60.0)), "Coat", inWardrobe = false, category = ClothingCategory.OUTERWEAR)
+        history.entries.value = listOf(boughtLater, bottom, top)
+        val model = viewModel()
+        assertNull(model.state.suggestion)
+
+        model.act { suggest() }
+        assertEquals(OutfitSuggestion.NeedsAnchor, model.state.suggestion)
+
+        model.act { addItem(31L) }
+        assertEquals(OutfitSuggestion.Candidates(ClothingCategory.BOTTOM, listOf(bottom), false), model.state.suggestion)
+
+        model.act { addItem(32L) }
+        assertEquals(listOf(31L, 32L), model.state.itemIds)
+        assertEquals(OutfitHarmonyLevel.WORKS, model.state.rating?.harmony?.level)
+        assertEquals(OutfitSuggestion.Candidates(ClothingCategory.OUTERWEAR, emptyList(), false), model.state.suggestion)
+
+        model.act { setSuggestIncludeNotOwned(true) }
+        assertEquals(OutfitSuggestion.Candidates(ClothingCategory.OUTERWEAR, listOf(boughtLater), true), model.state.suggestion)
+
+        model.act { dismissSuggestions() }
+        assertNull(model.state.suggestion)
     }
 }
