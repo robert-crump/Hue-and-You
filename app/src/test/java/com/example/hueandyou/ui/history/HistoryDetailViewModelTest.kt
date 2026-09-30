@@ -6,6 +6,7 @@ import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.IntArrayPixelSource
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.PaletteScorer
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
@@ -304,6 +305,62 @@ class HistoryDetailViewModelTest {
     }
 
     @Test
+    fun setInWardrobe_clothingEntry_persistsAndKeepsTheCategory() {
+        val repository = FakeHistoryRepository(clothingEntry().copy(category = ClothingCategory.SHOES))
+        val model = viewModel(repository)
+        mainDispatcher.scheduler.runCurrent()
+
+        model.setInWardrobe(true)
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(listOf(Triple(1L, true, ClothingCategory.SHOES)), repository.wardrobeUpdates)
+        assertTrue((model.uiState.value as HistoryDetailUiState.Loaded).entry.inWardrobe)
+    }
+
+    @Test
+    fun setCategory_clothingEntry_persistsAndKeepsTheWardrobeFlag() {
+        val repository = FakeHistoryRepository(clothingEntry().copy(inWardrobe = true))
+        val model = viewModel(repository)
+        mainDispatcher.scheduler.runCurrent()
+
+        model.setCategory(ClothingCategory.TOP)
+        mainDispatcher.scheduler.runCurrent()
+        model.setCategory(null)
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(
+            listOf(Triple(1L, true, ClothingCategory.TOP), Triple(1L, true, null)),
+            repository.wardrobeUpdates,
+        )
+    }
+
+    @Test
+    fun wardrobeDetails_unchangedValue_isANoop() {
+        val repository = FakeHistoryRepository(clothingEntry())
+        val model = viewModel(repository)
+        mainDispatcher.scheduler.runCurrent()
+
+        model.setInWardrobe(false)
+        model.setCategory(null)
+        mainDispatcher.scheduler.runCurrent()
+
+        assertTrue(repository.wardrobeUpdates.isEmpty())
+    }
+
+    @Test
+    fun wardrobeDetails_objectEntry_areIgnored() {
+        val repository = FakeHistoryRepository(objectEntry())
+        val model = viewModel(repository)
+        mainDispatcher.scheduler.runCurrent()
+
+        model.setInWardrobe(true)
+        model.setCategory(ClothingCategory.BELT)
+        mainDispatcher.scheduler.runCurrent()
+
+        assertTrue(repository.wardrobeUpdates.isEmpty())
+    }
+
+    @Test
     fun entryDeletedElsewhere_showsNotFound() {
         val repository = FakeHistoryRepository(clothingEntry())
         val model = viewModel(repository)
@@ -337,6 +394,7 @@ class HistoryDetailViewModelTest {
         var lastObjectPick: Triple<Long, Int, Pair<Double?, Double?>>? = null
         var lastClothingPick: ClothingPickCall? = null
         val chipUpdates = mutableListOf<List<Int>>()
+        val wardrobeUpdates = mutableListOf<Triple<Long, Boolean, ClothingCategory?>>()
 
         override fun observeEntries() = throw UnsupportedOperationException("not used by this test")
         override fun observeEntry(entryId: Long): Flow<HistoryEntry?> = entryFlow
@@ -348,6 +406,8 @@ class HistoryDetailViewModelTest {
             score: PaletteScore,
             chipColorsArgb: List<Int>,
             name: String,
+            inWardrobe: Boolean,
+            category: ClothingCategory?,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun saveObjectResult(
@@ -398,6 +458,14 @@ class HistoryDetailViewModelTest {
             chipUpdates += chipColorsArgb
             entryFlow.value = entryFlow.value?.copy(chipColorsArgb = chipColorsArgb)
         }
+
+        override suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?) {
+
+            wardrobeUpdates += Triple(entryId, inWardrobe, category)
+            entryFlow.value = entryFlow.value?.copy(inWardrobe = inWardrobe, category = category)
+
+        }
+
 
         override suspend fun deleteEntry(entryId: Long) {
             throw UnsupportedOperationException("not used by this test")

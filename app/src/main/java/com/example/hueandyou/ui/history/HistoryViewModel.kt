@@ -28,13 +28,30 @@ data class PendingDeletion(val entryIds: List<Long>, val entryName: String?) {
     val count: Int get() = entryIds.size
 }
 
+/** The Clothes Items tab's filter on the "In my wardrobe" flag. */
+enum class WardrobeFilter {
+    ALL,
+    WARDROBE,
+    NOT_OWNED;
+
+    fun matches(entry: HistoryEntry): Boolean = when (this) {
+        ALL -> true
+        WARDROBE -> entry.inWardrobe
+        NOT_OWNED -> !entry.inWardrobe
+    }
+}
+
 data class HistoryUiState(
+    /** The visible entries, after [wardrobeFilter]. */
     val entries: List<HistoryEntry> = emptyList(),
+    /** Whether there is anything to list before [wardrobeFilter]; false shows the empty state. */
+    val hasEntries: Boolean = false,
+    val wardrobeFilter: WardrobeFilter = WardrobeFilter.ALL,
     val pendingDeletion: PendingDeletion? = null,
     val isSelectionMode: Boolean = false,
     val selectedIds: Set<Long> = emptySet(),
 ) {
-    val isEmpty: Boolean get() = entries.isEmpty()
+    val isEmpty: Boolean get() = !hasEntries
 }
 
 class HistoryViewModel(
@@ -55,12 +72,17 @@ class HistoryViewModel(
     /** Null outside selection mode; may be empty inside it (delete is then disabled). */
     private val selectedIds = MutableStateFlow<Set<Long>?>(null)
 
+    private val wardrobeFilter = MutableStateFlow(WardrobeFilter.ALL)
+
     val uiState: StateFlow<HistoryUiState> = combine(
-        repository.observeEntries(), pendingBatches, deletedIds, selectedIds
-    ) { entries, batches, deleted, selected ->
+        repository.observeEntries(), pendingBatches, deletedIds, selectedIds, wardrobeFilter
+    ) { entries, batches, deleted, selected, filter ->
         val pendingIds = batches.flatten().mapTo(HashSet()) { it.id }
+        val listed = entries.filter { (type == null || it.type == type) && it.id !in pendingIds && it.id !in deleted }
         HistoryUiState(
-            entries = entries.filter { (type == null || it.type == type) && it.id !in pendingIds && it.id !in deleted },
+            entries = listed.filter(filter::matches),
+            hasEntries = listed.isNotEmpty(),
+            wardrobeFilter = filter,
             pendingDeletion = batches.lastOrNull()?.let { batch ->
                 PendingDeletion(batch.map { it.id }, batch.singleOrNull()?.name)
             },
@@ -68,6 +90,12 @@ class HistoryViewModel(
             selectedIds = selected.orEmpty(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
+
+    /** Clothes Items tab: shows all items, only owned ones, or only ones not owned. Leaves selection mode. */
+    fun setWardrobeFilter(filter: WardrobeFilter) {
+        exitSelectionMode()
+        wardrobeFilter.value = filter
+    }
 
     /** Long-press: enters selection mode with just [entryId] selected. */
     fun enterSelectionMode(entryId: Long) {

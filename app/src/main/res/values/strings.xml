@@ -216,4 +216,20 @@
     <string name="camera_zoom_in">Zoom in</string>
     <string name="camera_zoom_out">Zoom out</string>
     <string name="camera_zoom_ratio">%1$.1f×</string>
+
+    <string name="wardrobe_switch_label">In my wardrobe</string>
+    <string name="wardrobe_category_label">Category</string>
+    <string name="clothing_category_top">Top</string>
+    <string name="clothing_category_bottom">Bottom</string>
+    <string name="clothing_category_one_piece">One-piece</string>
+    <string name="clothing_category_outerwear">Outerwear</string>
+    <string name="clothing_category_shoes">Shoes</string>
+    <string name="clothing_category_belt">Belt</string>
+    <string name="clothes_tab_items">Items</string>
+    <string name="clothes_tab_outfits">Outfits</string>
+    <string name="clothes_outfits_empty_title">No outfits yet</string>
+    <string name="clothes_filter_all">All</string>
+    <string name="clothes_filter_wardrobe">Wardrobe</string>
+    <string name="clothes_filter_not_owned">Not owned</string>
+    <string name="clothes_filter_empty">No items match this filter.</string>
 </resources>

@@ -12,6 +12,7 @@ import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.colorspace.ColorExtractor
 import com.example.hueandyou.colorspace.PaletteScorer
 import com.example.hueandyou.colorspace.PixelSource
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
@@ -85,6 +86,23 @@ class HistoryDetailViewModel(
         if (trimmed.isEmpty()) return
         viewModelScope.launch { repository.renameEntry(entryId, trimmed) }
     }
+
+    /** Clothing-only: marks the item as owned or not. */
+    fun setInWardrobe(inWardrobe: Boolean) {
+        val entry = loadedClothingEntry() ?: return
+        if (inWardrobe == entry.inWardrobe) return
+        viewModelScope.launch { repository.updateWardrobeDetails(entryId, inWardrobe, entry.category) }
+    }
+
+    /** Clothing-only: sets the item's category; null clears it. */
+    fun setCategory(category: ClothingCategory?) {
+        val entry = loadedClothingEntry() ?: return
+        if (category == entry.category) return
+        viewModelScope.launch { repository.updateWardrobeDetails(entryId, entry.inWardrobe, category) }
+    }
+
+    private fun loadedClothingEntry(): HistoryEntry? =
+        (_uiState.value as? HistoryDetailUiState.Loaded)?.entry?.takeIf { it.type == HistoryEntryType.CLOTHING }
 
     /** Re-picks the entry's color from one of the chips; resets the sample point to the center box. */
     fun pickCandidate(argb: Int) {

@@ -17,3 +17,11 @@ val MIGRATION_4_5: Migration = object : Migration(4, 5) {
         db.execSQL("ALTER TABLE history_entries ADD COLUMN chipColorsArgb TEXT NOT NULL DEFAULT ''")
     }
 }
+
+/** Adds the clothing entries' wardrobe flag and category; existing rows start not owned and uncategorized. */
+val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE history_entries ADD COLUMN inWardrobe INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE history_entries ADD COLUMN category TEXT")
+    }
+}

@@ -15,6 +15,7 @@ import com.example.hueandyou.colorspace.ColorExtractor
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.PaletteScorer
 import com.example.hueandyou.colorspace.PixelSource
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.profile.Profile
@@ -133,8 +134,11 @@ class RateClothingViewModel(
         _uiState.value = state.copy(argb = argb, score = scoreFor(argb, selectedProfile))
     }
 
-    /** Saves the shown result to History under [name], then moves to [RateClothingUiState.Saved]. */
-    fun save(name: String) {
+    /**
+     * Saves the shown result to History under [name], with its wardrobe flag and optional
+     * category, then moves to [RateClothingUiState.Saved].
+     */
+    fun save(name: String, inWardrobe: Boolean = false, category: ClothingCategory? = null) {
         val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
         if (saveJob?.isActive == true) return
         saveJob = viewModelScope.launch {
@@ -145,6 +149,8 @@ class RateClothingViewModel(
                 score = state.score,
                 chipColorsArgb = state.chipColorsArgb,
                 name = name,
+                inWardrobe = inWardrobe,
+                category = category,
             )
             _uiState.value = RateClothingUiState.Saved
         }

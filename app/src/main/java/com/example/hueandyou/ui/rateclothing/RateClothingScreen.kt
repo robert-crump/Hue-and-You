@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.PaletteScore
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.defaultHistoryEntryName
 import com.example.hueandyou.data.profile.Profile
@@ -50,6 +51,7 @@ import com.example.hueandyou.ui.common.InfoDialog
 import com.example.hueandyou.ui.common.PaletteResultBody
 import com.example.hueandyou.ui.common.PhotoResultSection
 import com.example.hueandyou.ui.common.ResultNameDialog
+import com.example.hueandyou.ui.common.WardrobeDetailsEditor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -143,14 +145,25 @@ fun RateClothingScreen(
         }
 
         if (showNameDialog && showingResult) {
+            // Fresh each time the dialog opens: not owned, uncategorized.
+            var inWardrobe by remember { mutableStateOf(false) }
+            var category by remember { mutableStateOf<ClothingCategory?>(null) }
             ResultNameDialog(
                 title = stringResource(R.string.result_name_dialog_title_clothing),
                 defaultName = defaultHistoryEntryName(HistoryEntryType.CLOTHING),
                 onSave = { name ->
                     showNameDialog = false
-                    viewModel.save(name)
+                    viewModel.save(name, inWardrobe, category)
                 },
                 onDismiss = { showNameDialog = false },
+                extraContent = {
+                    WardrobeDetailsEditor(
+                        inWardrobe = inWardrobe,
+                        onInWardrobeChange = { inWardrobe = it },
+                        category = category,
+                        onCategoryChange = { category = it },
+                    )
+                },
             )
         }
 

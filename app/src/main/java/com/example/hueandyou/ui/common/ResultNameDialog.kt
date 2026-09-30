@@ -1,6 +1,10 @@
 package com.example.hueandyou.ui.common
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
@@ -19,11 +23,13 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.dp
 import com.example.hueandyou.R
 
 /**
  * Names a result before it is saved. The field starts empty with [defaultName] only as its hint,
  * so typing never has to clear anything first; saving a blank field keeps [defaultName].
+ * [extraContent], if any, sits below the field.
  */
 @Composable
 fun ResultNameDialog(
@@ -31,6 +37,7 @@ fun ResultNameDialog(
     defaultName: String,
     onSave: (String) -> Unit,
     onDismiss: () -> Unit,
+    extraContent: (@Composable () -> Unit)? = null,
 ) {
     var name by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
@@ -41,21 +48,27 @@ fun ResultNameDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text(stringResource(R.string.result_name_dialog_label)) },
-                placeholder = { Text(defaultName) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Words,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = { save() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(focusRequester)
-            )
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.result_name_dialog_label)) },
+                    placeholder = { Text(defaultName) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(onDone = { save() }),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(focusRequester)
+                )
+                extraContent?.invoke()
+            }
         },
         confirmButton = {
             TextButton(onClick = save) {

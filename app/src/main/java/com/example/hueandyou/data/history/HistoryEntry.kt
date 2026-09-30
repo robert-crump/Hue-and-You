@@ -31,6 +31,10 @@ data class HistoryEntry(
      * chip; empty for an entry saved before these were kept, until History detail backfills it.
      */
     val chipColorsArgb: List<Int> = emptyList(),
+    /** Clothing-only: whether the user owns this item. Always false for [HistoryEntryType.OBJECT]. */
+    val inWardrobe: Boolean = false,
+    /** Clothing-only: null = uncategorized, and always null for [HistoryEntryType.OBJECT]. */
+    val category: ClothingCategory? = null,
 )
 
 internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
@@ -54,6 +58,8 @@ internal fun HistoryEntryEntity.toDomain(): HistoryEntry {
         sampleX = sampleX,
         sampleY = sampleY,
         chipColorsArgb = chipColorsArgb,
+        inWardrobe = inWardrobe,
+        category = category,
     )
 }
 
@@ -79,6 +85,8 @@ internal fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
     sampleX = sampleX,
     sampleY = sampleY,
     chipColorsArgb = chipColorsArgb,
+    inWardrobe = inWardrobe,
+    category = category,
 )
 
 /** Default name a newly-saved entry gets, before the user edits it: just its type. */

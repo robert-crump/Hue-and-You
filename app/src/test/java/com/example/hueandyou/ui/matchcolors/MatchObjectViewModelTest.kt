@@ -5,6 +5,7 @@ import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.IntArrayPixelSource
 import com.example.hueandyou.colorspace.PaletteScore
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
@@ -192,6 +193,8 @@ class MatchObjectViewModelTest {
             score: PaletteScore,
             chipColorsArgb: List<Int>,
             name: String,
+            inWardrobe: Boolean,
+            category: ClothingCategory?,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun saveObjectResult(
@@ -248,6 +251,13 @@ class MatchObjectViewModelTest {
         override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
             throw UnsupportedOperationException("not used by this test")
         }
+
+        override suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?) {
+
+            throw UnsupportedOperationException("not used by this test")
+
+        }
+
 
         override suspend fun deleteEntry(entryId: Long) {
             throw UnsupportedOperationException("not used by this test")

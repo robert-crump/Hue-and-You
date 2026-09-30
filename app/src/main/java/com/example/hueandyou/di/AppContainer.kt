@@ -16,6 +16,7 @@ import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.profile.HueAndYouDatabase
 import com.example.hueandyou.data.profile.MIGRATION_3_4
 import com.example.hueandyou.data.profile.MIGRATION_4_5
+import com.example.hueandyou.data.profile.MIGRATION_5_6
 import com.example.hueandyou.data.profile.ProfileRepository
 import com.example.hueandyou.data.profile.RoomProfileRepository
 import com.example.hueandyou.data.settings.DataStoreSettingsRepository
@@ -46,7 +47,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     private val database: HueAndYouDatabase by lazy {
         Room.databaseBuilder(context, HueAndYouDatabase::class.java, "hue_and_you.db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }

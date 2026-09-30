@@ -38,4 +38,9 @@ data class HistoryEntryEntity(
      */
     @ColumnInfo(defaultValue = "")
     val chipColorsArgb: List<Int> = emptyList(),
+    /** Clothing-only: whether the user owns this item. Always false for [HistoryEntryType.OBJECT]. */
+    @ColumnInfo(defaultValue = "0")
+    val inWardrobe: Boolean = false,
+    /** Clothing-only: null = uncategorized, and always null for [HistoryEntryType.OBJECT]. */
+    val category: ClothingCategory? = null,
 )

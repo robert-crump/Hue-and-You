@@ -6,6 +6,7 @@ import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.formatHexColor
 import com.example.hueandyou.colorspace.parseHexColor
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntryType
 import java.time.Instant
 import java.util.Base64
@@ -111,6 +112,8 @@ private fun BackupHistoryEntry.toDto(): BackupHistoryDto = BackupHistoryDto(
             nearestBest = score.nearestBest?.toDto(),
             nearestAvoid = score.nearestAvoid?.toDto(),
             closerToAvoid = score.closerToAvoid,
+            inWardrobe = inWardrobe,
+            category = category?.name,
         )
     } else {
         null
@@ -178,6 +181,8 @@ private fun BackupHistoryDto.toDomain(): BackupHistoryEntry {
                 sampleX = sampleX,
                 sampleY = sampleY,
                 chipColorsArgb = chipColorsArgb,
+                inWardrobe = clothing.inWardrobe,
+                category = clothing.category?.toEnumOrThrow<ClothingCategory>(),
             )
         }
         HistoryEntryType.OBJECT -> {

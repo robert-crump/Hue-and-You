@@ -1,5 +1,33 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-30 - Issue #43: Wardrobe flag and category on Clothes items
+
+Clothes entries gained `inWardrobe` (default false) and an optional `category`
+(`data/history/ClothingCategory`: TOP, BOTTOM, ONE_PIECE, OUTERWEAR, SHOES, BELT; null =
+uncategorized). Room v5->v6 `MIGRATION_5_6`: `inWardrobe INTEGER NOT NULL DEFAULT 0`,
+`category TEXT` (null). One DAO/repo write, `updateWardrobeDetails(entryId, inWardrobe, category)`.
+Backup: both live in the `clothing` object (`inWardrobe`, `category` as the enum name), optional, so
+older backups import as not owned/uncategorized; schema version unchanged; an unknown category name
+is rejected like any other unknown enum.
+
+UI: new `ui/common/WardrobeDetailsEditor` (switch row + FilterChip category chips in a FlowRow;
+tapping the selected chip clears it). `ResultNameDialog` gained an `extraContent` slot (and scrolls);
+Rate Clothing puts the editor there, fresh (off/none) each time the dialog opens, and passes both to
+`save(name, inWardrobe, category)`. History detail shows the editor under the verdict for Clothes
+entries and persists each change immediately (`setInWardrobe` / `setCategory`; no-ops for Objects).
+Clothes tab (`HistoryScreen`, CLOTHING only): `PrimaryTabRow` Items | Outfits (rememberSaveable;
+switching to Outfits leaves selection mode; a new save's scroll-to-top switches back to Items).
+Outfits is an empty state ("No outfits yet"). Items has All / Wardrobe / Not owned filter chips
+(`WardrobeFilter` in `HistoryViewModel`; changing it leaves selection mode). `HistoryUiState` has
+`hasEntries` (before the filter): no entries at all still shows the old empty state, a filter that
+matches nothing shows "No items match this filter." under the chips.
+
+Test: `Migration5To6Test`, backup round trip with both fields + old backup without them + unknown
+category, repository defaults/update, Rate Clothing save passes both, History detail set/no-op/
+object-ignored, History list filter/empty-filter/selection exit.
+`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint: same
+15 warnings); not tried on a device.
+
 ## 2026-09-30 - Issue #41: Camera pinch to zoom
 
 Grilled with the user, spec written into the issue. The shared `CameraViewfinder` (so Rate
@@ -110,19 +138,3 @@ ranking, opposite flips both traits, % mapping/clamp, axes in range); `SeasonAna
 name dedupe, double confirm). `FakeProfileRepository` moved to `data/profile` in test sources for
 reuse. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass; not
 tried on a device.
-
-## 2026-09-28 - Issue #40: Season palettes (12 fixed palettes)
-
-New `colorspace/.../SeasonPalettes.kt`: `Season` enum (12 seasons) with `opposite` (the six
-every-trait-flipped pairs from the issue), `PaletteCategory` (Neutrals, Lights, Mid-tones, Accents,
-Darks) and `SeasonPalettes.best(season)` / `best(season, category)` / `avoid(season)` as ARGB ints.
-Each season stores 20 Best hexes, 4 per category in category order. Avoid is derived: the first 2
-of each category of the opposite season's Best, so within a category the leading colors are the
-season's signature ones. Hex values are our own drafts from published season descriptions.
-
-Test: `SeasonPalettesTest` covers 20 distinct colors, category order, opposite pairs/involution/trait
-flip, Avoid derivation and no Best/Avoid overlap, plus an HCT sanity check (thresholds are test
-constants): warm/cool hue arcs for chroma >= 12, Light tone >= 40, Deep Mid-tones/Accents tone <= 60
-and Darks <= 22, Bright Mid-tones/Accents chroma >= 45 (sRGB caps turquoise near 50), Soft chroma
-<= 40, Lights tone >= 70 and Darks <= 50 everywhere. Owner approved the private review page
-(https://claude.ai/artifact/VeJmynxtsKVWtWgY8NsPfS). `./gradlew :colorspace:test` passes.

@@ -3,6 +3,7 @@ package com.example.hueandyou.ui.history
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
@@ -217,7 +218,65 @@ class HistoryViewModelTest {
         job.cancel()
     }
 
-    private fun entry(id: Long, name: String) = HistoryEntry(
+    @Test
+    fun wardrobeFilter_showsAllOwnedOrNotOwnedItems() = runTest(dispatcher) {
+        repository = FakeHistoryRepository(
+            entry(1L, "Owned", inWardrobe = true),
+            entry(2L, "Wishlist"),
+            entry(3L, "Owned too", inWardrobe = true),
+        )
+        viewModel = HistoryViewModel(repository)
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        assertEquals(WardrobeFilter.ALL, states.last().wardrobeFilter)
+        assertEquals(listOf(1L, 2L, 3L), states.last().entries.map { it.id }.sorted())
+
+        viewModel.setWardrobeFilter(WardrobeFilter.WARDROBE)
+        runCurrent()
+        assertEquals(listOf(1L, 3L), states.last().entries.map { it.id }.sorted())
+
+        viewModel.setWardrobeFilter(WardrobeFilter.NOT_OWNED)
+        runCurrent()
+        assertEquals(listOf(2L), states.last().entries.map { it.id })
+
+        job.cancel()
+    }
+
+    @Test
+    fun wardrobeFilter_matchingNothing_isNotTheEmptyState() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.setWardrobeFilter(WardrobeFilter.WARDROBE)
+        runCurrent()
+
+        assertTrue(states.last().entries.isEmpty())
+        assertFalse(states.last().isEmpty)
+
+        job.cancel()
+    }
+
+    @Test
+    fun setWardrobeFilter_exitsSelectionMode() = runTest(dispatcher) {
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        runCurrent()
+        viewModel.setWardrobeFilter(WardrobeFilter.NOT_OWNED)
+        runCurrent()
+
+        assertFalse(states.last().isSelectionMode)
+        assertTrue(states.last().selectedIds.isEmpty())
+
+        job.cancel()
+    }
+
+    private fun entry(id: Long, name: String, inWardrobe: Boolean = false) = HistoryEntry(
         id = id,
         type = HistoryEntryType.CLOTHING,
         name = name,
@@ -228,7 +287,8 @@ class HistoryViewModelTest {
         profileName = null,
         bestColorsArgb = emptyList(),
         avoidColorsArgb = emptyList(),
-        score = PaletteScore(nearestBest = null, nearestAvoid = null, closerToAvoid = false)
+        score = PaletteScore(nearestBest = null, nearestAvoid = null, closerToAvoid = false),
+        inWardrobe = inWardrobe,
     )
 }
 
@@ -248,6 +308,8 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         score: PaletteScore,
         chipColorsArgb: List<Int>,
         name: String,
+        inWardrobe: Boolean,
+        category: ClothingCategory?,
     ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
     override suspend fun saveObjectResult(
@@ -284,6 +346,13 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
     override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
         throw UnsupportedOperationException("not used by this test")
     }
+
+    override suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?) {
+
+        throw UnsupportedOperationException("not used by this test")
+
+    }
+
 
     override suspend fun deleteEntry(entryId: Long) {
         deletedIds += entryId

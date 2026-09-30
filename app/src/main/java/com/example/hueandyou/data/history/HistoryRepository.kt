@@ -19,6 +19,8 @@ interface HistoryRepository {
         score: PaletteScore,
         chipColorsArgb: List<Int>,
         name: String = defaultHistoryEntryName(HistoryEntryType.CLOTHING),
+        inWardrobe: Boolean = false,
+        category: ClothingCategory? = null,
     ): HistoryEntry
 
     /** Saves a Match Colors for an Object result as a new history entry and returns it. */
@@ -45,6 +47,9 @@ interface HistoryRepository {
     /** Stores the chip colors of an entry saved before they were kept. */
     suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>)
 
+    /** Sets a CLOTHING entry's "In my wardrobe" flag and category (null = uncategorized). */
+    suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?)
+
     /** Deletes an entry and its thumbnail file. */
     suspend fun deleteEntry(entryId: Long)
 }
@@ -68,6 +73,8 @@ class DefaultHistoryRepository(
         score: PaletteScore,
         chipColorsArgb: List<Int>,
         name: String,
+        inWardrobe: Boolean,
+        category: ClothingCategory?,
     ): HistoryEntry {
         val now = currentTimeMillis()
         val entry = HistoryEntry(
@@ -83,6 +90,8 @@ class DefaultHistoryRepository(
             avoidColorsArgb = profile?.avoidColors.orEmpty().map { it.argb },
             score = score,
             chipColorsArgb = chipColorsArgb,
+            inWardrobe = inWardrobe,
+            category = category,
         )
         val id = dao.insert(entry.toEntity())
         return entry.copy(id = id)
@@ -158,6 +167,10 @@ class DefaultHistoryRepository(
 
     override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
         dao.updateChipColors(entryId, chipColorsArgb)
+    }
+
+    override suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?) {
+        dao.updateWardrobeDetails(entryId, inWardrobe, category)
     }
 
     override suspend fun deleteEntry(entryId: Long) {

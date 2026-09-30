@@ -61,6 +61,10 @@ internal data class BackupClothingDto(
     val nearestBest: BackupColorMatchDto? = null,
     val nearestAvoid: BackupColorMatchDto? = null,
     val closerToAvoid: Boolean = false,
+    /** Absent in older backups, which import as not owned. */
+    val inWardrobe: Boolean = false,
+    /** A ClothingCategory name; null/absent = uncategorized. */
+    val category: String? = null,
 )
 
 /** [band] is unused - kept (and always written) only so a backup this app writes has the same shape as older ones. */

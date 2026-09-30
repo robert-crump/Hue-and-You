@@ -3,6 +3,7 @@ package com.example.hueandyou.data.backup
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntryType
 
 /** The complete dataset a backup covers: settings defaults, profiles with their colors, and history. */
@@ -43,6 +44,10 @@ data class BackupHistoryEntry(
     val sampleY: Double? = null,
     /** The chip row saved with the entry; empty if it predates them (History detail backfills it). */
     val chipColorsArgb: List<Int> = emptyList(),
+    /** Clothing-only: always false for an object entry. */
+    val inWardrobe: Boolean = false,
+    /** Clothing-only: null = uncategorized, and always null for an object entry. */
+    val category: ClothingCategory? = null,
 ) {
     // ByteArray breaks data-class equals/hashCode (identity, not content) - compare content instead.
     override fun equals(other: Any?): Boolean {
@@ -64,7 +69,9 @@ data class BackupHistoryEntry(
             balance == other.balance &&
             sampleX == other.sampleX &&
             sampleY == other.sampleY &&
-            chipColorsArgb == other.chipColorsArgb
+            chipColorsArgb == other.chipColorsArgb &&
+            inWardrobe == other.inWardrobe &&
+            category == other.category
     }
 
     override fun hashCode(): Int {
@@ -85,6 +92,8 @@ data class BackupHistoryEntry(
         result = 31 * result + (sampleX?.hashCode() ?: 0)
         result = 31 * result + (sampleY?.hashCode() ?: 0)
         result = 31 * result + chipColorsArgb.hashCode()
+        result = 31 * result + inWardrobe.hashCode()
+        result = 31 * result + (category?.hashCode() ?: 0)
         return result
     }
 }

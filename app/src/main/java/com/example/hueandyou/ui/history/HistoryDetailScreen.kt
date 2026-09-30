@@ -48,12 +48,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.ui.common.ColorChipRow
 import com.example.hueandyou.ui.common.HarmonyResultBody
 import com.example.hueandyou.ui.common.InfoDialog
 import com.example.hueandyou.ui.common.PaletteResultBody
 import com.example.hueandyou.ui.common.PhotoResultSection
+import com.example.hueandyou.ui.common.WardrobeDetailsEditor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -138,6 +140,8 @@ fun HistoryDetailScreen(
                 state = state,
                 innerPadding = innerPadding,
                 onPickCandidate = viewModel::pickCandidate,
+                onInWardrobeChange = viewModel::setInWardrobe,
+                onCategoryChange = viewModel::setCategory,
             )
         }
 
@@ -235,6 +239,8 @@ private fun LoadedContent(
     state: HistoryDetailUiState.Loaded,
     innerPadding: PaddingValues,
     onPickCandidate: (Int) -> Unit,
+    onInWardrobeChange: (Boolean) -> Unit,
+    onCategoryChange: (ClothingCategory?) -> Unit,
 ) {
     val entry = state.entry
 
@@ -259,7 +265,16 @@ private fun LoadedContent(
             modifier = Modifier.padding(top = 16.dp),
         )
         when (entry.type) {
-            HistoryEntryType.CLOTHING -> PaletteResultBody(score = entry.score, modifier = Modifier.padding(top = 16.dp))
+            HistoryEntryType.CLOTHING -> {
+                PaletteResultBody(score = entry.score, modifier = Modifier.padding(top = 16.dp))
+                WardrobeDetailsEditor(
+                    inWardrobe = entry.inWardrobe,
+                    onInWardrobeChange = onInWardrobeChange,
+                    category = entry.category,
+                    onCategoryChange = onCategoryChange,
+                    modifier = Modifier.padding(top = 16.dp),
+                )
+            }
             HistoryEntryType.OBJECT -> HarmonyResultBody(
                 inputColorArgb = entry.calibratedArgb,
                 wheel = requireNotNull(entry.wheel),

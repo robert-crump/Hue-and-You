@@ -86,6 +86,9 @@ interface HistoryDao {
     @Query("UPDATE history_entries SET chipColorsArgb = :chipColorsArgb WHERE id = :entryId")
     suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>)
 
+    @Query("UPDATE history_entries SET inWardrobe = :inWardrobe, category = :category WHERE id = :entryId")
+    suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?)
+
     @Query("DELETE FROM history_entries WHERE id = :entryId")
     suspend fun delete(entryId: Long)
 }

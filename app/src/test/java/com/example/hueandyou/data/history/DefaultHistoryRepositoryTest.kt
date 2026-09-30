@@ -9,6 +9,7 @@ import com.example.hueandyou.data.profile.Profile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -56,6 +57,40 @@ class DefaultHistoryRepositoryTest {
         assertEquals(defaultHistoryEntryName(HistoryEntryType.CLOTHING), entry.name)
         assertEquals(HistoryEntryType.CLOTHING, entry.type)
         assertEquals(clock, entry.createdAt)
+    }
+
+    @Test
+    fun saveClothingResult_defaultsToNotOwnedAndUncategorized() = runBlocking {
+        val entry = repository.saveClothingResult(
+            thumbnailPath = "thumb.jpg",
+            calibratedArgb = 0xFF778899.toInt(),
+            profile = null,
+            score = sampleScore(),
+            chipColorsArgb = emptyList(),
+        )
+
+        assertFalse(entry.inWardrobe)
+        assertNull(entry.category)
+    }
+
+    @Test
+    fun updateWardrobeDetails_persistsBothFields() = runBlocking {
+        val saved = repository.saveClothingResult(
+            thumbnailPath = "thumb.jpg",
+            calibratedArgb = 0xFF778899.toInt(),
+            profile = null,
+            score = sampleScore(),
+            chipColorsArgb = emptyList(),
+            inWardrobe = true,
+            category = ClothingCategory.SHOES,
+        )
+        assertTrue(repository.observeEntry(saved.id).first()!!.inWardrobe)
+
+        repository.updateWardrobeDetails(saved.id, inWardrobe = false, category = ClothingCategory.BELT)
+
+        val stored = repository.observeEntry(saved.id).first()!!
+        assertFalse(stored.inWardrobe)
+        assertEquals(ClothingCategory.BELT, stored.category)
     }
 
     @Test

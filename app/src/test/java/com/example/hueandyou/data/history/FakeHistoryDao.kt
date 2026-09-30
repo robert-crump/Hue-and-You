@@ -123,6 +123,11 @@ class FakeHistoryDao : HistoryDao {
         emit()
     }
 
+    override suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?) {
+        entries[entryId]?.let { entries[entryId] = it.copy(inWardrobe = inWardrobe, category = category) }
+        emit()
+    }
+
     override suspend fun delete(entryId: Long) {
         entries.remove(entryId)
         emit()

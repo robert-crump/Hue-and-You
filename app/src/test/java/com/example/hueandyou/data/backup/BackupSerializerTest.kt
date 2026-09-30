@@ -4,6 +4,7 @@ import com.example.hueandyou.colorspace.ColorMatch
 import com.example.hueandyou.colorspace.HarmonyBalance
 import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.PaletteScore
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntryType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -13,6 +14,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -57,6 +59,8 @@ class BackupSerializerTest {
                 wheel = null,
                 balance = null,
                 chipColorsArgb = listOf(0xFF223344.toInt(), 0xFFAABBCC.toInt()),
+                inWardrobe = true,
+                category = ClothingCategory.ONE_PIECE,
             ),
             BackupHistoryEntry(
                 id = 11L,
@@ -184,6 +188,37 @@ class BackupSerializerTest {
         val restored = serializer.deserialize(withoutChipColors)
 
         restored.history.forEach { entry -> assertTrue(entry.chipColorsArgb.isEmpty()) }
+    }
+
+    @Test
+    fun deserialize_withoutWardrobeFields_defaultsToNotOwnedAndUncategorizedForOldBackups() {
+        val json = serializer.serialize(sampleData())
+        val withoutWardrobeFields = mutated(json) { obj ->
+            val history = obj.getValue("history").jsonArray.map { entry ->
+                val fields = entry.jsonObject.toMutableMap()
+                fields["clothing"]?.let { clothing ->
+                    if (clothing is JsonObject) {
+                        fields["clothing"] = JsonObject(clothing.filterKeys { it != "inWardrobe" && it != "category" })
+                    }
+                }
+                JsonObject(fields)
+            }
+            obj["history"] = JsonArray(history)
+        }
+
+        val restored = serializer.deserialize(withoutWardrobeFields)
+
+        restored.history.forEach { entry ->
+            assertFalse(entry.inWardrobe)
+            assertNull(entry.category)
+        }
+    }
+
+    @Test
+    fun deserialize_withUnknownCategory_throws() {
+        val json = serializer.serialize(sampleData()).replace("\"ONE_PIECE\"", "\"HAT\"")
+
+        assertThrows(BackupImportException::class.java) { serializer.deserialize(json) }
     }
 
     @Test

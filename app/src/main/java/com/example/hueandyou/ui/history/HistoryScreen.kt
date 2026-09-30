@@ -6,6 +6,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,14 +25,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,6 +47,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,19 +153,35 @@ fun HistoryScreen(
     }
     DisposableEffect(Unit) { onDispose { onSnackbarHeightChange(0) } }
 
+    // Clothes only: Items (this list) or Outfits.
+    var showOutfits by rememberSaveable { mutableStateOf(false) }
+
     LaunchedEffect(scrollToTopRequested) {
         if (!scrollToTopRequested) return@LaunchedEffect
+        // A new result was just saved: show it, even from the Outfits tab.
+        showOutfits = false
         listState.scrollToItem(0)
         onScrolledToTop()
     }
 
-    Scaffold(snackbarHost = {
-        SnackbarHost(snackbarHostState, modifier = Modifier.onSizeChanged { snackbarHeightPx = it.height })
-    }) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            if (uiState.isEmpty) {
-                HistoryEmptyState()
-            } else {
+    val entryList = @Composable {
+        if (uiState.isEmpty) {
+            HistoryEmptyState()
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                if (type == HistoryEntryType.CLOTHING) {
+                    WardrobeFilterRow(selected = uiState.wardrobeFilter, onSelect = viewModel::setWardrobeFilter)
+                }
+                if (uiState.entries.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.clothes_filter_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp)
+                    )
+                }
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     items(uiState.entries, key = { it.id }) { entry ->
                         HistoryEntryRow(
@@ -179,6 +202,87 @@ fun HistoryScreen(
                 }
             }
         }
+    }
+
+    Scaffold(snackbarHost = {
+        SnackbarHost(snackbarHostState, modifier = Modifier.onSizeChanged { snackbarHeightPx = it.height })
+    }) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            if (type == HistoryEntryType.CLOTHING) {
+                Column(Modifier.fillMaxSize()) {
+                    PrimaryTabRow(selectedTabIndex = if (showOutfits) 1 else 0) {
+                        Tab(
+                            selected = !showOutfits,
+                            onClick = { showOutfits = false },
+                            text = { Text(stringResource(R.string.clothes_tab_items)) }
+                        )
+                        Tab(
+                            selected = showOutfits,
+                            onClick = {
+                                viewModel.exitSelectionMode()
+                                showOutfits = true
+                            },
+                            text = { Text(stringResource(R.string.clothes_tab_outfits)) }
+                        )
+                    }
+                    if (showOutfits) OutfitsEmptyState() else entryList()
+                }
+            } else {
+                entryList()
+            }
+        }
+    }
+}
+
+/** All / Wardrobe / Not owned, above the Clothes items. */
+@Composable
+private fun WardrobeFilterRow(selected: WardrobeFilter, onSelect: (WardrobeFilter) -> Unit) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        WardrobeFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = filter == selected,
+                onClick = { onSelect(filter) },
+                label = {
+                    Text(
+                        stringResource(
+                            when (filter) {
+                                WardrobeFilter.ALL -> R.string.clothes_filter_all
+                                WardrobeFilter.WARDROBE -> R.string.clothes_filter_wardrobe
+                                WardrobeFilter.NOT_OWNED -> R.string.clothes_filter_not_owned
+                            }
+                        )
+                    )
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun OutfitsEmptyState() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Filled.Checkroom,
+            contentDescription = null,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        Text(
+            text = stringResource(R.string.clothes_outfits_empty_title),
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

@@ -69,6 +69,8 @@ class DefaultBackupRepository(
                 sampleX = entry.sampleX,
                 sampleY = entry.sampleY,
                 chipColorsArgb = entry.chipColorsArgb,
+                inWardrobe = entry.inWardrobe,
+                category = entry.category,
             )
         }
         return serializer.serialize(
@@ -142,6 +144,8 @@ class DefaultBackupRepository(
                     sampleX = entry.sampleX,
                     sampleY = entry.sampleY,
                     chipColorsArgb = entry.chipColorsArgb,
+                    inWardrobe = entry.inWardrobe,
+                    category = entry.category,
                 )
             }
             if (historyEntities.isNotEmpty()) historyDao.insertAll(historyEntities)

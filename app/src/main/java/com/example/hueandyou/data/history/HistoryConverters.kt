@@ -29,4 +29,10 @@ class HistoryConverters {
 
     @TypeConverter
     fun toHarmonyBalance(value: String?): HarmonyBalance? = value?.let { HarmonyBalance.valueOf(it) }
+
+    @TypeConverter
+    fun fromClothingCategory(category: ClothingCategory?): String? = category?.name
+
+    @TypeConverter
+    fun toClothingCategory(value: String?): ClothingCategory? = value?.let { ClothingCategory.valueOf(it) }
 }

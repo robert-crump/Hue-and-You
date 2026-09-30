@@ -6,6 +6,7 @@ import com.example.hueandyou.colorspace.HarmonyWheel
 import com.example.hueandyou.colorspace.IntArrayPixelSource
 import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.PaletteScorer
+import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
@@ -103,7 +104,25 @@ class RateClothingViewModelTest {
         assertEquals(state.score, historyRepository.savedScore)
         assertEquals(state.chipColorsArgb, historyRepository.savedChipColors)
         assertEquals("Red Scarf", historyRepository.savedName)
+        assertEquals(false, historyRepository.savedInWardrobe)
+        assertNull(historyRepository.savedCategory)
         assertEquals(RateClothingUiState.Saved, model.uiState.value)
+    }
+
+    @Test
+    fun save_passesTheWardrobeFlagAndCategory() {
+        val profileA = profile(1L, "Autumn", 0xFFFF0000.toInt(), 0xFF00FF00.toInt())
+        val historyRepository = FakeHistoryRepository()
+        val model = viewModel(listOf(profileA), lastUsedClothingProfileId = 1L, historyRepository = historyRepository)
+        mainDispatcher.scheduler.runCurrent()
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        mainDispatcher.scheduler.runCurrent()
+
+        model.save("Red Scarf", inWardrobe = true, category = ClothingCategory.OUTERWEAR)
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(true, historyRepository.savedInWardrobe)
+        assertEquals(ClothingCategory.OUTERWEAR, historyRepository.savedCategory)
     }
 
     @Test
@@ -288,6 +307,8 @@ class RateClothingViewModelTest {
         var savedScore: PaletteScore? = null
         var savedChipColors: List<Int>? = null
         var savedName: String? = null
+        var savedInWardrobe: Boolean? = null
+        var savedCategory: ClothingCategory? = null
 
         override fun observeEntries() = throw UnsupportedOperationException("not used by this test")
         override fun observeEntry(entryId: Long) = throw UnsupportedOperationException("not used by this test")
@@ -299,11 +320,15 @@ class RateClothingViewModelTest {
             score: PaletteScore,
             chipColorsArgb: List<Int>,
             name: String,
+            inWardrobe: Boolean,
+            category: ClothingCategory?,
         ): HistoryEntry {
             savedProfile = profile
             savedScore = score
             savedChipColors = chipColorsArgb
             savedName = name
+            savedInWardrobe = inWardrobe
+            savedCategory = category
             return HistoryEntry(
                 id = 1L,
                 type = HistoryEntryType.CLOTHING,
@@ -353,6 +378,13 @@ class RateClothingViewModelTest {
         override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {
             throw UnsupportedOperationException("not used by this test")
         }
+
+        override suspend fun updateWardrobeDetails(entryId: Long, inWardrobe: Boolean, category: ClothingCategory?) {
+
+            throw UnsupportedOperationException("not used by this test")
+
+        }
+
 
         override suspend fun deleteEntry(entryId: Long) {
             throw UnsupportedOperationException("not used by this test")
