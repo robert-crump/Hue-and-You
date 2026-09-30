@@ -8,6 +8,7 @@ import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.colorspace.PaletteScorer
 import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntry
+import com.example.hueandyou.data.history.NewClothingResult
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.profile.Profile
@@ -409,6 +410,10 @@ class HistoryDetailViewModelTest {
             inWardrobe: Boolean,
             category: ClothingCategory?,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
+
+        override suspend fun saveClothingResults(results: List<NewClothingResult>) {
+            throw UnsupportedOperationException("not used by this test")
+        }
 
         override suspend fun saveObjectResult(
             thumbnailPath: String,

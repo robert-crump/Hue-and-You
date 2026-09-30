@@ -98,6 +98,11 @@ fun HistoryScreen(
     onOpenEntry: (Long) -> Unit,
     onSnackbarHeightChange: (Int) -> Unit,
     onSelectionChange: (HistorySelectionBarState?) -> Unit,
+    /** Clothes only: switch to Items with the Wardrobe filter, e.g. after a Scan wardrobe save. */
+    showWardrobeRequested: Boolean = false,
+    onShowedWardrobe: () -> Unit = {},
+    /** Clothes only: whether Items (rather than Outfits) is the tab showing. */
+    onItemsTabShownChange: (Boolean) -> Unit = {},
     viewModel: HistoryViewModel = viewModel(key = type.name, factory = HistoryViewModel.factory(LocalContext.current, type)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -155,6 +160,15 @@ fun HistoryScreen(
 
     // Clothes only: Items (this list) or Outfits.
     var showOutfits by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(showOutfits) { onItemsTabShownChange(!showOutfits) }
+
+    LaunchedEffect(showWardrobeRequested) {
+        if (!showWardrobeRequested) return@LaunchedEffect
+        showOutfits = false
+        viewModel.setWardrobeFilter(WardrobeFilter.WARDROBE)
+        onShowedWardrobe()
+    }
 
     LaunchedEffect(scrollToTopRequested) {
         if (!scrollToTopRequested) return@LaunchedEffect

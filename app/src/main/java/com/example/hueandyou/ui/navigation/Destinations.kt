@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.hueandyou.R
+import com.example.hueandyou.data.history.ClothingCategory
 
 sealed class Destination(val route: String) {
     data object Clothes : Destination("clothes")
@@ -32,6 +33,11 @@ sealed class Destination(val route: String) {
     data object SeasonAnalysis : Destination("season_analysis")
     data object RateClothing : Destination("rate_clothing")
     data object MatchObject : Destination("match_object")
+    /** Batch capture of wardrobe items of one category, the enum name of a ClothingCategory. */
+    data object ScanWardrobe : Destination("scan_wardrobe/{category}") {
+        const val ARG_CATEGORY = "category"
+        fun route(category: ClothingCategory) = "scan_wardrobe/${category.name}"
+    }
 }
 
 /** [screens] are all destinations that keep this tab highlighted, so exactly one tab is always active. */
@@ -49,7 +55,7 @@ val topLevelDestinations = listOf(
         Destination.Clothes.route,
         Icons.Filled.Checkroom,
         R.string.nav_clothes,
-        screens = listOf(Destination.Clothes, Destination.RateClothing),
+        screens = listOf(Destination.Clothes, Destination.RateClothing, Destination.ScanWardrobe),
     ),
     TopLevelDestination(
         Destination.Objects,

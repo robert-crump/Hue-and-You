@@ -14,6 +14,12 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import com.example.hueandyou.data.history.ClothingCategory
+import com.example.hueandyou.ui.scanwardrobe.ScanCategorySheet
+import com.example.hueandyou.ui.scanwardrobe.ScanWardrobeScreen
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -64,6 +70,7 @@ import com.example.hueandyou.ui.seasonanalysis.SeasonAnalysisScreen
 import com.example.hueandyou.ui.settings.SettingsScreen
 
 private const val KEY_SCROLL_HISTORY_TO_TOP = "scrollHistoryToTop"
+private const val KEY_SHOW_WARDROBE = "showWardrobe"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +84,16 @@ fun HueAndYouNavHost() {
         navController.previousBackStackEntry?.savedStateHandle?.set(KEY_SCROLL_HISTORY_TO_TOP, true)
         navController.popBackStack()
     }
+
+    // A saved Scan wardrobe batch: History shows its Items with the Wardrobe filter, newest on top.
+    val finishWardrobeScan: () -> Unit = {
+        navController.previousBackStackEntry?.savedStateHandle?.set(KEY_SHOW_WARDROBE, true)
+        finishResult()
+    }
+
+    // Clothes only: the Items tab has the overflow menu, the Outfits tab doesn't.
+    var clothesItemsTabShown by remember { mutableStateOf(true) }
+    var showScanCategorySheet by remember { mutableStateOf(false) }
 
     // History's undo snackbar shares the FAB's spot, so the FAB lifts by the snackbar's height while it shows.
     var snackbarHeightPx by remember { mutableIntStateOf(0) }
@@ -144,6 +161,11 @@ fun HueAndYouNavHost() {
                     } else {
                         TopAppBar(
                             title = { Text(stringResource(rootTab.labelRes), fontWeight = FontWeight.Bold) },
+                            actions = {
+                                if (rootTab.destination == Destination.Clothes && clothesItemsTabShown) {
+                                    ClothesOverflowMenu(onScanWardrobe = { showScanCategorySheet = true })
+                                }
+                            },
                             windowInsets = WindowInsets(0, 0, 0, 0),
                             colors = barColors
                         )
@@ -223,10 +245,16 @@ fun HueAndYouNavHost() {
                     val scrollToTop by historyEntry.savedStateHandle
                         .getStateFlow(KEY_SCROLL_HISTORY_TO_TOP, false)
                         .collectAsState()
+                    val showWardrobe by historyEntry.savedStateHandle
+                        .getStateFlow(KEY_SHOW_WARDROBE, false)
+                        .collectAsState()
                     HistoryScreen(
                         type = type,
                         scrollToTopRequested = scrollToTop,
                         onScrolledToTop = { historyEntry.savedStateHandle[KEY_SCROLL_HISTORY_TO_TOP] = false },
+                        showWardrobeRequested = showWardrobe,
+                        onShowedWardrobe = { historyEntry.savedStateHandle[KEY_SHOW_WARDROBE] = false },
+                        onItemsTabShownChange = { clothesItemsTabShown = it },
                         onSnackbarHeightChange = { snackbarHeightPx = it },
                         onSelectionChange = { historySelection = it },
                         onOpenEntry = { entryId ->
@@ -331,6 +359,49 @@ fun HueAndYouNavHost() {
             composable(Destination.MatchObject.route) {
                 MatchObjectScreen(onNavigateBack = { navController.popBackStack() }, onFinished = finishResult)
             }
+            composable(
+                Destination.ScanWardrobe.route,
+                arguments = listOf(navArgument(Destination.ScanWardrobe.ARG_CATEGORY) { type = NavType.StringType })
+            ) { backStackEntry ->
+                val category = ClothingCategory.valueOf(
+                    backStackEntry.arguments?.getString(Destination.ScanWardrobe.ARG_CATEGORY).orEmpty()
+                )
+                ScanWardrobeScreen(
+                    category = category,
+                    onNavigateBack = { navController.popBackStack() },
+                    onSaved = finishWardrobeScan,
+                )
+            }
+        }
+    }
+
+    if (showScanCategorySheet) {
+        ScanCategorySheet(
+            onStart = { category -> navController.navigate(Destination.ScanWardrobe.route(category)) },
+            onDismiss = { showScanCategorySheet = false },
+        )
+    }
+}
+
+/** The Clothes Items tab's ⋮ menu. */
+@Composable
+private fun ClothesOverflowMenu(onScanWardrobe: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = stringResource(R.string.clothes_more_options_content_description)
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.scan_wardrobe_menu_item)) },
+                onClick = {
+                    expanded = false
+                    onScanWardrobe()
+                }
+            )
         }
     }
 }

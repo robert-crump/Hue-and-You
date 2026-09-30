@@ -1,5 +1,32 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-30 - Issue #45: Scan wardrobe (batch capture of one category)
+
+Entry: a ⋮ menu on the Clothes app bar while the Items tab shows (`HistoryScreen` reports the tab via
+`onItemsTabShownChange`) -> "Scan wardrobe" -> `ScanCategorySheet` ("What are you scanning?",
+category chips, Start disabled until one is picked) -> `Destination.ScanWardrobe`
+(`scan_wardrobe/{category}`, enum name, part of the Clothes tab). New package `ui/scanwardrobe`:
+`ScanWardrobeViewModel` holds the batch in memory (`ScannedItem`: key, photo, top-3 chips, picked
+argb, `defaultName` "Top N", name) with steps Viewfinder / Processing / Photo(itemKey, fromReview) /
+Review / Saving / Saved. A capture joins the batch straight away with the top chip preselected;
+Next item keeps it, Retake drops it (and returns its number if it was the newest), Done goes to
+review. Review: thumbnail (tap reopens), color circle, name field (select-all on focus, Words
+capitalization, duplicates allowed, blank saves as the default), ✕ or swipe removes, + FAB
+continues scanning, app bar "Tops · N" + Save. Back: per-photo -> retake (fresh capture) or review
+(reopened); viewfinder -> review if the batch has items; review -> "Discard N scanned items?".
+Save: thumbnails, then `HistoryRepository.saveClothingResults(List<NewClothingResult>)`, a single
+`insertAll` (one transaction), all owned, in the batch category, scored against the last-used
+Clothes profile (none -> no verdict); timestamps step 1 ms so the last item is newest. Then the
+NavHost sets `KEY_SHOW_WARDROBE` + scroll-to-top on Clothes: Items tab, Wardrobe filter.
+Also: `PhotoResultSection(showMarker)`, and the identical Rate Clothing / Match Object decoders
+moved to `ui/common/PhotoDecoding.kt` (`decodePhoto`).
+
+Test: `ScanWardrobeViewModelTest` (capture/preselect, pick, next, retake numbering, done, reopen,
+continue, rename/remove/duplicates, save batch + profile/score/names, no-profile save, save no-ops,
+discard persists nothing), repository batch order/timestamps/empty.
+`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint 16: one
+more GradleDependency-type warning in libs.versions.toml, none in new code); not tried on a device.
+
 ## 2026-09-30 - Issue #44: Outfit harmony classifier
 
 New `colorspace/OutfitHarmony.kt`: `OutfitHarmony.classify(colorsArgb, wheel)` for 2-8 colors
@@ -88,36 +115,3 @@ Grilled and agreed with the user, one commit each:
   and the alternatives (DocumentsUI, in-app gallery with READ_MEDIA_IMAGES) were judged worse.
 
 Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`, not on a device.
-
-## 2026-09-29 - UI polish: profile preview, season result, History rows (no issue; grill-me session)
-
-Profile preview (Settings `ProfileRow`): the 4 dots were `bestColors.take(4)`, i.e. the Neutrals of
-every season palette. New `colorspace/PreviewColors.kt` `previewColors(colors, count)`: highest HCT
-chroma first, then greedy max-min hue distance (ties to chroma); colors under chroma 16 only fill
-when there aren't enough colorful ones. Display-only, so existing/imported profiles benefit too.
-The share card is unchanged on purpose.
-
-Find my season result: skin/hair/eyes swatches sit in columns 1-3 of the 5-column palette grid at
-the grid's circle size (`gridCircleSize`); new "Top three matches" header over the unchanged match
-rows; Best / Avoid are a `PrimaryTabRow` (plain `remember`, always opens on Best). "Create profile"
-is pinned in the Scaffold `bottomBar` and opens `ProfileNameDialog` (`ShowingResult.nameDialog`,
-`NameDialog(name, isTaken)`), pre-filled with the deduped season name, text selected and focused.
-Existing names are loaded when the dialog opens. After Create the flow pops back to Settings (was:
-Profile editor). `isProfileNameTaken` / `uniqueProfileName` moved to `data/profile/ProfileNames.kt`:
-trimmed, case-insensitive. The Profile editor rename uses the same check (`isDraftNameTaken`,
-own profile excluded): tick disabled plus "A profile with this name already exists".
-
-History rows: name is `headlineSmall` bold (24sp, was 16sp) with the chosen color's circle to its
-left at the name's font size (scales with system font). Clothes: verdict text line removed;
-`VerdictBadge` (extracted from the Settings legend into `PaletteResultView.kt`, with
-`verdictColors`) fills a square as tall as the thumbnail at the far right (`ThumbnailRow` gained a
-`trailing` slot); TalkBack reads "Verdict: ...". Objects: the harmony line holds only the
-suggestions (chosen color moved to the name row), at the name circle size, shrunk evenly by a
-custom `Layout` when they don't fit; its fixed height keeps `ThumbnailRow`'s intrinsic-height query
-cheap. Clothing rows got shorter (about 52dp text block instead of 64dp), which was accepted.
-
-Test: new `PreviewColorsTest` (every season previews 4 colorful colors, True Winter no neutrals) and
-`ProfileNamesTest`; `SeasonAnalysisViewModelTest` covers dialog open/dedupe, taken/blank names,
-dismiss, trimmed create, double create; `ProfileEditorViewModelTest` covers taken vs own-name
-renames. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint:
-same 15 pre-existing warnings); not tried on a device.

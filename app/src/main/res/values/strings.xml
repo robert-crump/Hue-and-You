@@ -232,4 +232,32 @@
     <string name="clothes_filter_wardrobe">Wardrobe</string>
     <string name="clothes_filter_not_owned">Not owned</string>
     <string name="clothes_filter_empty">No items match this filter.</string>
+    <string name="clothes_more_options_content_description">More options</string>
+    <string name="scan_wardrobe_menu_item">Scan wardrobe</string>
+    <string name="scan_wardrobe_sheet_title">What are you scanning?</string>
+    <string name="scan_wardrobe_start">Start scanning</string>
+    <string name="scan_wardrobe_category_tops">Tops</string>
+    <string name="scan_wardrobe_category_bottoms">Bottoms</string>
+    <string name="scan_wardrobe_category_one_pieces">One-pieces</string>
+    <string name="scan_wardrobe_category_outerwear">Outerwear</string>
+    <string name="scan_wardrobe_category_shoes">Shoes</string>
+    <string name="scan_wardrobe_category_belts">Belts</string>
+    <!-- e.g. "Tops · 4": the batch's category and how many items are in it. -->
+    <string name="scan_wardrobe_title">%1$s · %2$d</string>
+    <string name="scan_wardrobe_hint">Center one item in the box</string>
+    <string name="scan_wardrobe_next_item">Next item</string>
+    <string name="scan_wardrobe_retake">Retake</string>
+    <string name="scan_wardrobe_done">Done</string>
+    <string name="scan_wardrobe_save">Save</string>
+    <string name="scan_wardrobe_name_label">Name</string>
+    <string name="scan_wardrobe_open_item_content_description">Open %1$s</string>
+    <string name="scan_wardrobe_remove_content_description">Remove %1$s</string>
+    <string name="scan_wardrobe_add_content_description">Scan more</string>
+    <string name="scan_wardrobe_review_empty">Nothing scanned. Tap + to scan an item.</string>
+    <plurals name="scan_wardrobe_discard_title">
+        <item quantity="one">Discard %d scanned item?</item>
+        <item quantity="other">Discard %d scanned items?</item>
+    </plurals>
+    <string name="scan_wardrobe_discard_confirm">Discard</string>
+    <string name="scan_wardrobe_keep_scanning">Keep</string>
 </resources>

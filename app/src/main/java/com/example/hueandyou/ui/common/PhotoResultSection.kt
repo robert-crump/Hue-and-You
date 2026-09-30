@@ -30,7 +30,8 @@ import com.example.hueandyou.colorspace.CalibrationConfig
 /**
  * The photo at the top of a result page, with a marker showing where the current color was
  * sampled from - the center box (null [sampleX]/[sampleY]), or a ring for History entries saved
- * back when tap-to-pick existed. Display-only: colors are re-picked through the chips.
+ * back when tap-to-pick existed; [showMarker] false shows the bare photo. Display-only: colors
+ * are re-picked through the chips.
  */
 @Composable
 internal fun PhotoResultSection(
@@ -39,6 +40,7 @@ internal fun PhotoResultSection(
     modifier: Modifier = Modifier,
     sampleX: Double? = null,
     sampleY: Double? = null,
+    showMarker: Boolean = true,
 ) {
     val imageBitmap = remember(photo) { photo.asImageBitmap() }
     val bitmapAspectRatio = photo.width.toFloat() / photo.height.toFloat()
@@ -56,7 +58,7 @@ internal fun PhotoResultSection(
                 modifier = Modifier
                     .fillMaxSize()
             )
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            if (showMarker) Canvas(modifier = Modifier.fillMaxSize()) {
                 if (sampleX != null && sampleY != null) {
                     val radius = (minOf(size.width, size.height) * CalibrationConfig.TAP_SAMPLE_RADIUS_FRACTION.toFloat())
                         .coerceAtLeast(8f)

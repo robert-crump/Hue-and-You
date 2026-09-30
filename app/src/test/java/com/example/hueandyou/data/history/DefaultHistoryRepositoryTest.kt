@@ -74,6 +74,41 @@ class DefaultHistoryRepositoryTest {
     }
 
     @Test
+    fun saveClothingResults_insertsAllInOrder_lastOneNewest() = runBlocking {
+        fun result(name: String, argb: Int) = NewClothingResult(
+            thumbnailPath = "$name.jpg",
+            calibratedArgb = argb,
+            profile = autumnProfile(),
+            score = sampleScore(),
+            chipColorsArgb = listOf(argb),
+            name = name,
+            inWardrobe = true,
+            category = ClothingCategory.TOP,
+        )
+
+        repository.saveClothingResults(listOf(result("Top 1", 0xFF111111.toInt()), result("Top 2", 0xFF222222.toInt())))
+
+        val entries = repository.observeEntries().first()
+        assertEquals(listOf("Top 2", "Top 1"), entries.map { it.name })
+        assertEquals(listOf(clock, clock - 1), entries.map { it.createdAt })
+        entries.forEach {
+            assertEquals(HistoryEntryType.CLOTHING, it.type)
+            assertTrue(it.inWardrobe)
+            assertEquals(ClothingCategory.TOP, it.category)
+            assertEquals(42L, it.profileId)
+            assertEquals(sampleScore(), it.score)
+        }
+        assertEquals(listOf(0xFF222222.toInt()), entries.first().chipColorsArgb)
+    }
+
+    @Test
+    fun saveClothingResults_emptyList_insertsNothing() = runBlocking {
+        repository.saveClothingResults(emptyList())
+
+        assertTrue(repository.observeEntries().first().isEmpty())
+    }
+
+    @Test
     fun updateWardrobeDetails_persistsBothFields() = runBlocking {
         val saved = repository.saveClothingResult(
             thumbnailPath = "thumb.jpg",

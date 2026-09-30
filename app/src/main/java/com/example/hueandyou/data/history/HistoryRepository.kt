@@ -23,6 +23,12 @@ interface HistoryRepository {
         category: ClothingCategory? = null,
     ): HistoryEntry
 
+    /**
+     * Saves several Clothing results at once, all or nothing (one transaction). Their timestamps
+     * step up by 1 ms in list order, so History shows the last one on top.
+     */
+    suspend fun saveClothingResults(results: List<NewClothingResult>)
+
     /** Saves a Match Colors for an Object result as a new history entry and returns it. */
     suspend fun saveObjectResult(
         thumbnailPath: String,
@@ -54,6 +60,18 @@ interface HistoryRepository {
     suspend fun deleteEntry(entryId: Long)
 }
 
+/** One Clothing result for [HistoryRepository.saveClothingResults]. */
+data class NewClothingResult(
+    val thumbnailPath: String,
+    val calibratedArgb: Int,
+    val profile: Profile?,
+    val score: PaletteScore,
+    val chipColorsArgb: List<Int>,
+    val name: String,
+    val inWardrobe: Boolean,
+    val category: ClothingCategory?,
+)
+
 class DefaultHistoryRepository(
     private val dao: HistoryDao,
     private val thumbnailStore: ThumbnailStore,
@@ -76,25 +94,18 @@ class DefaultHistoryRepository(
         inWardrobe: Boolean,
         category: ClothingCategory?,
     ): HistoryEntry {
-        val now = currentTimeMillis()
-        val entry = HistoryEntry(
-            id = 0,
-            type = HistoryEntryType.CLOTHING,
-            name = name,
-            createdAt = now,
-            thumbnailPath = thumbnailPath,
-            calibratedArgb = calibratedArgb,
-            profileId = profile?.id,
-            profileName = profile?.name,
-            bestColorsArgb = profile?.bestColors.orEmpty().map { it.argb },
-            avoidColorsArgb = profile?.avoidColors.orEmpty().map { it.argb },
-            score = score,
-            chipColorsArgb = chipColorsArgb,
-            inWardrobe = inWardrobe,
-            category = category,
-        )
+        val entry = NewClothingResult(
+            thumbnailPath, calibratedArgb, profile, score, chipColorsArgb, name, inWardrobe, category
+        ).toEntry(createdAt = currentTimeMillis())
         val id = dao.insert(entry.toEntity())
         return entry.copy(id = id)
+    }
+
+    override suspend fun saveClothingResults(results: List<NewClothingResult>) {
+        if (results.isEmpty()) return
+        // Backdated rather than in the future, so the last one is "now".
+        val first = currentTimeMillis() - results.lastIndex
+        dao.insertAll(results.mapIndexed { index, result -> result.toEntry(createdAt = first + index).toEntity() })
     }
 
     override suspend fun saveObjectResult(
@@ -179,3 +190,20 @@ class DefaultHistoryRepository(
         thumbnailStore.delete(entity.thumbnailPath)
     }
 }
+
+private fun NewClothingResult.toEntry(createdAt: Long) = HistoryEntry(
+    id = 0,
+    type = HistoryEntryType.CLOTHING,
+    name = name,
+    createdAt = createdAt,
+    thumbnailPath = thumbnailPath,
+    calibratedArgb = calibratedArgb,
+    profileId = profile?.id,
+    profileName = profile?.name,
+    bestColorsArgb = profile?.bestColors.orEmpty().map { it.argb },
+    avoidColorsArgb = profile?.avoidColors.orEmpty().map { it.argb },
+    score = score,
+    chipColorsArgb = chipColorsArgb,
+    inWardrobe = inWardrobe,
+    category = category,
+)
