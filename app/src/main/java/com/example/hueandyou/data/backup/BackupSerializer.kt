@@ -48,6 +48,7 @@ class JsonBackupSerializer : BackupSerializer {
             ),
             profiles = data.profiles.map { it.toDto() },
             history = data.history.map { it.toDto() },
+            outfits = data.outfits.map { BackupOutfitDto(it.id, it.name, it.createdAt, it.entryIds) },
         )
         return json.encodeToString(BackupDocumentDto.serializer(), document)
     }
@@ -136,6 +137,7 @@ internal fun BackupDocumentDto.toDomain(): BackupData = BackupData(
     defaultBalance = settings.defaultBalance.toEnumOrThrow(),
     profiles = profiles.map { it.toDomain() },
     history = history.map { it.toDomain() },
+    outfits = outfits.map { BackupOutfit(it.id, it.name, it.createdAt, it.items) },
 )
 
 private fun BackupProfileDto.toDomain(): BackupProfile = BackupProfile(

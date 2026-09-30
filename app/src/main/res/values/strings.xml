@@ -233,6 +233,69 @@
     <string name="clothes_filter_not_owned">Not owned</string>
     <string name="clothes_filter_empty">No items match this filter.</string>
     <string name="clothes_more_options_content_description">More options</string>
+    <string name="history_selection_make_outfit_content_description">Make outfit from selected items</string>
+    <plurals name="history_delete_confirm_title">
+        <item quantity="one">Delete %1$d item?</item>
+        <item quantity="other">Delete %1$d items?</item>
+    </plurals>
+    <plurals name="history_delete_used_in_outfits">
+        <item quantity="one">Used in %1$d outfit. It will be taken out of it.</item>
+        <item quantity="other">Used in %1$d outfits. They will be taken out of them.</item>
+    </plurals>
+    <string name="history_delete_confirm">Delete</string>
+
+    <!-- Outfits -->
+    <string name="outfits_fab_content_description">New outfit</string>
+    <string name="outfit_default_name_prefix">Outfit</string>
+    <string name="outfit_add_items_to_rate">Add items to rate</string>
+    <string name="outfit_suits_you_content_description">Suits you: %1$s</string>
+    <string name="outfit_harmony_content_description">Colors: %1$s</string>
+    <string name="outfit_editor_new_title">New outfit</string>
+    <string name="outfit_editor_save_content_description">Save outfit</string>
+    <string name="outfit_editor_delete_content_description">Delete outfit</string>
+    <string name="outfit_editor_add_items">Add items</string>
+    <string name="outfit_editor_item_count">Items: %1$d/%2$d</string>
+    <string name="outfit_editor_min_items">An outfit needs 2 to 8 items to be saved and rated.</string>
+    <string name="outfit_editor_remove_item_content_description">Remove %1$s</string>
+    <string name="outfit_editor_move_earlier_content_description">Move %1$s earlier</string>
+    <string name="outfit_editor_move_later_content_description">Move %1$s later</string>
+    <string name="outfit_editor_select_item_hint">Tap an item to move it.</string>
+    <string name="outfit_editor_name_dialog_title">Name this outfit</string>
+    <string name="outfit_editor_delete_title">Delete this outfit?</string>
+    <string name="outfit_editor_delete_body">Its items stay in Clothes.</string>
+    <string name="outfit_editor_discard_title">Discard changes?</string>
+    <string name="outfit_editor_discard_confirm">Discard</string>
+    <string name="outfit_editor_keep_editing">Keep editing</string>
+    <string name="outfit_suits_you_title">Suits you</string>
+    <plurals name="outfit_suits_you_best">
+        <item quantity="one">%1$d of %2$d items is a Best color</item>
+        <item quantity="other">%1$d of %2$d items are Best colors</item>
+    </plurals>
+    <plurals name="outfit_suits_you_avoid">
+        <item quantity="one">%1$d to avoid</item>
+        <item quantity="other">%1$d to avoid</item>
+    </plurals>
+    <string name="outfit_suits_you_avoid_items">Avoid: %1$s</string>
+    <string name="outfit_suits_you_no_profile">Add a profile in Settings to see whether this outfit suits you.</string>
+    <string name="outfit_verdict_suits_you">Suits you</string>
+    <string name="outfit_verdict_mixed">Mixed</string>
+    <string name="outfit_verdict_has_avoid">Has a color to avoid</string>
+    <string name="outfit_harmony_title">Colors work together</string>
+    <string name="outfit_harmony_works">Works together</string>
+    <string name="outfit_harmony_borderline">Borderline</string>
+    <string name="outfit_harmony_clashes">Clashes</string>
+    <string name="outfit_harmony_level_scheme">%1$s · %2$s</string>
+    <string name="outfit_harmony_odd_one_out">Odd one out: %1$s</string>
+    <string name="outfit_harmony_no_odd_one_out">No single item is to blame.</string>
+    <string name="outfit_harmony_odd_one_out_badge">Odd one out</string>
+    <string name="outfit_scheme_neutral">Neutral</string>
+    <string name="outfit_scheme_tonal">Tonal</string>
+    <string name="outfit_scheme_analogous">Analogous</string>
+    <string name="outfit_scheme_complementary">Complementary</string>
+    <string name="outfit_picker_title">Add items</string>
+    <string name="outfit_picker_wardrobe">Wardrobe</string>
+    <string name="outfit_picker_empty">No items match these filters.</string>
+    <string name="outfit_picker_done">Done</string>
     <string name="scan_wardrobe_menu_item">Scan wardrobe</string>
     <string name="scan_wardrobe_sheet_title">What are you scanning?</string>
     <string name="scan_wardrobe_start">Start scanning</string>

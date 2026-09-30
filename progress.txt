@@ -1,5 +1,48 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-30 - Issue #46: Outfits (build, save and rate)
+
+Data: new `data/outfit` package. Tables `outfits` (id, name, createdAt) + `outfit_items` (outfitId,
+entryId, position; PK outfitId+entryId; both FKs ON DELETE CASCADE, index on entryId), Room v6->v7
+`MIGRATION_6_7`. No profile or verdict is stored. `OutfitRepository` (observeOutfits newest first,
+observeOutfit, createOutfit, updateOutfit = name + items replaced in one transaction via the
+existing `TransactionRunner`, deleteOutfit) + `countOutfitsUsing(outfits, entryIds)`. A deleted
+Clothes entry drops out of its outfits through the FK cascade; the outfit stays, with fewer items.
+Backup: optional top-level `outfits` [{id, name, createdAt, items: [history ids]}], not written when
+empty, schema version unchanged; import maps old history ids to new ones (`HistoryDao.insertAll` now
+returns the ids) and drops items whose entry isn't in the backup. Older backups import with none.
+
+Verdicts (`ui/outfits/OutfitRating.kt`, live): `rateOutfit(colors, profile?, wheel)` -> null unless
+2-8 items; Suits you = each item's color through PaletteScorer + ClothingVerdict ->
+`SuitsYouSummary(itemCount, bestCount, avoidIndices)`, row roll-up `overall` = Avoid if any, Yes if
+a majority are Best, else Neither; null without a profile. Works together = `OutfitHarmony.classify`
+on the Settings wheel (level, scheme, odd one out).
+
+UI: Clothes Outfits tab is now `OutfitsTab` (`OutfitsViewModel`): name, strip of item color circles,
+the two verdict icons (bare, accent-colored, like History rows) or "Add items to rate". Its FAB is
+"+ New outfit" (the NavHost switches FAB on `clothesItemsTabShown`). `Destination.OutfitEditor`
+(`outfit_editor?outfitId=&entryIds=`, part of the Clothes tab) -> `OutfitEditorScreen` /
+`OutfitEditorViewModel`: LazyRow item strip (✕ removes; tap selects, then ←/→ move it; the odd one
+out gets an error border), "Items: n/8", profile dropdown (last-used default, switching remembers
+it; `ProfileDropdown` moved to ui/common), Suits-you card ("2 of 3 items are Best colors, 1 to
+avoid" + "Avoid: names") and Works-together card. "Add items" opens a sheet: grid of Clothes items,
+Wardrobe chip on by default + category chips, tap toggles in/out, full at 8. Tick (enabled at 2-8)
+-> `ResultNameDialog` (default "Outfit N", or the saved name when editing, so a blank keeps it);
+delete icon + confirm for saved outfits; back with changes -> "Discard changes?". Save/delete
+finish the screen only after the write, then return to Clothes on the Outfits tab (`KEY_SHOW_OUTFITS`).
+Items multiselect bar: new Make outfit action (1-8 selected) -> editor pre-filled in list order.
+Delete in the Clothes bar now goes through `HistoryViewModel.requestDeleteSelected()`: if any selected
+item is in an outfit, a dialog "Delete N items? Used in M outfits..." comes first; else the old
+undo-snackbar delete. `HistoryThumbnail` moved to ui/common.
+
+Test: `Migration6To7Test`, `DefaultOutfitRepositoryTest` (+ `FakeOutfitDao`), backup outfit round trip
+/ replace / old backup without outfits, serializer round trip + missing key, `OutfitRatingTest`,
+`OutfitEditorViewModelTest` (prefill, add/remove/toggle, 2-8 bounds, reorder, live rating + wheel,
+profile switch, no profiles, picker filters, save new/blank/too few, edit/rename, delete, entry
+deleted meanwhile), `OutfitsViewModelTest`, History delete confirmation (ask / dismiss / no outfits).
+`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint 15, all
+pre-existing); not tried on a device.
+
 ## 2026-09-30 - Issue #45: Scan wardrobe (batch capture of one category)
 
 Entry: a ⋮ menu on the Clothes app bar while the Items tab shows (`HistoryScreen` reports the tab via
@@ -90,28 +133,3 @@ actions Zoom in / Zoom out (×1.5 / ÷1.5, same clamps).
 Test: `CameraZoomTest` (multiply, 1x floor, device max, max below 1x, action round trip).
 `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint: same
 15 warnings); gesture, chip and slider handoff not tried on a device.
-
-## 2026-09-29 - Polish batch: History rows, chip highlight, Find my season, new-profile pulse
-
-Grilled and agreed with the user, one commit each:
-- History rows: names no longer bold; the Object harmony-suggestion row is gone, so both types are
-  name + timestamp at the same height; the clothing verdict is a bare 24dp icon tinted
-  `verdictAccentColor` (success content / error / onSurfaceVariant) instead of the filled badge.
-- History detail chip highlight: the chips were re-extracted from the downscaled JPEG thumbnail,
-  so they never exactly equalled `calibratedArgb`. Entries now store `chipColorsArgb` at save time
-  (Room v4->v5, `MIGRATION_4_5`, column default `''`; optional `chipColors` in the backup JSON,
-  schema version unchanged). Older entries backfill once on open: re-extract, then
-  `ColorExtractor.snapChipsTo` replaces the nearest chip within `CHIP_SNAP_MAX_DELTA_E` (8) with
-  the saved color, and the result is persisted.
-- Find my season result: "CREATE" is a `TextButton` in the app bar; scroll stays as a fallback.
-- Profile names (season dialog, Profile editor) and the History rename bar use
-  `KeyboardCapitalization.Words` (keyboard hint only, not enforced).
-- New profiles pulse in Settings: `ProfileRepository.newProfileId` is a one-shot set by
-  `createProfile` (all three creation flows). Settings waits for RESUMED (so it doesn't fire under
-  the transition to the editor), scrolls the row into view, fades it surfaceContainer ->
-  primaryContainer 3x (300ms each way), then consumes the id.
-- Dropped: skipping the photo picker's "1 / Preview / Done" bar. That bar is the system picker's
-  own single-select UI (`PickVisualMedia` already sends a plain single-select `ACTION_PICK_IMAGES`),
-  and the alternatives (DocumentsUI, in-app gallery with READ_MEDIA_IMAGES) were judged worse.
-
-Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`, not on a device.

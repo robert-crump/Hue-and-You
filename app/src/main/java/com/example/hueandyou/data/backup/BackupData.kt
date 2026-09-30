@@ -6,12 +6,13 @@ import com.example.hueandyou.colorspace.PaletteScore
 import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.data.history.HistoryEntryType
 
-/** The complete dataset a backup covers: settings defaults, profiles with their colors, and history. */
+/** The complete dataset a backup covers: settings defaults, profiles with their colors, history and outfits. */
 data class BackupData(
     val defaultWheel: HarmonyWheel,
     val defaultBalance: HarmonyBalance,
     val profiles: List<BackupProfile>,
     val history: List<BackupHistoryEntry>,
+    val outfits: List<BackupOutfit> = emptyList(),
 )
 
 data class BackupProfile(
@@ -21,6 +22,14 @@ data class BackupProfile(
     val updatedAt: Long,
     val bestColorsArgb: List<Int>,
     val avoidColorsArgb: List<Int>,
+)
+
+/** [entryIds] refer to [BackupHistoryEntry.id]s in the same [BackupData.history] list, in outfit order. */
+data class BackupOutfit(
+    val id: Long,
+    val name: String,
+    val createdAt: Long,
+    val entryIds: List<Long>,
 )
 
 /** [profileId], when present, refers to a [BackupProfile.id] in the same [BackupData.profiles] list. */

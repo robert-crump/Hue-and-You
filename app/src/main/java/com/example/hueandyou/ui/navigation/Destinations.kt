@@ -38,6 +38,17 @@ sealed class Destination(val route: String) {
         const val ARG_CATEGORY = "category"
         fun route(category: ClothingCategory) = "scan_wardrobe/${category.name}"
     }
+    /**
+     * Builds a new outfit (no outfitId), optionally pre-filled with Clothes entries (comma-separated
+     * ids), or edits a saved one.
+     */
+    data object OutfitEditor : Destination("outfit_editor?outfitId={outfitId}&entryIds={entryIds}") {
+        const val ARG_OUTFIT_ID = "outfitId"
+        const val ARG_ENTRY_IDS = "entryIds"
+        const val NO_OUTFIT_ID = -1L
+        fun route(outfitId: Long? = null, entryIds: List<Long> = emptyList()) =
+            "outfit_editor?outfitId=${outfitId ?: NO_OUTFIT_ID}&entryIds=${entryIds.joinToString(",")}"
+    }
 }
 
 /** [screens] are all destinations that keep this tab highlighted, so exactly one tab is always active. */
@@ -55,7 +66,12 @@ val topLevelDestinations = listOf(
         Destination.Clothes.route,
         Icons.Filled.Checkroom,
         R.string.nav_clothes,
-        screens = listOf(Destination.Clothes, Destination.RateClothing, Destination.ScanWardrobe),
+        screens = listOf(
+            Destination.Clothes,
+            Destination.RateClothing,
+            Destination.ScanWardrobe,
+            Destination.OutfitEditor,
+        ),
     ),
     TopLevelDestination(
         Destination.Objects,

@@ -28,12 +28,14 @@ class FakeHistoryDao : HistoryDao {
         return id
     }
 
-    override suspend fun insertAll(entries: List<HistoryEntryEntity>) {
-        entries.forEach { entry ->
+    override suspend fun insertAll(entries: List<HistoryEntryEntity>): List<Long> {
+        val ids = entries.map { entry ->
             val id = nextId++
             this.entries[id] = entry.copy(id = id)
+            id
         }
         emit()
+        return ids
     }
 
     override suspend fun deleteAllEntries() {

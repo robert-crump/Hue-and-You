@@ -4,6 +4,9 @@ import com.example.hueandyou.data.history.HistoryDao
 import com.example.hueandyou.data.history.HistoryEntryEntity
 import com.example.hueandyou.data.history.ThumbnailStore
 import com.example.hueandyou.data.history.toDomain
+import com.example.hueandyou.data.outfit.OutfitDao
+import com.example.hueandyou.data.outfit.OutfitEntity
+import com.example.hueandyou.data.outfit.OutfitItemEntity
 import com.example.hueandyou.data.profile.ColorKind
 import com.example.hueandyou.data.profile.PaletteColorEntity
 import com.example.hueandyou.data.profile.ProfileDao
@@ -14,11 +17,11 @@ import java.time.Instant
 import kotlinx.coroutines.flow.first
 
 interface BackupRepository {
-    /** Serializes the complete dataset (settings, profiles, history, thumbnails) as backup JSON. */
+    /** Serializes the complete dataset (settings, profiles, history, thumbnails, outfits) as backup JSON. */
     suspend fun exportBackup(): String
 
     /**
-     * Replaces all data (settings, profiles, colors, history, thumbnails) with the contents of
+     * Replaces all data (settings, profiles, colors, history, thumbnails, outfits) with the contents of
      * [json], in one atomic operation.
      *
      * @throws BackupImportException if [json] is invalid; when that happens, nothing changes.
@@ -29,6 +32,7 @@ interface BackupRepository {
 class DefaultBackupRepository(
     private val profileDao: ProfileDao,
     private val historyDao: HistoryDao,
+    private val outfitDao: OutfitDao,
     private val settingsRepository: SettingsRepository,
     private val thumbnailStore: ThumbnailStore,
     private val serializer: BackupSerializer,
@@ -73,8 +77,17 @@ class DefaultBackupRepository(
                 category = entry.category,
             )
         }
+        val itemsByOutfit = outfitDao.observeItems().first().groupBy { it.outfitId }
+        val outfits = outfitDao.observeOutfits().first().map { outfit ->
+            BackupOutfit(
+                id = outfit.id,
+                name = outfit.name,
+                createdAt = outfit.createdAt,
+                entryIds = itemsByOutfit[outfit.id].orEmpty().sortedBy { it.position }.map { it.entryId },
+            )
+        }
         return serializer.serialize(
-            BackupData(defaults.wheel, defaults.balance, profiles, history),
+            BackupData(defaults.wheel, defaults.balance, profiles, history, outfits),
             exportedAt = currentInstant(),
         )
     }
@@ -87,6 +100,7 @@ class DefaultBackupRepository(
         val newThumbnailPaths = data.history.map { thumbnailStore.writeBytes(it.thumbnailBytes) }
 
         transactionRunner.runInTransaction {
+            outfitDao.deleteAllOutfits()
             profileDao.deleteAllProfiles()
             historyDao.deleteAllEntries()
 
@@ -148,7 +162,18 @@ class DefaultBackupRepository(
                     category = entry.category,
                 )
             }
-            if (historyEntities.isNotEmpty()) historyDao.insertAll(historyEntities)
+            val newHistoryIds = if (historyEntities.isNotEmpty()) historyDao.insertAll(historyEntities) else emptyList()
+            val historyIdMap = data.history.map { it.id }.zip(newHistoryIds).toMap()
+
+            data.outfits.forEach { outfit ->
+                val newOutfitId = outfitDao.insertOutfit(
+                    OutfitEntity(id = 0, name = outfit.name, createdAt = outfit.createdAt)
+                )
+                // An item whose entry isn't in this backup is dropped, as if that entry had been deleted.
+                val items = outfit.entryIds.mapNotNull { historyIdMap[it] }.distinct()
+                    .mapIndexed { index, entryId -> OutfitItemEntity(newOutfitId, entryId, index) }
+                if (items.isNotEmpty()) outfitDao.insertItems(items)
+            }
 
             settingsRepository.setDefaultWheel(data.defaultWheel)
             settingsRepository.setDefaultBalance(data.defaultBalance)

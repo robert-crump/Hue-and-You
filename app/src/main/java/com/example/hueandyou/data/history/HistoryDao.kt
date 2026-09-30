@@ -19,9 +19,9 @@ interface HistoryDao {
     @Insert
     suspend fun insert(entry: HistoryEntryEntity): Long
 
-    /** Bulk insert, atomic: restoring a backup and saving a wardrobe scan batch. */
+    /** Bulk insert, atomic: restoring a backup and saving a wardrobe scan batch. Returns the new ids in order. */
     @Insert
-    suspend fun insertAll(entries: List<HistoryEntryEntity>)
+    suspend fun insertAll(entries: List<HistoryEntryEntity>): List<Long>
 
     /** Deletes every entry. Used to restore a backup. */
     @Query("DELETE FROM history_entries")

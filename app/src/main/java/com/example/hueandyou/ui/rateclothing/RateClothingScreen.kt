@@ -1,23 +1,18 @@
 package com.example.hueandyou.ui.rateclothing
 
 import android.graphics.Bitmap
-import androidx.compose.foundation.clickable
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +45,7 @@ import com.example.hueandyou.ui.common.ColorChipRow
 import com.example.hueandyou.ui.common.InfoDialog
 import com.example.hueandyou.ui.common.PaletteResultBody
 import com.example.hueandyou.ui.common.PhotoResultSection
+import com.example.hueandyou.ui.common.ProfileDropdown
 import com.example.hueandyou.ui.common.ResultNameDialog
 import com.example.hueandyou.ui.common.WardrobeDetailsEditor
 
@@ -243,40 +239,5 @@ private fun ResultStep(
             modifier = Modifier.padding(top = 16.dp),
         )
         PaletteResultBody(score = score, modifier = Modifier.padding(top = 16.dp))
-    }
-}
-
-/** "For: <name> ▾" - tapping it opens a dropdown menu of every profile to score against. */
-@Composable
-private fun ProfileDropdown(
-    profiles: List<Profile>,
-    selectedProfile: Profile,
-    onSelect: (Profile) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier) {
-        Row(
-            modifier = Modifier.clickable { expanded = true },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(R.string.rate_clothing_for_profile, selectedProfile.name),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            profiles.forEach { profile ->
-                DropdownMenuItem(
-                    text = { Text(profile.name) },
-                    onClick = {
-                        expanded = false
-                        onSelect(profile)
-                    },
-                )
-            }
-        }
     }
 }

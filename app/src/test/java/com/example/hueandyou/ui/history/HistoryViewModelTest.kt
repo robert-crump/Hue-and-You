@@ -8,6 +8,8 @@ import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.NewClothingResult
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
+import com.example.hueandyou.data.outfit.FakeOutfitRepository
+import com.example.hueandyou.data.outfit.Outfit
 import com.example.hueandyou.data.profile.Profile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -215,6 +217,72 @@ class HistoryViewModelTest {
 
         assertEquals(listOf(1L), repository.deletedIds)
         assertEquals(listOf(2L, 3L), states.last().entries.map { it.id }.sorted())
+
+        job.cancel()
+    }
+
+    @Test
+    fun requestDeleteSelected_withItemsInOutfits_asksFirstWithTheOutfitCount() = runTest(dispatcher) {
+        val outfits = FakeOutfitRepository(
+            Outfit(1L, "Work", 0L, listOf(1L, 3L)),
+            Outfit(2L, "Weekend", 0L, listOf(2L, 3L)),
+            Outfit(3L, "Other", 0L, listOf(9L)),
+        )
+        viewModel = HistoryViewModel(repository, outfitRepository = outfits)
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        viewModel.toggleSelected(2L)
+        viewModel.requestDeleteSelected()
+        runCurrent()
+
+        assertEquals(DeleteConfirmation(itemCount = 2, outfitCount = 2), states.last().deleteConfirmation)
+        assertEquals(listOf(1L, 2L, 3L), states.last().entries.map { it.id })
+
+        viewModel.confirmDelete()
+        runCurrent()
+        assertNull(states.last().deleteConfirmation)
+        assertEquals(listOf(3L), states.last().entries.map { it.id })
+
+        job.cancel()
+    }
+
+    @Test
+    fun dismissDeleteConfirmation_keepsTheEntriesAndTheSelection() = runTest(dispatcher) {
+        viewModel = HistoryViewModel(repository, outfitRepository = FakeOutfitRepository(Outfit(1L, "Work", 0L, listOf(1L))))
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        viewModel.requestDeleteSelected()
+        runCurrent()
+        viewModel.dismissDeleteConfirmation()
+        runCurrent()
+
+        assertNull(states.last().deleteConfirmation)
+        assertEquals(setOf(1L), states.last().selectedIds)
+        assertEquals(3, states.last().entries.size)
+
+        job.cancel()
+    }
+
+    @Test
+    fun requestDeleteSelected_withNoItemInAnOutfit_deletesRightAway() = runTest(dispatcher) {
+        viewModel = HistoryViewModel(repository, outfitRepository = FakeOutfitRepository(Outfit(1L, "Work", 0L, listOf(3L))))
+        val states = mutableListOf<HistoryUiState>()
+        val job = launch { viewModel.uiState.toList(states) }
+        runCurrent()
+
+        viewModel.enterSelectionMode(1L)
+        viewModel.requestDeleteSelected()
+        runCurrent()
+
+        assertNull(states.last().deleteConfirmation)
+        assertEquals(listOf(2L, 3L), states.last().entries.map { it.id })
+        assertEquals(PendingDeletion(listOf(1L), "Clothing A"), states.last().pendingDeletion)
 
         job.cancel()
     }

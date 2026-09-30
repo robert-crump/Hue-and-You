@@ -82,6 +82,7 @@ class BackupSerializerTest {
                 chipColorsArgb = listOf(0xFF001122.toInt(), 0xFF334455.toInt(), 0xFFDDEEFF.toInt()),
             ),
         ),
+        outfits = listOf(BackupOutfit(id = 20L, name = "Weekend", createdAt = 5_000L, entryIds = listOf(10L))),
     )
 
     /** Parses [json], applies [mutate] to the top-level object, and re-serializes it. */
@@ -212,6 +213,17 @@ class BackupSerializerTest {
             assertFalse(entry.inWardrobe)
             assertNull(entry.category)
         }
+    }
+
+    @Test
+    fun deserialize_withoutOutfits_defaultsToNoneForOldBackups() {
+        val json = serializer.serialize(sampleData())
+        val withoutOutfits = mutated(json) { obj -> obj.remove("outfits") }
+
+        val restored = serializer.deserialize(withoutOutfits)
+
+        assertTrue(restored.outfits.isEmpty())
+        assertEquals(sampleData().history, restored.history)
     }
 
     @Test

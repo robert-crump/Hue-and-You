@@ -10,12 +10,15 @@ import com.example.hueandyou.HueAndYouApplication
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.HistoryRepository
+import com.example.hueandyou.data.outfit.OutfitRepository
+import com.example.hueandyou.data.outfit.countOutfitsUsing
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -27,6 +30,9 @@ private const val UNDO_WINDOW_MILLIS = 4_000L
 data class PendingDeletion(val entryIds: List<Long>, val entryName: String?) {
     val count: Int get() = entryIds.size
 }
+
+/** Deleting [itemCount] selected items that [outfitCount] outfits use: asked before deleting. */
+data class DeleteConfirmation(val itemCount: Int, val outfitCount: Int)
 
 /** The Clothes Items tab's filter on the "In my wardrobe" flag. */
 enum class WardrobeFilter {
@@ -50,6 +56,7 @@ data class HistoryUiState(
     val pendingDeletion: PendingDeletion? = null,
     val isSelectionMode: Boolean = false,
     val selectedIds: Set<Long> = emptySet(),
+    val deleteConfirmation: DeleteConfirmation? = null,
 ) {
     val isEmpty: Boolean get() = !hasEntries
 }
@@ -57,6 +64,8 @@ data class HistoryUiState(
 class HistoryViewModel(
     private val repository: HistoryRepository,
     private val type: HistoryEntryType? = null,
+    /** Clothes only: to say which outfits a delete touches. Null skips that check. */
+    private val outfitRepository: OutfitRepository? = null,
 ) : ViewModel() {
 
     /**
@@ -74,9 +83,13 @@ class HistoryViewModel(
 
     private val wardrobeFilter = MutableStateFlow(WardrobeFilter.ALL)
 
+    private val deleteConfirmation = MutableStateFlow<DeleteConfirmation?>(null)
+
+    private val selection = combine(selectedIds, deleteConfirmation, ::Pair)
+
     val uiState: StateFlow<HistoryUiState> = combine(
-        repository.observeEntries(), pendingBatches, deletedIds, selectedIds, wardrobeFilter
-    ) { entries, batches, deleted, selected, filter ->
+        repository.observeEntries(), pendingBatches, deletedIds, selection, wardrobeFilter
+    ) { entries, batches, deleted, (selected, confirmation), filter ->
         val pendingIds = batches.flatten().mapTo(HashSet()) { it.id }
         val listed = entries.filter { (type == null || it.type == type) && it.id !in pendingIds && it.id !in deleted }
         HistoryUiState(
@@ -88,6 +101,7 @@ class HistoryViewModel(
             },
             isSelectionMode = selected != null,
             selectedIds = selected.orEmpty(),
+            deleteConfirmation = confirmation,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
 
@@ -110,6 +124,34 @@ class HistoryViewModel(
     /** Close (X), back, or leaving the tab: exits selection mode and clears all selections. */
     fun exitSelectionMode() {
         selectedIds.value = null
+    }
+
+    /**
+     * The selection bar's delete: when any selected item is in an outfit, asks first via
+     * [HistoryUiState.deleteConfirmation] ("Used in N outfits"); otherwise deletes right away.
+     */
+    fun requestDeleteSelected() {
+        val selected = selectedIds.value ?: return
+        val outfitRepository = outfitRepository ?: return deleteSelected()
+        viewModelScope.launch {
+            val outfitCount = countOutfitsUsing(outfitRepository.observeOutfits().first(), selected)
+            if (outfitCount > 0) {
+                deleteConfirmation.value = DeleteConfirmation(selected.size, outfitCount)
+            } else {
+                deleteSelected()
+            }
+        }
+    }
+
+    /** The confirmation's Delete. */
+    fun confirmDelete() {
+        deleteConfirmation.value = null
+        deleteSelected()
+    }
+
+    /** The confirmation's Cancel: the selection stays. */
+    fun dismissDeleteConfirmation() {
+        deleteConfirmation.value = null
     }
 
     /** Hides every selected entry immediately as one undoable batch and exits selection mode. */
@@ -140,9 +182,12 @@ class HistoryViewModel(
     companion object {
         fun factory(context: Context, type: HistoryEntryType? = null): ViewModelProvider.Factory = viewModelFactory {
             initializer {
-                val repository = (context.applicationContext as HueAndYouApplication)
-                    .container.historyRepository
-                HistoryViewModel(repository, type)
+                val container = (context.applicationContext as HueAndYouApplication).container
+                HistoryViewModel(
+                    repository = container.historyRepository,
+                    type = type,
+                    outfitRepository = container.outfitRepository.takeIf { type == HistoryEntryType.CLOTHING },
+                )
             }
         }
     }

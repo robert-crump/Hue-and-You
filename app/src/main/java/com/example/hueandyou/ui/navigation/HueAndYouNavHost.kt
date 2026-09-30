@@ -21,6 +21,8 @@ import com.example.hueandyou.data.history.ClothingCategory
 import com.example.hueandyou.ui.scanwardrobe.ScanCategorySheet
 import com.example.hueandyou.ui.scanwardrobe.ScanWardrobeScreen
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Style
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.LargeFloatingActionButton
@@ -63,6 +65,8 @@ import com.example.hueandyou.ui.history.HistoryDetailScreen
 import com.example.hueandyou.ui.history.HistoryScreen
 import com.example.hueandyou.ui.history.HistorySelectionBarState
 import com.example.hueandyou.ui.matchcolors.MatchObjectScreen
+import com.example.hueandyou.ui.outfits.OUTFIT_MAX_ITEMS
+import com.example.hueandyou.ui.outfits.OutfitEditorScreen
 import com.example.hueandyou.ui.paletteimport.PaletteImportScreen
 import com.example.hueandyou.ui.profiles.ProfileEditorScreen
 import com.example.hueandyou.ui.rateclothing.RateClothingScreen
@@ -71,6 +75,7 @@ import com.example.hueandyou.ui.settings.SettingsScreen
 
 private const val KEY_SCROLL_HISTORY_TO_TOP = "scrollHistoryToTop"
 private const val KEY_SHOW_WARDROBE = "showWardrobe"
+private const val KEY_SHOW_OUTFITS = "showOutfits"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +96,14 @@ fun HueAndYouNavHost() {
         finishResult()
     }
 
-    // Clothes only: the Items tab has the overflow menu, the Outfits tab doesn't.
+    // A saved or deleted outfit: back to Clothes, on the Outfits tab.
+    val finishOutfit: () -> Unit = {
+        runCatching { navController.getBackStackEntry(Destination.Clothes.route) }.getOrNull()
+            ?.savedStateHandle?.set(KEY_SHOW_OUTFITS, true)
+        navController.popBackStack(Destination.Clothes.route, inclusive = false)
+    }
+
+    // Clothes only: the Items tab has the overflow menu and the camera FAB, the Outfits tab a new-outfit FAB.
     var clothesItemsTabShown by remember { mutableStateOf(true) }
     var showScanCategorySheet by remember { mutableStateOf(false) }
 
@@ -148,6 +160,14 @@ fun HueAndYouNavHost() {
                                 }
                             },
                             actions = {
+                                selection.onMakeOutfit?.let { onMakeOutfit ->
+                                    IconButton(onClick = onMakeOutfit, enabled = selection.count in 1..OUTFIT_MAX_ITEMS) {
+                                        Icon(
+                                            Icons.Filled.Style,
+                                            contentDescription = stringResource(R.string.history_selection_make_outfit_content_description)
+                                        )
+                                    }
+                                }
                                 IconButton(onClick = selection.onDelete, enabled = selection.count > 0) {
                                     Icon(
                                         Icons.Filled.Delete,
@@ -212,20 +232,24 @@ fun HueAndYouNavHost() {
             }
         },
         floatingActionButton = {
-            val fabTarget = when {
+            val newOutfit = currentRoute == Destination.Clothes.route && !clothesItemsTabShown
+            val fabRoute = when {
                 historySelection != null -> null
-                currentRoute == Destination.Clothes.route -> Destination.RateClothing
-                currentRoute == Destination.Objects.route -> Destination.MatchObject
+                newOutfit -> Destination.OutfitEditor.route()
+                currentRoute == Destination.Clothes.route -> Destination.RateClothing.route
+                currentRoute == Destination.Objects.route -> Destination.MatchObject.route
                 else -> null
             }
-            if (fabTarget != null) {
+            if (fabRoute != null) {
                 LargeFloatingActionButton(
-                    onClick = { navController.navigate(fabTarget.route) },
+                    onClick = { navController.navigate(fabRoute) },
                     modifier = Modifier.offset(y = fabOffset)
                 ) {
                     Icon(
-                        Icons.Filled.PhotoCamera,
-                        contentDescription = stringResource(R.string.history_fab_content_description),
+                        if (newOutfit) Icons.Filled.Add else Icons.Filled.PhotoCamera,
+                        contentDescription = stringResource(
+                            if (newOutfit) R.string.outfits_fab_content_description else R.string.history_fab_content_description
+                        ),
                         modifier = Modifier.size(FloatingActionButtonDefaults.LargeIconSize)
                     )
                 }
@@ -248,6 +272,9 @@ fun HueAndYouNavHost() {
                     val showWardrobe by historyEntry.savedStateHandle
                         .getStateFlow(KEY_SHOW_WARDROBE, false)
                         .collectAsState()
+                    val showOutfits by historyEntry.savedStateHandle
+                        .getStateFlow(KEY_SHOW_OUTFITS, false)
+                        .collectAsState()
                     HistoryScreen(
                         type = type,
                         scrollToTopRequested = scrollToTop,
@@ -255,6 +282,14 @@ fun HueAndYouNavHost() {
                         showWardrobeRequested = showWardrobe,
                         onShowedWardrobe = { historyEntry.savedStateHandle[KEY_SHOW_WARDROBE] = false },
                         onItemsTabShownChange = { clothesItemsTabShown = it },
+                        showOutfitsRequested = showOutfits,
+                        onShowedOutfits = { historyEntry.savedStateHandle[KEY_SHOW_OUTFITS] = false },
+                        onMakeOutfit = { entryIds ->
+                            navController.navigate(Destination.OutfitEditor.route(entryIds = entryIds))
+                        },
+                        onOpenOutfit = { outfitId ->
+                            navController.navigate(Destination.OutfitEditor.route(outfitId = outfitId))
+                        },
                         onSnackbarHeightChange = { snackbarHeightPx = it },
                         onSelectionChange = { historySelection = it },
                         onOpenEntry = { entryId ->
@@ -370,6 +405,31 @@ fun HueAndYouNavHost() {
                     category = category,
                     onNavigateBack = { navController.popBackStack() },
                     onSaved = finishWardrobeScan,
+                )
+            }
+            composable(
+                Destination.OutfitEditor.route,
+                arguments = listOf(
+                    navArgument(Destination.OutfitEditor.ARG_OUTFIT_ID) {
+                        type = NavType.LongType
+                        defaultValue = Destination.OutfitEditor.NO_OUTFIT_ID
+                    },
+                    navArgument(Destination.OutfitEditor.ARG_ENTRY_IDS) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                )
+            ) { backStackEntry ->
+                val arguments = backStackEntry.arguments
+                val outfitId = arguments?.getLong(Destination.OutfitEditor.ARG_OUTFIT_ID)
+                    ?.takeIf { it != Destination.OutfitEditor.NO_OUTFIT_ID }
+                val entryIds = arguments?.getString(Destination.OutfitEditor.ARG_ENTRY_IDS).orEmpty()
+                    .split(",").mapNotNull { it.toLongOrNull() }
+                OutfitEditorScreen(
+                    outfitId = outfitId,
+                    initialEntryIds = entryIds,
+                    onNavigateBack = { navController.popBackStack() },
+                    onFinished = finishOutfit,
                 )
             }
         }

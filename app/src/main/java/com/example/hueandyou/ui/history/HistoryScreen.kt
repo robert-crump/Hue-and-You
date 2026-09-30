@@ -1,8 +1,6 @@
 package com.example.hueandyou.ui.history
 
-import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -22,11 +20,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +35,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +43,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -58,9 +55,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -77,18 +71,26 @@ import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.ClothingVerdict
 import com.example.hueandyou.data.history.HistoryEntry
 import com.example.hueandyou.data.history.HistoryEntryType
+import com.example.hueandyou.ui.common.HistoryThumbnail
 import com.example.hueandyou.ui.common.verdictAccentColor
 import com.example.hueandyou.ui.common.verdictIcon
 import com.example.hueandyou.ui.common.verdictLabel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.example.hueandyou.ui.outfits.OutfitsTab
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-/** What the NavHost needs to swap its tab bar for History's contextual selection bar. */
-data class HistorySelectionBarState(val count: Int, val onClose: () -> Unit, val onDelete: () -> Unit)
+/**
+ * What the NavHost needs to swap its tab bar for History's contextual selection bar.
+ * [onMakeOutfit] is null except on Clothes.
+ */
+data class HistorySelectionBarState(
+    val count: Int,
+    val onClose: () -> Unit,
+    val onDelete: () -> Unit,
+    val onMakeOutfit: (() -> Unit)? = null,
+)
 
 @Composable
 fun HistoryScreen(
@@ -103,6 +105,12 @@ fun HistoryScreen(
     onShowedWardrobe: () -> Unit = {},
     /** Clothes only: whether Items (rather than Outfits) is the tab showing. */
     onItemsTabShownChange: (Boolean) -> Unit = {},
+    /** Clothes only: switch to the Outfits tab, e.g. after an outfit is saved. */
+    showOutfitsRequested: Boolean = false,
+    onShowedOutfits: () -> Unit = {},
+    /** Clothes only: opens the outfit editor pre-filled with these items, in list order. */
+    onMakeOutfit: (List<Long>) -> Unit = {},
+    onOpenOutfit: (Long) -> Unit = {},
     viewModel: HistoryViewModel = viewModel(key = type.name, factory = HistoryViewModel.factory(LocalContext.current, type)),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -122,13 +130,23 @@ fun HistoryScreen(
     BackHandler(enabled = uiState.isSelectionMode) { viewModel.exitSelectionMode() }
 
     // The contextual bar lives in the NavHost's Scaffold, so the selection is reported up to it.
-    LaunchedEffect(uiState.isSelectionMode, uiState.selectedIds.size) {
+    LaunchedEffect(uiState.isSelectionMode, uiState.selectedIds, uiState.entries) {
         onSelectionChange(
             if (uiState.isSelectionMode) {
                 HistorySelectionBarState(
                     count = uiState.selectedIds.size,
                     onClose = viewModel::exitSelectionMode,
-                    onDelete = viewModel::deleteSelected
+                    onDelete = viewModel::requestDeleteSelected,
+                    onMakeOutfit = if (type == HistoryEntryType.CLOTHING) {
+                        {
+                            val selected = uiState.selectedIds
+                            val ids = uiState.entries.filter { it.id in selected }.map { it.id }
+                            viewModel.exitSelectionMode()
+                            onMakeOutfit(ids)
+                        }
+                    } else {
+                        null
+                    }
                 )
             } else {
                 null
@@ -168,6 +186,13 @@ fun HistoryScreen(
         showOutfits = false
         viewModel.setWardrobeFilter(WardrobeFilter.WARDROBE)
         onShowedWardrobe()
+    }
+
+    LaunchedEffect(showOutfitsRequested) {
+        if (!showOutfitsRequested) return@LaunchedEffect
+        viewModel.exitSelectionMode()
+        showOutfits = true
+        onShowedOutfits()
     }
 
     LaunchedEffect(scrollToTopRequested) {
@@ -239,12 +264,38 @@ fun HistoryScreen(
                             text = { Text(stringResource(R.string.clothes_tab_outfits)) }
                         )
                     }
-                    if (showOutfits) OutfitsEmptyState() else entryList()
+                    if (showOutfits) OutfitsTab(onOpenOutfit = onOpenOutfit) else entryList()
                 }
             } else {
                 entryList()
             }
         }
+    }
+
+    uiState.deleteConfirmation?.let { confirmation ->
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDeleteConfirmation,
+            title = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.history_delete_confirm_title, confirmation.itemCount, confirmation.itemCount
+                    )
+                )
+            },
+            text = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.history_delete_used_in_outfits, confirmation.outfitCount, confirmation.outfitCount
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmDelete) { Text(stringResource(R.string.history_delete_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDeleteConfirmation) { Text(stringResource(R.string.dialog_cancel)) }
+            },
+        )
     }
 }
 
@@ -275,28 +326,6 @@ private fun WardrobeFilterRow(selected: WardrobeFilter, onSelect: (WardrobeFilte
                 }
             )
         }
-    }
-}
-
-@Composable
-private fun OutfitsEmptyState() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            Icons.Filled.Checkroom,
-            contentDescription = null,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Text(
-            text = stringResource(R.string.clothes_outfits_empty_title),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
     }
 }
 
@@ -440,23 +469,6 @@ private fun SummaryCircle(argb: Int, size: Dp? = null) {
             .background(Color(argb))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
     )
-}
-
-@Composable
-private fun HistoryThumbnail(path: String) {
-    val imageBitmap by produceState<ImageBitmap?>(initialValue = null, key1 = path) {
-        value = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(path)?.asImageBitmap() }
-    }
-    imageBitmap?.let { bitmap ->
-        Image(
-            bitmap = bitmap,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(8.dp))
-        )
-    }
 }
 
 private val historyTimestampFormatter: DateTimeFormatter =

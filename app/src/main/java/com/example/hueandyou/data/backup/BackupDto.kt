@@ -13,6 +13,17 @@ internal data class BackupDocumentDto(
     val settings: BackupSettingsDto,
     val profiles: List<BackupProfileDto>,
     val history: List<BackupHistoryDto>,
+    /** Absent in older backups, which import with no outfits. */
+    val outfits: List<BackupOutfitDto> = emptyList(),
+)
+
+/** [items] are history entry ids from the same document, in outfit order. */
+@Serializable
+internal data class BackupOutfitDto(
+    val id: Long,
+    val name: String,
+    val createdAt: Long,
+    val items: List<Long> = emptyList(),
 )
 
 @Serializable

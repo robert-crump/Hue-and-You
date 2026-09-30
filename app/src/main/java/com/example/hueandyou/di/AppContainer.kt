@@ -13,10 +13,13 @@ import com.example.hueandyou.data.history.DefaultHistoryRepository
 import com.example.hueandyou.data.history.FileThumbnailStore
 import com.example.hueandyou.data.history.HistoryRepository
 import com.example.hueandyou.data.history.ThumbnailStore
+import com.example.hueandyou.data.outfit.DefaultOutfitRepository
+import com.example.hueandyou.data.outfit.OutfitRepository
 import com.example.hueandyou.data.profile.HueAndYouDatabase
 import com.example.hueandyou.data.profile.MIGRATION_3_4
 import com.example.hueandyou.data.profile.MIGRATION_4_5
 import com.example.hueandyou.data.profile.MIGRATION_5_6
+import com.example.hueandyou.data.profile.MIGRATION_6_7
 import com.example.hueandyou.data.profile.ProfileRepository
 import com.example.hueandyou.data.profile.RoomProfileRepository
 import com.example.hueandyou.data.settings.DataStoreSettingsRepository
@@ -36,6 +39,7 @@ interface AppContainer {
     val settingsDataStore: DataStore<Preferences>
     val profileRepository: ProfileRepository
     val historyRepository: HistoryRepository
+    val outfitRepository: OutfitRepository
     val thumbnailStore: ThumbnailStore
     val settingsRepository: SettingsRepository
     val shareCardRenderer: ShareCardRenderer
@@ -47,7 +51,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
 
     private val database: HueAndYouDatabase by lazy {
         Room.databaseBuilder(context, HueAndYouDatabase::class.java, "hue_and_you.db")
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
@@ -64,6 +68,10 @@ class DefaultAppContainer(context: Context) : AppContainer {
         DefaultHistoryRepository(database.historyDao(), thumbnailStore)
     }
 
+    override val outfitRepository: OutfitRepository by lazy {
+        DefaultOutfitRepository(database.outfitDao(), RoomTransactionRunner(database))
+    }
+
     override val settingsRepository: SettingsRepository by lazy {
         DataStoreSettingsRepository(settingsDataStore)
     }
@@ -76,6 +84,7 @@ class DefaultAppContainer(context: Context) : AppContainer {
         DefaultBackupRepository(
             profileDao = database.profileDao(),
             historyDao = database.historyDao(),
+            outfitDao = database.outfitDao(),
             settingsRepository = settingsRepository,
             thumbnailStore = thumbnailStore,
             serializer = JsonBackupSerializer(),

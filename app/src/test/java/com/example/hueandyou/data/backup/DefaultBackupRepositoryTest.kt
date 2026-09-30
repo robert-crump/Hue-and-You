@@ -8,6 +8,9 @@ import com.example.hueandyou.data.history.FakeHistoryDao
 import com.example.hueandyou.data.history.HistoryEntryEntity
 import com.example.hueandyou.data.history.HistoryEntryType
 import com.example.hueandyou.data.history.ThumbnailStore
+import com.example.hueandyou.data.outfit.FakeOutfitDao
+import com.example.hueandyou.data.outfit.OutfitEntity
+import com.example.hueandyou.data.outfit.OutfitItemEntity
 import com.example.hueandyou.data.profile.ColorKind
 import com.example.hueandyou.data.profile.FakeProfileDao
 import com.example.hueandyou.data.profile.PaletteColorEntity
@@ -28,12 +31,14 @@ class DefaultBackupRepositoryTest {
 
     private lateinit var sourceProfileDao: FakeProfileDao
     private lateinit var sourceHistoryDao: FakeHistoryDao
+    private lateinit var sourceOutfitDao: FakeOutfitDao
     private lateinit var sourceSettings: SettingsRepository
     private lateinit var sourceThumbnails: FakeThumbnailStore
     private lateinit var sourceRepository: DefaultBackupRepository
 
     private lateinit var targetProfileDao: FakeProfileDao
     private lateinit var targetHistoryDao: FakeHistoryDao
+    private lateinit var targetOutfitDao: FakeOutfitDao
     private lateinit var targetSettings: SettingsRepository
     private lateinit var targetThumbnails: FakeThumbnailStore
     private lateinit var targetRepository: DefaultBackupRepository
@@ -47,19 +52,21 @@ class DefaultBackupRepositoryTest {
     fun setUp() {
         sourceProfileDao = FakeProfileDao()
         sourceHistoryDao = FakeHistoryDao()
+        sourceOutfitDao = FakeOutfitDao()
         sourceSettings = DataStoreSettingsRepository(tempDataStore("backup_source"))
         sourceThumbnails = FakeThumbnailStore()
         sourceRepository = DefaultBackupRepository(
-            sourceProfileDao, sourceHistoryDao, sourceSettings, sourceThumbnails,
+            sourceProfileDao, sourceHistoryDao, sourceOutfitDao, sourceSettings, sourceThumbnails,
             serializer, passthroughTransactionRunner,
         )
 
         targetProfileDao = FakeProfileDao()
         targetHistoryDao = FakeHistoryDao()
+        targetOutfitDao = FakeOutfitDao()
         targetSettings = DataStoreSettingsRepository(tempDataStore("backup_target"))
         targetThumbnails = FakeThumbnailStore()
         targetRepository = DefaultBackupRepository(
-            targetProfileDao, targetHistoryDao, targetSettings, targetThumbnails,
+            targetProfileDao, targetHistoryDao, targetOutfitDao, targetSettings, targetThumbnails,
             serializer, passthroughTransactionRunner,
         )
     }
@@ -152,6 +159,72 @@ class DefaultBackupRepositoryTest {
             val expectedBytes = if (entity.name == "Clothing") byteArrayOf(1, 2, 3) else byteArrayOf(4, 5, 6)
             assertArrayEquals(expectedBytes, targetThumbnails.readBytes(entity.thumbnailPath))
         }
+    }
+
+    @Test
+    fun exportThenImport_restoresOutfitsWithTheirItemsInOrder_pointingAtTheImportedEntries() = runBlocking {
+        val shirt = sourceHistoryDao.insert(clothing("Shirt", createdAt = 1_000L, path = "shirt.jpg"))
+        val jeans = sourceHistoryDao.insert(clothing("Jeans", createdAt = 2_000L, path = "jeans.jpg"))
+        val shoes = sourceHistoryDao.insert(clothing("Shoes", createdAt = 3_000L, path = "shoes.jpg"))
+        val weekend = sourceOutfitDao.insertOutfit(OutfitEntity(name = "Weekend", createdAt = 5_000L))
+        sourceOutfitDao.insertItems(
+            listOf(OutfitItemEntity(weekend, shoes, 0), OutfitItemEntity(weekend, shirt, 1), OutfitItemEntity(weekend, jeans, 2))
+        )
+        val empty = sourceOutfitDao.insertOutfit(OutfitEntity(name = "Empty", createdAt = 4_000L))
+        sourceOutfitDao.insertItems(listOf(OutfitItemEntity(empty, jeans, 0)))
+
+        targetRepository.importBackup(sourceRepository.exportBackup())
+
+        val targetNames = targetHistoryDao.observeEntries().first().associate { it.id to it.name }
+        val targetOutfits = targetOutfitDao.observeOutfits().first()
+        assertEquals(listOf("Weekend" to 5_000L, "Empty" to 4_000L), targetOutfits.map { it.name to it.createdAt })
+        val targetItems = targetOutfitDao.observeItems().first()
+        fun namesIn(outfitId: Long) = targetItems.filter { it.outfitId == outfitId }
+            .sortedBy { it.position }.map { targetNames.getValue(it.entryId) }
+        assertEquals(listOf("Shoes", "Shirt", "Jeans"), namesIn(targetOutfits[0].id))
+        assertEquals(listOf("Jeans"), namesIn(targetOutfits[1].id))
+    }
+
+    @Test
+    fun importBackup_replacesExistingOutfits() = runBlocking {
+        targetOutfitDao.insertOutfit(OutfitEntity(name = "Old", createdAt = 1L))
+
+        targetRepository.importBackup(sourceRepository.exportBackup())
+
+        assertEquals(emptyList<OutfitEntity>(), targetOutfitDao.observeOutfits().first())
+    }
+
+    @Test
+    fun importBackup_withoutOutfits_asInOlderBackups_importsTheRestWithNoOutfits() = runBlocking {
+        sourceHistoryDao.insert(clothing("Shirt", createdAt = 1_000L, path = "shirt.jpg"))
+        // Defaults aren't written, so with no outfits the export has no "outfits" key, like an older backup.
+        val json = sourceRepository.exportBackup()
+        check("outfits" !in json)
+
+        targetRepository.importBackup(json)
+
+        assertEquals(listOf("Shirt"), targetHistoryDao.observeEntries().first().map { it.name })
+        assertEquals(emptyList<OutfitEntity>(), targetOutfitDao.observeOutfits().first())
+    }
+
+    private fun clothing(name: String, createdAt: Long, path: String): HistoryEntryEntity {
+        sourceThumbnails.seed(path, byteArrayOf(1))
+        return HistoryEntryEntity(
+            type = HistoryEntryType.CLOTHING,
+            name = name,
+            createdAt = createdAt,
+            thumbnailPath = path,
+            calibratedArgb = 0xFF112233.toInt(),
+            profileId = null,
+            profileName = null,
+            bestColorsArgb = emptyList(),
+            avoidColorsArgb = emptyList(),
+            nearestBestArgb = null,
+            nearestBestDeltaE = null,
+            nearestAvoidArgb = null,
+            nearestAvoidDeltaE = null,
+            closerToAvoid = false,
+        )
     }
 
     @Test
