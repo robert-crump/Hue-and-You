@@ -21,6 +21,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -39,7 +40,7 @@ class MatchObjectViewModelTest {
     fun tearDown() = Dispatchers.resetMain()
 
     @Test
-    fun extractAndSaveResult_showsSpinnerImmediately_extractsOffMainThread_andSavesOneColor() {
+    fun extractResult_showsSpinnerImmediately_extractsOffMainThread_andSavesNothing() {
         val extractionThreadNames = mutableListOf<String>()
         val bitmap = allocateWithoutConstructor(Bitmap::class.java)
         val mainColor = 0xFF336699.toInt()
@@ -55,7 +56,7 @@ class MatchObjectViewModelTest {
             },
         )
 
-        invokeExtractAndSaveResult(viewModel, bitmap)
+        invokeExtractResult(viewModel, bitmap)
 
         // Nothing has run yet: the caller only flipped state and queued the work.
         assertEquals(MatchObjectUiState.ExtractingColors, viewModel.uiState.value)
@@ -68,12 +69,37 @@ class MatchObjectViewModelTest {
         assertTrue(state is MatchObjectUiState.ShowingResult)
         state as MatchObjectUiState.ShowingResult
         assertEquals(mainColor, state.inputColorArgb)
-        assertEquals(listOf(mainColor), historyRepository.savedInputColors)
-        assertEquals(state.chipColorsArgb, historyRepository.savedChipColors)
+        // Only the tick saves.
+        assertNull(historyRepository.savedInputColors)
     }
 
     @Test
-    fun pickCandidate_updatesStateInstantlyAndPersistsToTheSameEntry() {
+    fun pickCandidate_updatesStateInstantly() {
+        val red = 0xFFFF0000.toInt()
+        val blue = 0xFF0000FF.toInt()
+        val viewModel = MatchObjectViewModel(
+            historyRepository = FakeHistoryRepository(),
+            thumbnailStore = FakeThumbnailStore(),
+            settingsRepository = FakeSettingsRepository(),
+            backgroundDispatcher = backgroundDispatcher,
+            pixelSourceOf = { twoColorPixelSource(red, blue) },
+        )
+        invokeExtractResult(viewModel, allocateWithoutConstructor(Bitmap::class.java))
+        mainDispatcher.scheduler.runCurrent()
+        val initial = viewModel.uiState.value as MatchObjectUiState.ShowingResult
+        assertEquals(red, initial.inputColorArgb)
+        assertEquals(listOf(red, blue), initial.chipColorsArgb)
+
+        viewModel.pickCandidate(blue)
+
+        val afterPick = viewModel.uiState.value as MatchObjectUiState.ShowingResult
+        assertEquals(blue, afterPick.inputColorArgb)
+        // The chip row stays put; only the highlight (the current color) moves.
+        assertEquals(listOf(red, blue), afterPick.chipColorsArgb)
+    }
+
+    @Test
+    fun save_persistsTheCurrentPickUnderTheGivenName_thenReportsSaved() {
         val red = 0xFFFF0000.toInt()
         val blue = 0xFF0000FF.toInt()
         val historyRepository = FakeHistoryRepository()
@@ -84,40 +110,37 @@ class MatchObjectViewModelTest {
             backgroundDispatcher = backgroundDispatcher,
             pixelSourceOf = { twoColorPixelSource(red, blue) },
         )
-        invokeExtractAndSaveResult(viewModel, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(viewModel, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
-        val initial = viewModel.uiState.value as MatchObjectUiState.ShowingResult
-        assertEquals(red, initial.inputColorArgb)
-        assertEquals(listOf(red, blue), initial.chipColorsArgb)
-
         viewModel.pickCandidate(blue)
 
-        // The state updates synchronously; only persistence needs the coroutine to run.
-        val afterPick = viewModel.uiState.value as MatchObjectUiState.ShowingResult
-        assertEquals(blue, afterPick.inputColorArgb)
-        // The chip row stays put; only the highlight (the current color) moves.
-        assertEquals(listOf(red, blue), afterPick.chipColorsArgb)
-        assertEquals(initial.historyEntryId, afterPick.historyEntryId)
-
+        viewModel.save("Blue Mug")
         mainDispatcher.scheduler.runCurrent()
-        assertEquals(Triple(initial.historyEntryId, blue, null to null), historyRepository.lastObjectPick)
+
+        assertEquals(listOf(blue), historyRepository.savedInputColors)
+        assertEquals(listOf(red, blue), historyRepository.savedChipColors)
+        assertEquals("Blue Mug", historyRepository.savedName)
+        assertEquals(MatchObjectUiState.Saved, viewModel.uiState.value)
     }
 
     @Test
-    fun startNewPhoto_returnsToViewfinder() {
+    fun retakePhoto_returnsToViewfinderWithoutSaving() {
+        val historyRepository = FakeHistoryRepository()
         val viewModel = MatchObjectViewModel(
-            historyRepository = FakeHistoryRepository(),
+            historyRepository = historyRepository,
             thumbnailStore = FakeThumbnailStore(),
             settingsRepository = FakeSettingsRepository(),
             backgroundDispatcher = backgroundDispatcher,
             pixelSourceOf = { twoColorPixelSource(0xFFFF0000.toInt(), 0xFF0000FF.toInt()) },
         )
-        invokeExtractAndSaveResult(viewModel, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(viewModel, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
 
-        viewModel.startNewPhoto()
+        viewModel.retakePhoto()
+        mainDispatcher.scheduler.runCurrent()
 
         assertEquals(MatchObjectUiState.PickingPhoto, viewModel.uiState.value)
+        assertNull(historyRepository.savedInputColors)
     }
 
     /**
@@ -137,9 +160,9 @@ class MatchObjectViewModelTest {
         )
     }
 
-    private fun invokeExtractAndSaveResult(viewModel: MatchObjectViewModel, bitmap: Bitmap) {
+    private fun invokeExtractResult(viewModel: MatchObjectViewModel, bitmap: Bitmap) {
         val method: Method = MatchObjectViewModel::class.java.getDeclaredMethod(
-            "extractAndSaveResult",
+            "extractResult",
             Bitmap::class.java,
         )
         method.isAccessible = true
@@ -157,7 +180,7 @@ class MatchObjectViewModelTest {
     private class FakeHistoryRepository : HistoryRepository {
         var savedInputColors: List<Int>? = null
         var savedChipColors: List<Int>? = null
-        var lastObjectPick: Triple<Long, Int, Pair<Double?, Double?>>? = null
+        var savedName: String? = null
 
         override fun observeEntries() = throw UnsupportedOperationException("not used by this test")
         override fun observeEntry(entryId: Long) = throw UnsupportedOperationException("not used by this test")
@@ -168,6 +191,7 @@ class MatchObjectViewModelTest {
             profile: Profile?,
             score: PaletteScore,
             chipColorsArgb: List<Int>,
+            name: String,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun saveObjectResult(
@@ -176,13 +200,15 @@ class MatchObjectViewModelTest {
             wheel: HarmonyWheel,
             balance: HarmonyBalance,
             chipColorsArgb: List<Int>,
+            name: String,
         ): HistoryEntry {
             savedInputColors = inputColorsArgb
             savedChipColors = chipColorsArgb
+            savedName = name
             return HistoryEntry(
                 id = 1L,
                 type = HistoryEntryType.OBJECT,
-                name = "Object",
+                name = name,
                 createdAt = 0L,
                 thumbnailPath = thumbnailPath,
                 calibratedArgb = inputColorsArgb.first(),
@@ -202,7 +228,7 @@ class MatchObjectViewModelTest {
         }
 
         override suspend fun updateObjectPick(entryId: Long, argb: Int, sampleX: Double?, sampleY: Double?) {
-            lastObjectPick = Triple(entryId, argb, sampleX to sampleY)
+            throw UnsupportedOperationException("not used by this test")
         }
 
         override suspend fun updateClothingPick(

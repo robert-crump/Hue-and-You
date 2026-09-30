@@ -18,6 +18,7 @@ interface HistoryRepository {
         profile: Profile?,
         score: PaletteScore,
         chipColorsArgb: List<Int>,
+        name: String = defaultHistoryEntryName(HistoryEntryType.CLOTHING),
     ): HistoryEntry
 
     /** Saves a Match Colors for an Object result as a new history entry and returns it. */
@@ -27,6 +28,7 @@ interface HistoryRepository {
         wheel: HarmonyWheel,
         balance: HarmonyBalance,
         chipColorsArgb: List<Int>,
+        name: String = defaultHistoryEntryName(HistoryEntryType.OBJECT),
     ): HistoryEntry
 
     suspend fun renameEntry(entryId: Long, name: String)
@@ -65,12 +67,13 @@ class DefaultHistoryRepository(
         profile: Profile?,
         score: PaletteScore,
         chipColorsArgb: List<Int>,
+        name: String,
     ): HistoryEntry {
         val now = currentTimeMillis()
         val entry = HistoryEntry(
             id = 0,
             type = HistoryEntryType.CLOTHING,
-            name = defaultHistoryEntryName(HistoryEntryType.CLOTHING),
+            name = name,
             createdAt = now,
             thumbnailPath = thumbnailPath,
             calibratedArgb = calibratedArgb,
@@ -91,13 +94,14 @@ class DefaultHistoryRepository(
         wheel: HarmonyWheel,
         balance: HarmonyBalance,
         chipColorsArgb: List<Int>,
+        name: String,
     ): HistoryEntry {
         require(inputColorsArgb.isNotEmpty()) { "At least one input color is required" }
         val now = currentTimeMillis()
         val entry = HistoryEntry(
             id = 0,
             type = HistoryEntryType.OBJECT,
-            name = defaultHistoryEntryName(HistoryEntryType.OBJECT),
+            name = name,
             createdAt = now,
             thumbnailPath = thumbnailPath,
             calibratedArgb = inputColorsArgb.first(),

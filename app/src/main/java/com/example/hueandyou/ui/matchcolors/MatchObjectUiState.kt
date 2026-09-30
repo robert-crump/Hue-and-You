@@ -16,6 +16,8 @@ sealed interface MatchObjectUiState {
         val chipColorsArgb: List<Int>,
         val wheel: HarmonyWheel,
         val balance: HarmonyBalance,
-        val historyEntryId: Long,
     ) : MatchObjectUiState
+
+    /** The result was saved to History; the screen closes. */
+    data object Saved : MatchObjectUiState
 }

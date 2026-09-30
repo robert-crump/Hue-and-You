@@ -19,6 +19,7 @@ import com.example.hueandyou.data.settings.SettingsRepository
 import com.example.hueandyou.ui.common.toPixelSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,45 +57,37 @@ class MatchObjectViewModel(
     /** Every candidate color from the current photo's center-box extraction, ranked by share. */
     private var candidates: List<Int> = emptyList()
 
+    private var saveJob: Job? = null
+
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
         _uiState.value = MatchObjectUiState.LoadingPhoto
         viewModelScope.launch {
             val bitmap = withContext(backgroundDispatcher) { decodeBitmap(contentResolver, uri) }
-            extractAndSaveResult(bitmap)
+            extractResult(bitmap)
         }
     }
 
-    private fun extractAndSaveResult(bitmap: Bitmap) {
+    /** Shows the result without saving it: only [save] writes it to History. */
+    private fun extractResult(bitmap: Bitmap) {
         _uiState.value = MatchObjectUiState.ExtractingColors
         viewModelScope.launch {
             val extractedCandidates = withContext(backgroundDispatcher) {
                 ColorExtractor.extractCandidates(pixelSourceOf(bitmap))
             }
             candidates = extractedCandidates.map { it.argb }
-            val mainColorArgb = candidates.first()
             val defaults = settingsRepository.observeDefaults().first()
-            val chipColors = ColorExtractor.selectTopColors(candidates)
-            val thumbnailPath = thumbnailStore.save(bitmap)
-            val entry = historyRepository.saveObjectResult(
-                thumbnailPath = thumbnailPath,
-                inputColorsArgb = listOf(mainColorArgb),
-                wheel = defaults.wheel,
-                balance = defaults.balance,
-                chipColorsArgb = chipColors,
-            )
             _uiState.value = MatchObjectUiState.ShowingResult(
                 photo = bitmap,
-                inputColorArgb = entry.inputColorsArgb.first(),
-                chipColorsArgb = chipColors,
-                wheel = entry.wheel ?: defaults.wheel,
-                balance = entry.balance ?: defaults.balance,
-                historyEntryId = entry.id,
+                inputColorArgb = candidates.first(),
+                chipColorsArgb = ColorExtractor.selectTopColors(candidates),
+                wheel = defaults.wheel,
+                balance = defaults.balance,
             )
         }
     }
 
-    /** Back to the viewfinder for the next item; the saved entry stays. */
-    fun startNewPhoto() {
+    /** Back to the viewfinder, discarding the unsaved result. */
+    fun retakePhoto() {
         if (_uiState.value !is MatchObjectUiState.ShowingResult) return
         candidates = emptyList()
         _uiState.value = MatchObjectUiState.PickingPhoto
@@ -104,14 +97,24 @@ class MatchObjectViewModel(
     fun pickCandidate(argb: Int) {
         val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
         if (argb == state.inputColorArgb) return
-        applyPick(state, argb)
+        _uiState.value = state.copy(inputColorArgb = argb)
     }
 
-    private fun applyPick(state: MatchObjectUiState.ShowingResult, argb: Int) {
-        _uiState.value = state.copy(
-            inputColorArgb = argb,
-        )
-        viewModelScope.launch { historyRepository.updateObjectPick(state.historyEntryId, argb, sampleX = null, sampleY = null) }
+    /** Saves the shown result to History under [name], then moves to [MatchObjectUiState.Saved]. */
+    fun save(name: String) {
+        val state = _uiState.value as? MatchObjectUiState.ShowingResult ?: return
+        if (saveJob?.isActive == true) return
+        saveJob = viewModelScope.launch {
+            historyRepository.saveObjectResult(
+                thumbnailPath = thumbnailStore.save(state.photo),
+                inputColorsArgb = listOf(state.inputColorArgb),
+                wheel = state.wheel,
+                balance = state.balance,
+                chipColorsArgb = state.chipColorsArgb,
+                name = name,
+            )
+            _uiState.value = MatchObjectUiState.Saved
+        }
     }
 
     companion object {

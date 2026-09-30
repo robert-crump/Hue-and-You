@@ -347,6 +347,7 @@ class HistoryDetailViewModelTest {
             profile: Profile?,
             score: PaletteScore,
             chipColorsArgb: List<Int>,
+            name: String,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun saveObjectResult(
@@ -355,6 +356,7 @@ class HistoryDetailViewModelTest {
             wheel: HarmonyWheel,
             balance: HarmonyBalance,
             chipColorsArgb: List<Int>,
+            name: String,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun renameEntry(entryId: Long, name: String) {

@@ -247,6 +247,7 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         profile: Profile?,
         score: PaletteScore,
         chipColorsArgb: List<Int>,
+        name: String,
     ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
     override suspend fun saveObjectResult(
@@ -255,6 +256,7 @@ private class FakeHistoryRepository(vararg initialEntries: HistoryEntry) : Histo
         wheel: HarmonyWheel,
         balance: HarmonyBalance,
         chipColorsArgb: List<Int>,
+        name: String,
     ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
     override suspend fun renameEntry(entryId: Long, name: String) {

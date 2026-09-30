@@ -23,6 +23,7 @@ import com.example.hueandyou.data.settings.SettingsRepository
 import com.example.hueandyou.ui.common.toPixelSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,6 +65,8 @@ class RateClothingViewModel(
     /** Every candidate color from the current photo's center-box extraction, ranked by share. */
     private var candidates: List<Int> = emptyList()
 
+    private var saveJob: Job? = null
+
     init {
         viewModelScope.launch {
             profiles = profileRepository.observeProfiles().first()
@@ -84,21 +87,19 @@ class RateClothingViewModel(
         selectedProfile = profile
         val score = scoreFor(state.argb, profile)
         _uiState.value = state.copy(score = score, selectedProfile = profile)
-        viewModelScope.launch {
-            settingsRepository.setLastUsedClothingProfileId(profile.id)
-            historyRepository.updateClothingProfile(state.historyEntryId, profile, score)
-        }
+        viewModelScope.launch { settingsRepository.setLastUsedClothingProfileId(profile.id) }
     }
 
     fun onPhotoPicked(contentResolver: ContentResolver, uri: Uri) {
         _uiState.value = RateClothingUiState.LoadingPhoto
         viewModelScope.launch {
             val bitmap = withContext(backgroundDispatcher) { decodeBitmap(contentResolver, uri) }
-            extractAndSaveResult(bitmap)
+            extractResult(bitmap)
         }
     }
 
-    private fun extractAndSaveResult(bitmap: Bitmap) {
+    /** Shows the result without saving it: only [save] writes it to History. */
+    private fun extractResult(bitmap: Bitmap) {
         _uiState.value = RateClothingUiState.ExtractingColors
         viewModelScope.launch {
             val extractedCandidates = withContext(backgroundDispatcher) {
@@ -107,30 +108,19 @@ class RateClothingViewModel(
             candidates = extractedCandidates.map { it.argb }
             val argb = candidates.first()
             val profile = selectedProfile
-            val score = scoreFor(argb, profile)
-            val chipColors = ColorExtractor.selectTopColors(candidates)
-            val thumbnailPath = thumbnailStore.save(bitmap)
-            val entry = historyRepository.saveClothingResult(
-                thumbnailPath = thumbnailPath,
-                calibratedArgb = argb,
-                profile = profile,
-                score = score,
-                chipColorsArgb = chipColors,
-            )
             _uiState.value = RateClothingUiState.ShowingResult(
                 photo = bitmap,
                 argb = argb,
-                chipColorsArgb = chipColors,
-                score = score,
-                historyEntryId = entry.id,
+                chipColorsArgb = ColorExtractor.selectTopColors(candidates),
+                score = scoreFor(argb, profile),
                 profiles = profiles,
                 selectedProfile = profile,
             )
         }
     }
 
-    /** Back to the viewfinder for the next item; the saved entry stays and the profile is kept. */
-    fun startNewPhoto() {
+    /** Back to the viewfinder, discarding the unsaved result; the profile is kept. */
+    fun retakePhoto() {
         if (_uiState.value !is RateClothingUiState.ShowingResult) return
         candidates = emptyList()
         _uiState.value = RateClothingUiState.PickingPhoto
@@ -140,17 +130,23 @@ class RateClothingViewModel(
     fun pickCandidate(argb: Int) {
         val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
         if (argb == state.argb) return
-        applyPick(state, argb)
+        _uiState.value = state.copy(argb = argb, score = scoreFor(argb, selectedProfile))
     }
 
-    private fun applyPick(state: RateClothingUiState.ShowingResult, argb: Int) {
-        val score = scoreFor(argb, selectedProfile)
-        _uiState.value = state.copy(
-            argb = argb,
-            score = score,
-        )
-        viewModelScope.launch {
-            historyRepository.updateClothingPick(state.historyEntryId, argb, score, sampleX = null, sampleY = null)
+    /** Saves the shown result to History under [name], then moves to [RateClothingUiState.Saved]. */
+    fun save(name: String) {
+        val state = _uiState.value as? RateClothingUiState.ShowingResult ?: return
+        if (saveJob?.isActive == true) return
+        saveJob = viewModelScope.launch {
+            historyRepository.saveClothingResult(
+                thumbnailPath = thumbnailStore.save(state.photo),
+                calibratedArgb = state.argb,
+                profile = state.selectedProfile,
+                score = state.score,
+                chipColorsArgb = state.chipColorsArgb,
+                name = name,
+            )
+            _uiState.value = RateClothingUiState.Saved
         }
     }
 

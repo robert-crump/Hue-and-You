@@ -77,35 +77,55 @@ class RateClothingViewModelTest {
         // No selection step: init lands straight on PickingPhoto.
         assertEquals(RateClothingUiState.PickingPhoto, model.uiState.value)
 
-        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
 
         val state = model.uiState.value as RateClothingUiState.ShowingResult
         assertEquals(profileB, state.selectedProfile)
-        assertEquals(profileB, historyRepository.savedProfile)
-        assertEquals(state.chipColorsArgb, historyRepository.savedChipColors)
     }
 
     @Test
-    fun startNewPhoto_returnsToViewfinderKeepingProfile_andNextResultIsANewEntry() {
+    fun save_persistsTheShownResultUnderTheGivenName_thenReportsSaved() {
+        val profileA = profile(1L, "Autumn", 0xFFFF0000.toInt(), 0xFF00FF00.toInt())
+        val historyRepository = FakeHistoryRepository()
+        val model = viewModel(listOf(profileA), lastUsedClothingProfileId = 1L, historyRepository = historyRepository)
+        mainDispatcher.scheduler.runCurrent()
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        mainDispatcher.scheduler.runCurrent()
+        val state = model.uiState.value as RateClothingUiState.ShowingResult
+        // Only the tick saves.
+        assertNull(historyRepository.savedProfile)
+
+        model.save("Red Scarf")
+        mainDispatcher.scheduler.runCurrent()
+
+        assertEquals(profileA, historyRepository.savedProfile)
+        assertEquals(state.score, historyRepository.savedScore)
+        assertEquals(state.chipColorsArgb, historyRepository.savedChipColors)
+        assertEquals("Red Scarf", historyRepository.savedName)
+        assertEquals(RateClothingUiState.Saved, model.uiState.value)
+    }
+
+    @Test
+    fun retakePhoto_returnsToViewfinderKeepingProfile_withoutSaving() {
         val profileA = profile(1L, "Autumn", 0xFFFF0000.toInt(), 0xFF00FF00.toInt())
         val profileB = profile(2L, "Winter", 0xFF0000FF.toInt(), 0xFFFFFF00.toInt())
         val historyRepository = FakeHistoryRepository()
         val model = viewModel(listOf(profileA, profileB), lastUsedClothingProfileId = 1L, historyRepository = historyRepository)
         mainDispatcher.scheduler.runCurrent()
-        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
         model.switchProfile(profileB)
         mainDispatcher.scheduler.runCurrent()
 
-        model.startNewPhoto()
+        model.retakePhoto()
         assertEquals(RateClothingUiState.PickingPhoto, model.uiState.value)
 
-        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
         val state = model.uiState.value as RateClothingUiState.ShowingResult
         assertEquals(profileB, state.selectedProfile)
-        assertEquals(profileB, historyRepository.savedProfile)
+        assertNull(historyRepository.savedProfile)
     }
 
     @Test
@@ -115,7 +135,7 @@ class RateClothingViewModelTest {
         val model = viewModel(listOf(profileA, profileB), lastUsedClothingProfileId = 999L)
         mainDispatcher.scheduler.runCurrent()
 
-        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
 
         val state = model.uiState.value as RateClothingUiState.ShowingResult
@@ -128,7 +148,7 @@ class RateClothingViewModelTest {
         val model = viewModel(listOf(profileA), lastUsedClothingProfileId = null)
         mainDispatcher.scheduler.runCurrent()
 
-        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
 
         val state = model.uiState.value as RateClothingUiState.ShowingResult
@@ -137,7 +157,7 @@ class RateClothingViewModelTest {
     }
 
     @Test
-    fun switchProfile_rescoresUpdatesTheHistoryEntryAndRemembersTheChoice() {
+    fun switchProfile_rescoresAndRemembersTheChoice() {
         val profileA = profile(1L, "Autumn", 0xFFFF0000.toInt(), 0xFF00FF00.toInt())
         val profileB = profile(2L, "Winter", 0xFF0000FF.toInt(), 0xFFFFFF00.toInt())
         val historyRepository = FakeHistoryRepository()
@@ -149,7 +169,7 @@ class RateClothingViewModelTest {
             settingsRepository = settingsRepository,
         )
         mainDispatcher.scheduler.runCurrent()
-        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
         val initial = model.uiState.value as RateClothingUiState.ShowingResult
         assertEquals(profileA, initial.selectedProfile)
@@ -165,11 +185,10 @@ class RateClothingViewModelTest {
             avoidColors = profileB.avoidColors.map { it.argb },
         )
         assertEquals(expectedScore, afterSwitch.score)
-        assertEquals(initial.historyEntryId, afterSwitch.historyEntryId)
 
         mainDispatcher.scheduler.runCurrent()
         assertEquals(listOf(2L), settingsRepository.setCalls)
-        assertEquals(Triple(initial.historyEntryId, profileB, expectedScore), historyRepository.lastProfileUpdate)
+        assertNull(historyRepository.savedProfile)
     }
 
     @Test
@@ -185,14 +204,13 @@ class RateClothingViewModelTest {
             settingsRepository = settingsRepository,
         )
         mainDispatcher.scheduler.runCurrent()
-        invokeExtractAndSaveResult(model, allocateWithoutConstructor(Bitmap::class.java))
+        invokeExtractResult(model, allocateWithoutConstructor(Bitmap::class.java))
         mainDispatcher.scheduler.runCurrent()
 
         model.switchProfile(profileA)
         mainDispatcher.scheduler.runCurrent()
 
         assertEquals(emptyList<Long>(), settingsRepository.setCalls)
-        assertNull(historyRepository.lastProfileUpdate)
     }
 
     private fun redPixelSource(): IntArrayPixelSource {
@@ -200,9 +218,9 @@ class RateClothingViewModelTest {
         return IntArrayPixelSource(size, size, IntArray(size * size) { 0xFFFF0000.toInt() })
     }
 
-    private fun invokeExtractAndSaveResult(viewModel: RateClothingViewModel, bitmap: Bitmap) {
+    private fun invokeExtractResult(viewModel: RateClothingViewModel, bitmap: Bitmap) {
         val method: Method = RateClothingViewModel::class.java.getDeclaredMethod(
-            "extractAndSaveResult",
+            "extractResult",
             Bitmap::class.java,
         )
         method.isAccessible = true
@@ -267,8 +285,9 @@ class RateClothingViewModelTest {
 
     private class FakeHistoryRepository : HistoryRepository {
         var savedProfile: Profile? = null
+        var savedScore: PaletteScore? = null
         var savedChipColors: List<Int>? = null
-        var lastProfileUpdate: Triple<Long, Profile, PaletteScore>? = null
+        var savedName: String? = null
 
         override fun observeEntries() = throw UnsupportedOperationException("not used by this test")
         override fun observeEntry(entryId: Long) = throw UnsupportedOperationException("not used by this test")
@@ -279,13 +298,16 @@ class RateClothingViewModelTest {
             profile: Profile?,
             score: PaletteScore,
             chipColorsArgb: List<Int>,
+            name: String,
         ): HistoryEntry {
             savedProfile = profile
+            savedScore = score
             savedChipColors = chipColorsArgb
+            savedName = name
             return HistoryEntry(
                 id = 1L,
                 type = HistoryEntryType.CLOTHING,
-                name = "Clothing",
+                name = name,
                 createdAt = 0L,
                 thumbnailPath = thumbnailPath,
                 calibratedArgb = calibratedArgb,
@@ -303,6 +325,7 @@ class RateClothingViewModelTest {
             wheel: HarmonyWheel,
             balance: HarmonyBalance,
             chipColorsArgb: List<Int>,
+            name: String,
         ): HistoryEntry = throw UnsupportedOperationException("not used by this test")
 
         override suspend fun renameEntry(entryId: Long, name: String) {
@@ -324,7 +347,7 @@ class RateClothingViewModelTest {
         }
 
         override suspend fun updateClothingProfile(entryId: Long, profile: Profile, score: PaletteScore) {
-            lastProfileUpdate = Triple(entryId, profile, score)
+            throw UnsupportedOperationException("not used by this test")
         }
 
         override suspend fun updateChipColors(entryId: Long, chipColorsArgb: List<Int>) {

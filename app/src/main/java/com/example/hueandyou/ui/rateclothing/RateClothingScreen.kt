@@ -13,8 +13,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -28,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,12 +41,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.PaletteScore
+import com.example.hueandyou.data.history.HistoryEntryType
+import com.example.hueandyou.data.history.defaultHistoryEntryName
 import com.example.hueandyou.data.profile.Profile
 import com.example.hueandyou.ui.common.CameraCaptureStep
 import com.example.hueandyou.ui.common.ColorChipRow
 import com.example.hueandyou.ui.common.InfoDialog
 import com.example.hueandyou.ui.common.PaletteResultBody
 import com.example.hueandyou.ui.common.PhotoResultSection
+import com.example.hueandyou.ui.common.ResultNameDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,51 +62,54 @@ fun RateClothingScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showDisclaimer by remember { mutableStateOf(false) }
+    var showNameDialog by remember { mutableStateOf(false) }
     val showingResult = uiState is RateClothingUiState.ShowingResult
 
-    // On the finished result the checkmark replaces the back arrow; system back behaves the same.
-    BackHandler(enabled = showingResult, onBack = onFinished)
+    LaunchedEffect(uiState) {
+        if (uiState is RateClothingUiState.Saved) onFinished()
+    }
+
+    // On the unsaved result, back returns to the viewfinder and discards the photo.
+    BackHandler(enabled = showingResult, onBack = viewModel::retakePhoto)
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.rate_clothing_title)) },
                 navigationIcon = {
-                    if (!showingResult) {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.navigate_back)
+                    IconButton(onClick = { if (showingResult) viewModel.retakePhoto() else onNavigateBack() }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(
+                                if (showingResult) R.string.result_retake_content_description else R.string.navigate_back
                             )
-                        }
+                        )
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showDisclaimer = true }) {
-                        Icon(
-                            Icons.Filled.Info,
-                            contentDescription = stringResource(R.string.harmony_disclaimer_content_description)
-                        )
-                    }
                     if (showingResult) {
-                        IconButton(onClick = onFinished) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(R.string.result_discard_content_description)
+                            )
+                        }
+                        IconButton(onClick = { showNameDialog = true }) {
                             Icon(
                                 Icons.Filled.Check,
                                 contentDescription = stringResource(R.string.result_done_content_description)
                             )
                         }
+                    } else {
+                        IconButton(onClick = { showDisclaimer = true }) {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = stringResource(R.string.harmony_disclaimer_content_description)
+                            )
+                        }
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            if (showingResult) {
-                ExtendedFloatingActionButton(
-                    onClick = viewModel::startNewPhoto,
-                    icon = { Icon(Icons.Filled.PhotoCamera, contentDescription = null) },
-                    text = { Text(stringResource(R.string.result_new_photo)) },
-                )
-            }
         }
     ) { innerPadding ->
         Box(
@@ -122,6 +128,7 @@ fun RateClothingScreen(
                 )
                 is RateClothingUiState.LoadingPhoto -> LoadingStep()
                 is RateClothingUiState.ExtractingColors -> LoadingStep()
+                is RateClothingUiState.Saved -> Unit
                 is RateClothingUiState.ShowingResult -> ResultStep(
                     photo = state.photo,
                     argb = state.argb,
@@ -133,6 +140,18 @@ fun RateClothingScreen(
                     onSwitchProfile = viewModel::switchProfile,
                 )
             }
+        }
+
+        if (showNameDialog && showingResult) {
+            ResultNameDialog(
+                title = stringResource(R.string.result_name_dialog_title_clothing),
+                defaultName = defaultHistoryEntryName(HistoryEntryType.CLOTHING),
+                onSave = { name ->
+                    showNameDialog = false
+                    viewModel.save(name)
+                },
+                onDismiss = { showNameDialog = false },
+            )
         }
 
         if (showDisclaimer) {
@@ -171,11 +190,8 @@ private fun LoadingStep() {
     }
 }
 
-/** Aligns content with the app bar's back arrow on the left and info icon on the right. */
+/** Aligns content with the app bar's back arrow on the left and tick on the right. */
 private val RESULT_HORIZONTAL_PADDING = 16.dp
-
-/** Clears the extended "New photo" FAB (56dp tall + 16dp margin) so it never covers the result. */
-private val RESULT_BOTTOM_PADDING = 88.dp
 
 @Composable
 private fun ResultStep(
@@ -191,7 +207,7 @@ private fun ResultStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(start = RESULT_HORIZONTAL_PADDING, end = RESULT_HORIZONTAL_PADDING, top = 16.dp, bottom = RESULT_BOTTOM_PADDING),
+            .padding(horizontal = RESULT_HORIZONTAL_PADDING, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         PhotoResultSection(

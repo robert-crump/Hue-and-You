@@ -18,9 +18,11 @@ sealed interface RateClothingUiState {
         /** The fixed top-3 chip row; only the highlight moves when a pick changes. */
         val chipColorsArgb: List<Int>,
         val score: PaletteScore,
-        val historyEntryId: Long,
         /** Every profile, for the "For: <name>" switcher; the "For:" line is hidden below 2. */
         val profiles: List<Profile>,
         val selectedProfile: Profile?,
     ) : RateClothingUiState
+
+    /** The result was saved to History; the screen closes. */
+    data object Saved : RateClothingUiState
 }
