@@ -1,5 +1,48 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-09-30 - Issue #41: Camera pinch to zoom
+
+Grilled with the user, spec written into the issue. The shared `CameraViewfinder` (so Rate
+Clothing, Match Object and Find my season) zooms with `cameraControl.setZoomRatio`, so the capture
+and its center box match the preview. New `ui/common/CameraZoom.kt`: pure `nextZoomRatio(current,
+scale, max)` (clamped to 1x..`maxZoomRatio`, uncapped, never below 1x even with an ultra-wide) and
+`Modifier.pinchToZoom`, which watches the Initial pass on the viewfinder Box: once a second finger
+lands the gesture is consumed before the WB/exposure sliders see it (and stays consumed after one
+finger lifts), while one-finger drags pass through. Zoom resets to 1x on every bind (lens switch,
+new screen, retake). No reset gesture. A "2.3×" chip in the hint's style (`viewfinderLabel`) sits
+above the shutter while pinching and fades 1s after release (`zoomActivity` counter re-triggers
+it); it is a polite live region. TalkBack: the preview is a "Camera preview" node with custom
+actions Zoom in / Zoom out (×1.5 / ÷1.5, same clamps).
+
+Test: `CameraZoomTest` (multiply, 1x floor, device max, max below 1x, action round trip).
+`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint: same
+15 warnings); gesture, chip and slider handoff not tried on a device.
+
+## 2026-09-29 - Polish batch: History rows, chip highlight, Find my season, new-profile pulse
+
+Grilled and agreed with the user, one commit each:
+- History rows: names no longer bold; the Object harmony-suggestion row is gone, so both types are
+  name + timestamp at the same height; the clothing verdict is a bare 24dp icon tinted
+  `verdictAccentColor` (success content / error / onSurfaceVariant) instead of the filled badge.
+- History detail chip highlight: the chips were re-extracted from the downscaled JPEG thumbnail,
+  so they never exactly equalled `calibratedArgb`. Entries now store `chipColorsArgb` at save time
+  (Room v4->v5, `MIGRATION_4_5`, column default `''`; optional `chipColors` in the backup JSON,
+  schema version unchanged). Older entries backfill once on open: re-extract, then
+  `ColorExtractor.snapChipsTo` replaces the nearest chip within `CHIP_SNAP_MAX_DELTA_E` (8) with
+  the saved color, and the result is persisted.
+- Find my season result: "CREATE" is a `TextButton` in the app bar; scroll stays as a fallback.
+- Profile names (season dialog, Profile editor) and the History rename bar use
+  `KeyboardCapitalization.Words` (keyboard hint only, not enforced).
+- New profiles pulse in Settings: `ProfileRepository.newProfileId` is a one-shot set by
+  `createProfile` (all three creation flows). Settings waits for RESUMED (so it doesn't fire under
+  the transition to the editor), scrolls the row into view, fades it surfaceContainer ->
+  primaryContainer 3x (300ms each way), then consumes the id.
+- Dropped: skipping the photo picker's "1 / Preview / Done" bar. That bar is the system picker's
+  own single-select UI (`PickVisualMedia` already sends a plain single-select `ACTION_PICK_IMAGES`),
+  and the alternatives (DocumentsUI, in-app gallery with READ_MEDIA_IMAGES) were judged worse.
+
+Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`, not on a device.
+
 ## 2026-09-29 - UI polish: profile preview, season result, History rows (no issue; grill-me session)
 
 Profile preview (Settings `ProfileRow`): the 4 dots were `bestColors.take(4)`, i.e. the Neutrals of
@@ -83,91 +126,3 @@ constants): warm/cool hue arcs for chroma >= 12, Light tone >= 40, Deep Mid-tone
 and Darks <= 22, Bright Mid-tones/Accents chroma >= 45 (sRGB caps turquoise near 50), Soft chroma
 <= 40, Lights tone >= 70 and Darks <= 50 everywhere. Owner approved the private review page
 (https://claude.ai/artifact/VeJmynxtsKVWtWgY8NsPfS). `./gradlew :colorspace:test` passes.
-
-## 2026-09-28 - Issue #39: Add profile chooser bottom sheet
-
-Settings -> Profiles "Add profile" now opens a `ModalBottomSheet` ("New profile") with two rows:
-"Import color palette" (opens `PaletteImport` in new-profile mode) and "Choose custom colors" (the
-old behavior: create a default-named profile and open its editor). The "Find my season" row is
-omitted until #35 ships. The sheet hides before running the chosen action.
-
-New-profile mode: the `PaletteImport` route is now `palette_import?profileId={profileId}` with a
-`-1` default meaning "no profile"; `PaletteImportViewModel` takes `profileId: Long?` plus the
-default profile name. With no profile, review uses the full 25 slots and `confirmImport` creates
-the profile only then (so backing out creates nothing). Confirm moves to a new `Saving` state first
-so a double tap can't create two profiles; `Done` now carries the target profile id. The NavHost
-pops back for an existing profile, or navigates to the new profile's editor with `popUpTo` the
-import screen (inclusive) so back returns to Settings. The review button reads "Create profile"
-in new-profile mode. The review-start logic was split into `@VisibleForTesting startReview` so
-tests can skip the Bitmap/marking steps.
-
-Test: new `PaletteImportViewModelTest` covers full slots, nothing created without confirm, confirm
-creating exactly one profile with the selected Best/Avoid colors, double confirm, and existing-profile
-import. `./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass; not
-tried on a device.
-
-## 2026-09-27 - Issue #34: History rows - color summary line, long-press multiselect
-
-Each History row gets a bodySmall summary line between the name and the date. Clothing:
-`chosen | verdict`, verdict text colored by a new `SuccessColors.content` token (on-surface green;
-`onContainer` was only legible on the green card), `error` for Avoid, `onSurfaceVariant` for
-Ambiguous. Object: `chosen | complementary | analogous | tonal`, recomputed via
-`HarmonyEngine.generate` from the entry's stored wheel/balance, Tonal only for a neutral color
-(same rule as `HarmonyResultBody`). Circles are 12dp with a 1dp `outlineVariant` ring and are
-drawn as plain Boxes, not `ColorCircle`, because that one always consumes click/long-press
-(hex copy) and would steal the row's gestures. Object entries always have wheel/balance (detail
-already `requireNotNull`s them), so a null just shows the chosen circle alone rather than
-reading Settings defaults.
-
-Trash icon removed in favor of Velometrics' Home selection pattern: long-press enters selection
-mode, tap toggles, 0 selected stays in the mode with delete disabled. The contextual bar
-(`X | N selected | delete`) is drawn by the NavHost (it owns the tab top bar), so `HistoryScreen`
-reports `HistorySelectionBarState` up via `onSelectionChange`, like snackbar height. FAB is hidden
-during selection; any bottom-nav tap, back or X exits. Selected rows get a `secondaryContainer`
-tint and a check badge on the thumbnail. No confirm dialog: the undo snackbar was generalized
-from one entry to a batch (`PendingDeletion.entryIds`, name only for a single entry, plural
-"Deleted N entries" otherwise); a second delete takes over the snackbar while the earlier batch
-finalizes on its own timer.
-
-Test: `HistoryViewModelTest` now covers enter/toggle/exit selection, toggle-outside-mode no-op,
-batch delete hide + exit selection, single-entry name, batch undo, batch finalize, and a second
-delete replacing the undo target. `./gradlew :colorspace:test :app:testDebugUnitTest
-assembleDebug lintDebug` all pass.
-
-## 2026-09-27 - Issue #33: History detail - rename in the app bar, no scrolling
-
-History detail's app bar title is now the entry name (1 line, ellipsis) with a pencil next to the
-info icon; the "Name" text field and the fixed "Result" title (`history_entry_name_label`,
-`history_detail_title`) are gone. The pencil swaps in `RenameTopBar`: X / an in-place
-`BasicTextField` (`titleLarge`, primary underline, focused with the whole name selected) / tick.
-Tick and IME Done save once; X and system back (`BackHandler`) discard. The tick is disabled while
-the draft is blank. Draft + mode live in `rememberSaveable`. `HistoryDetailViewModel.rename` now
-trims and ignores blank names (it no longer runs per keystroke). The body uses the live result
-layout (photo `weight(1f)`, `maxHeightFraction = 1f`, no `verticalScroll`). Landscape/short screens
-are split out to #36. Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`,
-not on a device.
-
-## 2026-09-29 - Polish batch: History rows, chip highlight, Find my season, new-profile pulse
-
-Grilled and agreed with the user, one commit each:
-- History rows: names no longer bold; the Object harmony-suggestion row is gone, so both types are
-  name + timestamp at the same height; the clothing verdict is a bare 24dp icon tinted
-  `verdictAccentColor` (success content / error / onSurfaceVariant) instead of the filled badge.
-- History detail chip highlight: the chips were re-extracted from the downscaled JPEG thumbnail,
-  so they never exactly equalled `calibratedArgb`. Entries now store `chipColorsArgb` at save time
-  (Room v4->v5, `MIGRATION_4_5`, column default `''`; optional `chipColors` in the backup JSON,
-  schema version unchanged). Older entries backfill once on open: re-extract, then
-  `ColorExtractor.snapChipsTo` replaces the nearest chip within `CHIP_SNAP_MAX_DELTA_E` (8) with
-  the saved color, and the result is persisted.
-- Find my season result: "CREATE" is a `TextButton` in the app bar; scroll stays as a fallback.
-- Profile names (season dialog, Profile editor) and the History rename bar use
-  `KeyboardCapitalization.Words` (keyboard hint only, not enforced).
-- New profiles pulse in Settings: `ProfileRepository.newProfileId` is a one-shot set by
-  `createProfile` (all three creation flows). Settings waits for RESUMED (so it doesn't fire under
-  the transition to the editor), scrolls the row into view, fades it surfaceContainer ->
-  primaryContainer 3x (300ms each way), then consumes the id.
-- Dropped: skipping the photo picker's "1 / Preview / Done" bar. That bar is the system picker's
-  own single-select UI (`PickVisualMedia` already sends a plain single-select `ACTION_PICK_IMAGES`),
-  and the alternatives (DocumentsUI, in-app gallery with READ_MEDIA_IMAGES) were judged worse.
-
-Verified by `:colorspace:test :app:testDebugUnitTest assembleDebug lintDebug`, not on a device.

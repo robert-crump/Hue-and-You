@@ -207,4 +207,8 @@
     <string name="camera_switch_content_description">Switch camera</string>
     <string name="camera_permission_denied_message">Camera access was denied. You can still pick a photo from your gallery, or turn on Camera access in Settings to use the viewfinder.</string>
     <string name="camera_open_settings">Open Settings</string>
+    <string name="camera_preview_content_description">Camera preview</string>
+    <string name="camera_zoom_in">Zoom in</string>
+    <string name="camera_zoom_out">Zoom out</string>
+    <string name="camera_zoom_ratio">%1$.1f×</string>
 </resources>

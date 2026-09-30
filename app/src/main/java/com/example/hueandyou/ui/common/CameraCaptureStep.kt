@@ -16,6 +16,9 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +55,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -60,10 +70,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.hueandyou.R
 import com.example.hueandyou.colorspace.CalibrationConfig
 import java.io.File
+import kotlinx.coroutines.delay
 
 private val SHUTTER_BOTTOM_PADDING = 32.dp
 /** Centers the 48dp gallery and lens buttons on the 96dp shutter. */
 private val SIDE_BUTTON_BOTTOM_PADDING = SHUTTER_BOTTOM_PADDING + 24.dp
+/** Just above the 96dp shutter. */
+private val ZOOM_CHIP_BOTTOM_PADDING = SHUTTER_BOTTOM_PADDING + 96.dp + 16.dp
+/** How long the zoom chip stays after the fingers lift, before it fades out. */
+private const val ZOOM_CHIP_LINGER_MILLIS = 1_000L
 
 /**
  * Home screen for both photo flows: an in-app CameraX viewfinder with a shutter and a gallery
@@ -141,6 +156,11 @@ private fun CameraViewfinder(
     var camera by remember { mutableStateOf<Camera?>(null) }
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     val lensFacing = CameraLensSession.lensFacing
+    var zoomRatio by remember { mutableFloatStateOf(MIN_ZOOM_RATIO) }
+    var isPinching by remember { mutableStateOf(false) }
+    var showZoomChip by remember { mutableStateOf(false) }
+    // Bumped on every zoom request, so the chip reappears (and TalkBack reads it) even at a clamp.
+    var zoomActivity by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         val future = ProcessCameraProvider.getInstance(context)
@@ -157,11 +177,53 @@ private fun CameraViewfinder(
         // A lens remembered from another screen may be missing here; fall back to whatever exists.
         val usable = if (provider.hasCamera(selector)) selector else CameraSelector.DEFAULT_BACK_CAMERA
         provider.unbindAll()
-        camera = provider.bindToLifecycle(lifecycleOwner, usable, preview, imageCapture)
+        camera = provider.bindToLifecycle(lifecycleOwner, usable, preview, imageCapture).also {
+            // Zoom is per shot, so every bind (lens switch, new screen, retake) starts at 1x.
+            zoomRatio = MIN_ZOOM_RATIO
+            it.cameraControl.setZoomRatio(MIN_ZOOM_RATIO)
+        }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
-        AndroidView(modifier = Modifier.fillMaxSize(), factory = { previewView })
+    val zoomBy: (Float) -> Unit = { scale ->
+        camera?.let { boundCamera ->
+            val max = boundCamera.cameraInfo.zoomState.value?.maxZoomRatio ?: MIN_ZOOM_RATIO
+            val next = nextZoomRatio(zoomRatio, scale, max)
+            if (next != zoomRatio) {
+                zoomRatio = next
+                boundCamera.cameraControl.setZoomRatio(next)
+            }
+            zoomActivity++
+        }
+    }
+    LaunchedEffect(isPinching, zoomActivity) {
+        if (zoomActivity == 0) return@LaunchedEffect
+        showZoomChip = true
+        if (!isPinching) {
+            delay(ZOOM_CHIP_LINGER_MILLIS)
+            showZoomChip = false
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .pinchToZoom(onPinch = zoomBy, onPinchingChange = { isPinching = it }),
+    ) {
+        val previewDescription = stringResource(R.string.camera_preview_content_description)
+        val zoomInLabel = stringResource(R.string.camera_zoom_in)
+        val zoomOutLabel = stringResource(R.string.camera_zoom_out)
+        AndroidView(
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics {
+                    contentDescription = previewDescription
+                    customActions = listOf(
+                        CustomAccessibilityAction(zoomInLabel) { zoomBy(ZOOM_ACTION_STEP); true },
+                        CustomAccessibilityAction(zoomOutLabel) { zoomBy(1f / ZOOM_ACTION_STEP); true },
+                    )
+                },
+            factory = { previewView },
+        )
 
         if (showCenterBox) {
             Canvas(modifier = Modifier.fillMaxSize()) {
@@ -182,9 +244,25 @@ private fun CameraViewfinder(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = 32.dp, start = 32.dp, end = 32.dp)
-                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .viewfinderLabel(),
         )
+
+        AnimatedVisibility(
+            visible = showZoomChip,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = ZOOM_CHIP_BOTTOM_PADDING),
+        ) {
+            Text(
+                text = stringResource(R.string.camera_zoom_ratio, zoomRatio),
+                color = Color.White,
+                modifier = Modifier
+                    .viewfinderLabel()
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+            )
+        }
 
         CameraAdjustmentSliders(camera = camera, modifier = Modifier.fillMaxSize())
 
@@ -293,6 +371,11 @@ private fun CameraPermissionFallback(
         }
     }
 }
+
+/** White text backdrop shared by the hint and the zoom chip. */
+private fun Modifier.viewfinderLabel(): Modifier = this
+    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+    .padding(horizontal = 16.dp, vertical = 8.dp)
 
 private fun Context.openAppSettings() {
     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
