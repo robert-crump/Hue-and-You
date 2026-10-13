@@ -1,5 +1,17 @@
 Progress log for Hue and You. Newest entry at the top. Keep only the 5 newest entries.
 
+## 2026-10-13 - Issue #36: Result screens in landscape -> portrait only
+
+Decision: the app is locked to portrait instead of getting a landscape layout. `MainActivity` (the
+only activity) has `android:screenOrientation="portrait"`, so Rate Clothing, Match Object and History
+detail keep their non-scrolling portrait layout and never get the ~300dp landscape height. Lint's
+`LockedOrientationActivity` + `DiscouragedApi` are suppressed on that attribute (`tools:ignore`).
+Note: with targetSdk 37, Android 16+ ignores the lock on large screens (smallest width >= 600dp,
+tablets/foldables unfolded); phones stay portrait.
+
+Test: manifest-only change, no new tests. `./gradlew :colorspace:test :app:testDebugUnitTest
+assembleDebug lintDebug` all pass (lint 20, same as before the change); not tried on a device.
+
 ## 2026-09-30 - Issue #47: Complete this outfit (suggest wardrobe items)
 
 Logic (pure, `ui/outfits/OutfitSuggestion.kt`): `nextOutfitSlot(categories)` -> required Top + Bottom
@@ -111,31 +123,3 @@ Note: Tonal is never the Borderline scheme, since a near-tonal set always fits A
 Test: `OutfitHarmonyTest` (neutrals, each scheme, wrap-around at 0, borderline analogous/
 complementary, clash with/without odd one out, yellow+blue and red+green across wheels, the RYB
 wheel turning a tonal pair analogous, size limits). `./gradlew :colorspace:test` passes.
-
-## 2026-09-30 - Issue #43: Wardrobe flag and category on Clothes items
-
-Clothes entries gained `inWardrobe` (default false) and an optional `category`
-(`data/history/ClothingCategory`: TOP, BOTTOM, ONE_PIECE, OUTERWEAR, SHOES, BELT; null =
-uncategorized). Room v5->v6 `MIGRATION_5_6`: `inWardrobe INTEGER NOT NULL DEFAULT 0`,
-`category TEXT` (null). One DAO/repo write, `updateWardrobeDetails(entryId, inWardrobe, category)`.
-Backup: both live in the `clothing` object (`inWardrobe`, `category` as the enum name), optional, so
-older backups import as not owned/uncategorized; schema version unchanged; an unknown category name
-is rejected like any other unknown enum.
-
-UI: new `ui/common/WardrobeDetailsEditor` (switch row + FilterChip category chips in a FlowRow;
-tapping the selected chip clears it). `ResultNameDialog` gained an `extraContent` slot (and scrolls);
-Rate Clothing puts the editor there, fresh (off/none) each time the dialog opens, and passes both to
-`save(name, inWardrobe, category)`. History detail shows the editor under the verdict for Clothes
-entries and persists each change immediately (`setInWardrobe` / `setCategory`; no-ops for Objects).
-Clothes tab (`HistoryScreen`, CLOTHING only): `PrimaryTabRow` Items | Outfits (rememberSaveable;
-switching to Outfits leaves selection mode; a new save's scroll-to-top switches back to Items).
-Outfits is an empty state ("No outfits yet"). Items has All / Wardrobe / Not owned filter chips
-(`WardrobeFilter` in `HistoryViewModel`; changing it leaves selection mode). `HistoryUiState` has
-`hasEntries` (before the filter): no entries at all still shows the old empty state, a filter that
-matches nothing shows "No items match this filter." under the chips.
-
-Test: `Migration5To6Test`, backup round trip with both fields + old backup without them + unknown
-category, repository defaults/update, Rate Clothing save passes both, History detail set/no-op/
-object-ignored, History list filter/empty-filter/selection exit.
-`./gradlew :colorspace:test :app:testDebugUnitTest assembleDebug lintDebug` all pass (lint: same
-15 warnings); not tried on a device.
